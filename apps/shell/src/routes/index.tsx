@@ -1,12 +1,12 @@
 import { useTranslations } from "@feel-your-website/i18n-core/react";
-import { ThemeProvider } from "@puranderdua8/theme/client";
+import { Badge } from "@feel-your-website/ui";
+import { ThemeProvider } from "@feel-your-website/theme/client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { localeConfig } from "@/i18n/config";
 
 import { ThemeShowcase } from "@/components/theme-showcase";
-import { Badge } from "@/components/ui/badge";
 import { Route as RootRoute } from "./__root";
 
 export const Route = createFileRoute("/")({

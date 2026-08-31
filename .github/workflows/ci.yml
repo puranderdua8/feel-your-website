@@ -14,9 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Required to install @puranderdua8/tokens and @puranderdua8/theme
-      # from GitHub Packages.
-      packages: read
     steps:
       - uses: actions/checkout@v5
 
@@ -26,12 +23,6 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-
-      # Written to the user-level ~/.npmrc rather than the repo's .npmrc,
-      # because pnpm will not expand env vars in credentials read from a
-      # committed project file.
-      - name: Authenticate to GitHub Packages
-        run: pnpm config set "//npm.pkg.github.com/:_authToken" "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Install
         run: pnpm install --frozen-lockfile

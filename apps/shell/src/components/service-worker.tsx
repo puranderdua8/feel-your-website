@@ -1,7 +1,6 @@
 import { useTranslations } from "@feel-your-website/i18n-core/react";
+import { Button } from "@feel-your-website/ui";
 import { useCallback, useEffect, useState } from "react";
-
-import { Button } from "@/components/ui/button";
 
 /**
  * Registers the service worker and surfaces the two states a user can act on:

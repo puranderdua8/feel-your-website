@@ -1,11 +1,11 @@
-import { ThemeProvider } from "@puranderdua8/theme/client";
+import { ThemeProvider } from "@feel-your-website/theme/client";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ThemeShowcase } from "./theme-showcase";
 
 /**
- * `@puranderdua8/theme` already unit-tests that ThemeProvider resolves
+ * `@feel-your-website/theme` already unit-tests that ThemeProvider resolves
  * different tokens per theme. These tests assert the level above that: the
  * consuming app's real UI components, wired through the Tailwind preset,
  * actually pick those tokens up — and that one component definition serves
@@ -70,7 +70,7 @@ describe("theming contract", () => {
   });
 
   it("renders light and dark mode with genuinely different tokens", () => {
-    // Requires @puranderdua8/theme >= 0.3.0. Before that, resolveTheme
+    // Requires @feel-your-website/theme >= 0.3.0. Before that, resolveTheme
     // layered a theme's light tier1 onto the dark floor, so a fully
     // specified theme like `base` rendered identically in both modes.
     const { container } = render(

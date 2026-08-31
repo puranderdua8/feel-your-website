@@ -1,6 +1,5 @@
 import { useTranslations } from "@feel-your-website/i18n-core/react";
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@feel-your-website/ui";
 
 /**
  * What a guarded route renders when the permission is absent.

@@ -1,8 +1,8 @@
 import { Can } from "@feel-your-website/rbac/react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@feel-your-website/ui";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { LockedBanner } from "@/components/locked-banner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const Route = createFileRoute("/admin")({
   component: Admin,

@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { Button } from "@feel-your-website/ui";
 
-import { Button } from "@/components/ui/button";
 import { useLocaleSwitch } from "@/i18n/strategy.ui";
 
 /** Display names, in each language's own script. */

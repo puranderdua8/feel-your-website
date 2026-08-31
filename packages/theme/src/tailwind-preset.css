@@ -1,0 +1,59 @@
+/**
+ * Static Tailwind v4 theme block: tokens that never change per-brand
+ * (font fallback stacks, the radius scale's primitive names).
+ */
+@theme {
+  --font-sans-fallback:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono-fallback: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius-none: 0rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+}
+
+/**
+ * Semantic token registration — the compile-time half of the theming
+ * contract.
+ *
+ * `ThemeProvider` / `compileCssVars` inject the per-brand *values* at
+ * runtime, scoped to a `[data-theme]` element. But Tailwind v4 only
+ * *generates* a utility such as `bg-primary` if `--color-primary` is
+ * declared in `@theme` at build time. Without these declarations the
+ * utilities are never emitted at all, so every colour class in every
+ * component silently resolves to nothing — the runtime values are set
+ * correctly and then read by no one.
+ *
+ * `inline` is what makes the self-reference work: it tells Tailwind to
+ * inline the value into each utility (`background-color: var(--color-primary)`)
+ * rather than emit its own `--color-primary` declaration on `:root`. The
+ * utility therefore resolves against whichever `[data-theme]` scope it
+ * lands in, which is exactly the runtime-swappable behaviour the theme
+ * package promises.
+ *
+ * Keep this list in sync with `Tier1Schema` in @feel-your-website/tokens.
+ */
+@theme inline {
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-foreground: var(--color-destructive-foreground);
+  --color-border: var(--color-border);
+  --color-ring: var(--color-ring);
+
+  --radius: var(--radius);
+  --font-sans: var(--font-sans), var(--font-sans-fallback);
+  --font-mono: var(--font-mono), var(--font-mono-fallback);
+}

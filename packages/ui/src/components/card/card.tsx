@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils.js";
 
 /**
  * NOTE: intentionally minimal placeholder stub for the Phase 0 registry

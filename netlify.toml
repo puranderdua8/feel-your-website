@@ -7,22 +7,7 @@
   base = "/"
   publish = "apps/shell/dist/client"
 
-  # The `pnpm config set` prefix is not optional.
-  #
-  # @puranderdua8/tokens and @puranderdua8/theme come from GitHub Packages,
-  # and the committed .npmrc deliberately carries no token — pnpm refuses to
-  # expand environment variables in credentials read from a project-level
-  # .npmrc, since that file could otherwise exfiltrate the token to a
-  # malicious registry entry. Writing it to the user-level npmrc first is
-  # what makes the install work.
-  #
-  # Granting the packages Actions access (as CI uses) does not help here:
-  # that applies to GitHub Actions' own GITHUB_TOKEN, and Netlify is a third
-  # party with no such credential.
-  command = """
-    pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_PACKAGES_TOKEN" && \
-    pnpm turbo run build --filter=@feel-your-website/shell...
-  """
+  command = "pnpm turbo run build --filter=@feel-your-website/shell..."
 
 [build.environment]
   NODE_VERSION = "22.13.0"

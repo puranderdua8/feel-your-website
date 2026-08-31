@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
  * plugins (like `@vitejs/plugin-react`).
  *
  * Plain JS (not .ts): Vite's config-file loader leaves bare-specifier
- * imports (like `@puranderdua8/config/vitest/base`) unbundled, so Node
+ * imports (like `@feel-your-website/config/vitest/base`) unbundled, so Node
  * resolves this file directly at config-load time — a `.ts` file there
  * fails with ERR_UNKNOWN_FILE_EXTENSION since nothing transforms it first.
  *

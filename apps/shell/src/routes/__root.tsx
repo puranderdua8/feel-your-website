@@ -1,4 +1,4 @@
-import { ThemeProvider } from "@puranderdua8/theme/client";
+import { ThemeProvider } from "@feel-your-website/theme/client";
 import { I18nProvider } from "@feel-your-website/i18n-core/react";
 import { PermissionsProvider } from "@feel-your-website/rbac/react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";

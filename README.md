@@ -18,8 +18,8 @@ Products are built by cloning this repo, not by installing it.
 | App framework | TanStack Start (React 19, Vite 8)                                              |
 | Hosting       | Netlify — TanStack Start's official deployment partner                         |
 | Backend       | Supabase — Postgres, Auth, Storage, Realtime                                   |
-| Styling       | Tailwind v4 + `@puranderdua8/theme`                                            |
-| Components    | `@puranderdua8/registry` via `npx shadcn add` (source, not a package)          |
+| Styling       | Tailwind v4 + `@feel-your-website/theme` (in-repo)                             |
+| Components    | `@feel-your-website/ui` (in-repo)                                              |
 | i18n          | `use-intl`, with all copy served from the CMS                                  |
 | IaC           | Terraform (Supabase project, Netlify site) + Supabase CLI (schema, RLS, hooks) |
 
@@ -146,6 +146,9 @@ apps/
   cms/       authoring — content, roles, route bundles, wizard configs
   demo/      proving app: exercises all three mechanisms end to end
 packages/
+  tokens/                   design tokens (primitive → semantic → extended)
+  theme/                    theme resolution, CSS vars, ThemeProvider, Tailwind preset
+  ui/                       the component library
   rbac/                     permission catalog + resolution + guards
   auth/                     AuthProvider interface, mock, contract suite
   content-core/             ContentAdapter + TemplateKey + contract suite
@@ -158,6 +161,24 @@ packages/
 supabase/    declarative schema, migrations, edge functions (Phase 4)
 infra/       Terraform (Phase 4)
 ```
+
+### Why the design system lives here
+
+`tokens`, `theme` and `ui` were originally a separate repo, published to a
+private registry and consumed as versioned packages. They are vendored into
+this workspace instead.
+
+The split was solving a problem this project does not have. A boilerplate is
+_cloned per project_, so there was exactly one consumer — and in exchange for
+no benefit it cost a registry credential in CI, on Netlify, and in every
+future clone, plus a publish-and-bump cycle for every change. Vendoring
+removes all of it: there is no registry, no token, and a component fix is one
+commit rather than a release.
+
+If a client ever needs one design system shared across several repos,
+extracting these three packages back out is the change to make _then_ — the
+package boundaries are already drawn, so it stays a move rather than a
+rewrite.
 
 There is deliberately no `data-adapters` package. The domain-scoped adapters
 the architecture sketches (`getSubmissions`, `getAnalyticsSummary`) belong to
@@ -185,36 +206,12 @@ fallback, and idempotency.
 
 Requires Node 22.13+ (see `.nvmrc`) and pnpm 11.
 
-`@puranderdua8/tokens` and `@puranderdua8/theme` come from GitHub Packages,
-so you need a personal access token with `read:packages`. It goes in your
-user-level `~/.npmrc` — pnpm refuses to expand env vars in credentials read
-from a committed project `.npmrc`, so this cannot live in the repo:
-
-```bash
-pnpm config set "//npm.pkg.github.com/:_authToken" <your-pat>
-```
-
 ```bash
 pnpm install
 ```
 
-### CI and GitHub Packages
-
-`GITHUB_TOKEN` in Actions is scoped to the repository it runs in, and
-`@puranderdua8/tokens` and `@puranderdua8/theme` are published from
-`web-components`. A fresh clone's CI therefore gets a 403 on install until
-those two packages are told to trust this repo:
-
-> Package page → **Package settings** → **Manage Actions access** → **Add
-> repository** → this repo, with **Read**.
-
-Do it for both packages. That is preferable to storing a personal access
-token as a repository secret: nothing long-lived to rotate, and the workflow
-needs no change.
-
-```bash
-pnpm dev
-```
+No credentials are needed — not locally, not in CI, not on Netlify. Every
+dependency resolves from public npm or from this workspace.
 
 ## Scripts
 
