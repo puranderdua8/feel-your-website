@@ -1,0 +1,10 @@
+{
+  "extends": "@feel-your-website/config/typescript/react-library.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  // vitest.config.ts is deliberately excluded: it imports the shared config
+  // package's plain-JS entry, which has no declaration file, so including it
+  // fails typecheck with TS7016 for no benefit.
+  "include": ["src", "tsup.config.ts"]
+}

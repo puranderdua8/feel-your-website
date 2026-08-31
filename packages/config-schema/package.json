@@ -1,0 +1,54 @@
+{
+  "name": "@feel-your-website/config-schema",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The shared assignable-configuration substrate: versioned, audited bundles drawn from a fixed vocabulary. Used by both roles and routes.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./contract-tests": {
+      "types": "./dist/contract-tests.d.ts",
+      "import": "./dist/contract-tests.js",
+      "require": "./dist/contract-tests.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:contracts": "vitest run",
+    "clean": "rm -rf dist .turbo"
+  },
+  "peerDependencies": {
+    "vitest": "*"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@feel-your-website/config": "workspace:*",
+    "@feel-your-website/content-core": "workspace:*",
+    "@feel-your-website/rbac": "workspace:*",
+    "eslint": "catalog:",
+    "jsdom": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

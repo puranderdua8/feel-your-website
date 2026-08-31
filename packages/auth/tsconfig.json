@@ -1,0 +1,5 @@
+{
+  "extends": "@feel-your-website/config/typescript/base.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src", "tsup.config.ts"]
+}
