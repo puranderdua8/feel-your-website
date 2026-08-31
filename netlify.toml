@@ -10,9 +10,12 @@
   command = "pnpm turbo run build --filter=@feel-your-website/shell..."
 
 [build.environment]
-  NODE_VERSION = "22.13.0"
-  # pnpm is pinned by package.json's `packageManager` field and enabled via
-  # corepack; Netlify picks it up from there.
+  # Node version comes from .nvmrc — declaring it here too would be a second
+  # place for the same fact to drift.
+  #
+  # It must stay >= 22.23.x: earlier 22.x ships corepack 0.30, whose npm
+  # registry signing keys are stale, so corepack fails to verify pnpm with
+  # "Cannot find matching keyid" and the install never starts.
   NETLIFY_USE_PNPM = "true"
 
 [[headers]]
