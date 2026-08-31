@@ -1,0 +1,34 @@
+{
+  "name": "feel-your-website",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reusable platform boilerplate: runtime-configurable RBAC, CMS-driven content, and a config-driven wizard.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:contracts": "turbo run test:contracts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "prettier": "@feel-your-website/config/prettier",
+  "devDependencies": {
+    "@changesets/cli": "^2.27.11",
+    "@feel-your-website/config": "workspace:*",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.9",
+    "turbo": "^2.3.3",
+    "typescript": "catalog:"
+  }
+}

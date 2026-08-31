@@ -1,0 +1,35 @@
+{
+  "name": "@feel-your-website/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "description": "Shared ESLint, Prettier, TypeScript and Vitest configuration for the feel-your-website workspace.",
+  "exports": {
+    "./eslint/base": "./eslint/base.js",
+    "./eslint/react": "./eslint/react.js",
+    "./prettier": "./prettier/index.js",
+    "./typescript/base.json": "./typescript/base.json",
+    "./typescript/react-library.json": "./typescript/react-library.json",
+    "./vitest/base": "./vitest/base.js",
+    "./vitest/setup": "./vitest/setup.ts"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.18.0",
+    "@testing-library/react": "catalog:",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.3",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-turbo": "^2.3.3",
+    "jsdom": "catalog:",
+    "prettier-plugin-tailwindcss": "^0.6.9",
+    "typescript-eslint": "^8.19.1",
+    "vitest": "catalog:",
+    "vitest-axe": "^0.1.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

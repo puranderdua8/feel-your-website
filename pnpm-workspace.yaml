@@ -1,0 +1,51 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Single source of truth for dependency versions shared across 2+ workspace
+# packages, referenced from package.json via the `catalog:` protocol. This
+# exists to stop the silent drift that catalogs were introduced to prevent —
+# three TanStack Start apps (shell, cms, demo) on three different router
+# versions would be a debugging nightmare, not a feature.
+#
+# Versions are pinned to what `web-components/apps/sandbox` is already
+# running, since that combination is proven to work together. Do not bump
+# TanStack packages independently of each other.
+catalog:
+  # Language + lint
+  typescript: ^5.7.3
+  eslint: ^9.18.0
+
+  # React
+  react: ^19.0.0
+  react-dom: ^19.0.0
+  "@types/react": ^19.0.2
+  "@types/react-dom": ^19.0.2
+  "@vitejs/plugin-react": ^4.3.4
+
+  # Build
+  vite: ^8.2.1
+  tsup: ^8.3.5
+
+  # Styling — Tailwind v4 is CSS-first; @puranderdua8/theme ships a CSS
+  # preset, not a JS one, so there is no tailwind.config.js anywhere.
+  tailwindcss: ^4.0.0
+  "@tailwindcss/vite": ^4.0.0
+
+  # TanStack — router and start are versioned together upstream.
+  "@tanstack/react-router": ^1.170.29
+  "@tanstack/react-start": ^1.168.46
+  "@tanstack/react-query": ^5.66.0
+
+  # Test
+  vitest: ^2.1.8
+  jsdom: ^25.0.1
+  "@testing-library/react": ^16.1.0
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+
+minimumReleaseAgeExclude:
+  - "@puranderdua8/theme@0.3.0"
+  - "@puranderdua8/tokens@0.3.0"
