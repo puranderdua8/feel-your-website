@@ -87,6 +87,20 @@ pnpm config set "//npm.pkg.github.com/:_authToken" <your-pat>
 pnpm install
 ```
 
+### CI and GitHub Packages
+
+`GITHUB_TOKEN` in Actions is scoped to the repository it runs in, and
+`@puranderdua8/tokens` and `@puranderdua8/theme` are published from
+`web-components`. A fresh clone's CI therefore gets a 403 on install until
+those two packages are told to trust this repo:
+
+> Package page → **Package settings** → **Manage Actions access** → **Add
+> repository** → this repo, with **Read**.
+
+Do it for both packages. That is preferable to storing a personal access
+token as a repository secret: nothing long-lived to rotate, and the workflow
+needs no change.
+
 ## Scripts
 
 | Command               | Does                                |
