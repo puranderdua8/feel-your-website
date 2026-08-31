@@ -1,9 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  // Declared so these participate in Turbo's cache key: a build made with
+  // CONTENT_ADAPTER=supabase must not be reused for a memory-adapter build.
+  // `DEV` is Vite's compile-time flag rather than a process variable, listed
+  // only to satisfy the lint rule that scans for undeclared inputs.
+  "globalEnv": ["NODE_ENV", "CONTENT_ADAPTER", "DEV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".output/**", "storybook-static/**"]
+      "outputs": ["dist/**", ".output/**", ".netlify/**", "storybook-static/**"]
     },
     "lint": {
       "dependsOn": ["^build"]
@@ -13,10 +18,10 @@
     },
     "@feel-your-website/shell#typecheck": {
       // TanStack Start's Vite plugin generates src/routeTree.gen.ts as a
-      // build side effect. Plain `tsc` (no Vite involved) cannot see it until
+      // build side effect. Plain `tsc` (no Vite involved) can't see it until
       // this package's own build has run at least once, so a fresh clone
-      // would fail typecheck before ever building. Every TanStack Start app
-      // added later needs the same guard.
+      // would fail typecheck before ever building. Same guard is needed for
+      // every TanStack Start app added later (cms, demo).
       "dependsOn": ["^build", "build"]
     },
     "test": {

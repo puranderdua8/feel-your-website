@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/generate-sw.mjs",
     "start": "vite start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -13,9 +13,16 @@
     "clean": "rm -rf .output .netlify dist .turbo"
   },
   "dependencies": {
+    "@feel-your-website/auth": "workspace:*",
+    "@feel-your-website/config-schema": "workspace:*",
+    "@feel-your-website/content-adapter-memory": "workspace:*",
+    "@feel-your-website/content-core": "workspace:*",
+    "@feel-your-website/i18n-core": "workspace:*",
+    "@feel-your-website/rbac": "workspace:*",
     "@puranderdua8/theme": "^0.3.0",
     "@puranderdua8/tokens": "^0.3.0",
     "@radix-ui/react-label": "^2.1.15",
+    "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "class-variance-authority": "^0.7.1",

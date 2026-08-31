@@ -1,0 +1,58 @@
+# Netlify build configuration.
+#
+# Lives at the repo root because this is a pnpm workspace: Netlify installs
+# from the root lockfile, then builds only the shell.
+
+[build]
+  base = "/"
+  publish = "apps/shell/dist/client"
+
+  # The `pnpm config set` prefix is not optional.
+  #
+  # @puranderdua8/tokens and @puranderdua8/theme come from GitHub Packages,
+  # and the committed .npmrc deliberately carries no token — pnpm refuses to
+  # expand environment variables in credentials read from a project-level
+  # .npmrc, since that file could otherwise exfiltrate the token to a
+  # malicious registry entry. Writing it to the user-level npmrc first is
+  # what makes the install work.
+  #
+  # Granting the packages Actions access (as CI uses) does not help here:
+  # that applies to GitHub Actions' own GITHUB_TOKEN, and Netlify is a third
+  # party with no such credential.
+  command = """
+    pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_PACKAGES_TOKEN" && \
+    pnpm turbo run build --filter=@feel-your-website/shell...
+  """
+
+[build.environment]
+  NODE_VERSION = "22.13.0"
+  # pnpm is pinned by package.json's `packageManager` field and enabled via
+  # corepack; Netlify picks it up from there.
+  NETLIFY_USE_PNPM = "true"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# The service worker must never be served stale, or a client can be pinned to
+# an old version indefinitely — the one file where caching is actively
+# harmful.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Hashed build assets are immutable by construction, so they can be cached
+# hard.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

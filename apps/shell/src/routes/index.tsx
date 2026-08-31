@@ -1,7 +1,13 @@
+import { useTranslations } from "@feel-your-website/i18n-core/react";
 import { ThemeProvider } from "@puranderdua8/theme/client";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { localeConfig } from "@/i18n/config";
 
 import { ThemeShowcase } from "@/components/theme-showcase";
+import { Badge } from "@/components/ui/badge";
+import { Route as RootRoute } from "./__root";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -9,41 +15,73 @@ export const Route = createFileRoute("/")({
 
 const THEMES = ["base", "corporate", "playful"] as const;
 
-/**
- * Phase 1 proving page. `ThemeShowcase` is one definition; the only thing that
- * differs between the columns is the `theme` prop on the provider.
- */
 function Home() {
+  const t = useTranslations();
+  const bootstrap = RootRoute.useLoaderData();
+
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-8 p-8">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold">feel-your-website</h1>
         <p className="text-muted-foreground text-sm">
-          Phase 1 — theming contract. The columns below share one component definition.
+          Phase 3 — the shell, running against the memory adapter.
         </p>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Badge>{bootstrap.locale}</Badge>
+          {/*
+            `degraded` is true when the CMS could not be reached and the
+            bootstrap set is doing the talking. Surfaced rather than hidden:
+            silently serving fallback copy makes a CMS outage invisible.
+          */}
+          {bootstrap.degraded ? (
+            <Badge variant="destructive">{t("bootstrap.offline.title")}</Badge>
+          ) : (
+            <Badge variant="secondary">CMS connected</Badge>
+          )}
+        </div>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {THEMES.map((theme) => (
-          <section key={theme} className="flex flex-col gap-2">
-            <h2 className="text-muted-foreground font-mono text-xs uppercase">{theme}</h2>
-            <ThemeProvider theme={theme}>
-              <ThemeShowcase />
-            </ThemeProvider>
-          </section>
-        ))}
-      </div>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-muted-foreground font-mono text-xs uppercase">
+          Copy served from the CMS
+        </h2>
+        <ul className="flex flex-col gap-1 text-sm">
+          {/*
+            None of this text is in the app. It is fetched per request and
+            layered over the bootstrap set.
+          */}
+          <li>{t("bootstrap.loading")}</li>
+          <li>{t("bootstrap.offline.body")}</li>
+          <li>{t("bootstrap.retry")}</li>
+        </ul>
+      </section>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {THEMES.map((theme) => (
-          <section key={theme} className="flex flex-col gap-2">
-            <h2 className="text-muted-foreground font-mono text-xs uppercase">{theme} · dark</h2>
-            <ThemeProvider theme={theme} mode="dark">
+      <section className="flex flex-wrap gap-4 text-sm">
+        <Link to="/admin" className="underline">
+          Permission-gated route →
+        </Link>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-muted-foreground font-mono text-xs uppercase">Language</h2>
+        <LanguageSwitcher locales={localeConfig.supported} active={bootstrap.locale} />
+        <p className="text-muted-foreground text-xs">
+          Stored in a cookie, so it survives closing the app — and the next visit is server-rendered
+          in this language.
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-muted-foreground font-mono text-xs uppercase">Theming contract</h2>
+        <div className="grid gap-6 md:grid-cols-3">
+          {THEMES.map((theme) => (
+            <ThemeProvider key={theme} theme={theme}>
               <ThemeShowcase />
             </ThemeProvider>
-          </section>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
     </main>
   );
 }
