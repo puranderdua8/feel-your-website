@@ -11,6 +11,14 @@
     "typecheck": {
       "dependsOn": ["^build"]
     },
+    "@feel-your-website/shell#typecheck": {
+      // TanStack Start's Vite plugin generates src/routeTree.gen.ts as a
+      // build side effect. Plain `tsc` (no Vite involved) cannot see it until
+      // this package's own build has run at least once, so a fresh clone
+      // would fail typecheck before ever building. Every TanStack Start app
+      // added later needs the same guard.
+      "dependsOn": ["^build", "build"]
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
