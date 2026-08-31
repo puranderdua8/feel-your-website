@@ -35,6 +35,13 @@ export const baseConfig = [
       // already cleaned it up. Excluding the pattern outright removes the
       // race rather than trying to serialize the two tasks.
       "**/*.timestamp-*.mjs",
+      // tsup does the same thing with a different name: loading
+      // `tsup.config.ts` writes `tsup.config.bundled_<hash>.mjs`, executes
+      // it, and deletes it. Same race, same fix. This only started failing
+      // once several packages built with tsup at once — with a warm Turbo
+      // cache the build is skipped entirely and the window never opens,
+      // which is why it appeared in CI and not locally.
+      "**/*.bundled_*.mjs",
     ],
   },
 ];
