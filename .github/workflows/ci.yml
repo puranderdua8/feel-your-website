@@ -97,8 +97,19 @@ jobs:
       - name: Reset and replay migrations + seed
         run: supabase db reset
 
+      # The `...` suffix on each filter is load-bearing, not decoration — it
+      # is what pulls in each package's own workspace dependencies (`auth`,
+      # `content-core`, `config-schema`, `rbac`, …), the same syntax
+      # `netlify.toml`'s build command already uses for the same reason. This
+      # job's runner starts with no `dist/` anywhere; without `...`, pnpm
+      # builds only the three named leaf packages and `tsup`'s isolated DTS
+      # step fails the moment one of them imports a workspace package that
+      # was never built — caught only by an actual GitHub Actions run on a
+      # clean checkout, not by anything local, since a local run always had
+      # an already-built `dist/` from an earlier full `pnpm build` sitting on
+      # disk.
       - name: Build the adapter packages
-        run: pnpm --filter @feel-your-website/content-adapter-supabase --filter @feel-your-website/auth-supabase --filter @feel-your-website/config-bundle-supabase build
+        run: pnpm --filter @feel-your-website/content-adapter-supabase... --filter @feel-your-website/auth-supabase... --filter @feel-your-website/config-bundle-supabase... build
 
       # The live suites this repo has, run against the database this job just
       # built — real PostgREST queries, real GoTrue sign-ins, real RLS, not a
