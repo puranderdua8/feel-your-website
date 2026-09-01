@@ -10,7 +10,17 @@ function tier1VarName(key: string): string {
   if (key === "fontSans") return "--font-sans";
   if (key === "fontMono") return "--font-mono";
   if (key === "radius") return "--radius";
-  return `--color-${kebabCase(key)}`;
+  // `chart1`..`chart5` need the digit special-cased: kebabCase only inserts
+  // a dash at a lower→upper boundary, so it would otherwise leave these as
+  // `--chart1` rather than shadcn's `--chart-1`.
+  const chart = /^chart([1-5])$/.exec(key);
+  if (chart) return `--chart-${chart[1]}`;
+  // Every other Tier 1 token is emitted under its own raw shadcn name
+  // (`primary` → `--primary`, `cardForeground` → `--card-foreground`), not
+  // prefixed with `--color-` — that prefix is the Tailwind namespace the
+  // preset's `@theme inline` block maps onto these, not the variable name
+  // itself. See tailwind-preset.css.
+  return `--${kebabCase(key)}`;
 }
 
 function tier2VarName(key: string): string {

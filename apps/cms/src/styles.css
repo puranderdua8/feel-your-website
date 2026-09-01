@@ -5,18 +5,9 @@
 
 /*
  * Same note as apps/shell/src/styles.css: the theme preset registers every
- * semantic token; this app declares none of its own. The radius scale below
- * is app-level for the same reason — see that file for the full comment.
+ * semantic token, and the radius scale derived from them; this app declares
+ * none of its own.
  */
-@theme inline {
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
 
 /*
  * Same Tailwind v4 content-scanning gap apps/shell works around: without

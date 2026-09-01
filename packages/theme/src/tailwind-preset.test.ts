@@ -27,8 +27,16 @@ describe("tailwind-preset.css", () => {
   const tier1Keys = Object.keys(Tier1Schema.shape);
   const colourKeys = tier1Keys.filter((key) => !["radius", "fontSans", "fontMono"].includes(key));
 
-  const toCssVar = (key: string) =>
-    `--color-${key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()}`;
+  const toCssVar = (key: string) => {
+    // `chart1`..`chart5` need the digit special-cased, same as
+    // `compile-css-vars.ts`'s `tier1VarName` — kebab-casing alone leaves
+    // these as `chart1` rather than shadcn's `chart-1`.
+    const chart = /^chart([1-5])$/.exec(key);
+    const kebab = chart
+      ? `chart-${chart[1]}`
+      : key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    return `--color-${kebab}`;
+  };
 
   it.each(colourKeys)("registers %s so its utility is generated", (key) => {
     expect(preset).toContain(`${toCssVar(key)}:`);

@@ -1,6 +1,24 @@
 /**
+ * shadcn/ui's canonical Tailwind v4 animation utilities (`animate-in`,
+ * `fade-out-0`, `data-[state=open]:...`, etc.) — every overlay component
+ * (dialog, popover, dropdown-menu, sheet, drawer, ...) is authored against
+ * these. Imported once, here, rather than duplicated in every consumer's own
+ * stylesheet: it resolves from this package's own `node_modules` via pnpm's
+ * per-package linking, so no app or `@feel-your-website/ui` needs to depend
+ * on `tw-animate-css` directly.
+ */
+@import "tw-animate-css";
+
+/**
  * Static Tailwind v4 theme block: tokens that never change per-brand
- * (font fallback stacks, the radius scale's primitive names).
+ * (font fallback stacks, the radius scale's fixed edges).
+ *
+ * `--radius-sm/md/lg/xl` are deliberately NOT declared here — they are
+ * derived from the runtime `--radius` value in the `@theme inline` block
+ * below, and declaring them twice (once as a fixed value here, once as a
+ * `calc()` there) would leave whichever one comes last in the cascade
+ * silently shadowing the other. `--radius-none` and `--radius-full` have no
+ * such derived counterpart, so they stay fixed.
  */
 @theme {
   --font-sans-fallback:
@@ -8,11 +26,6 @@
   --font-mono-fallback: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   --radius-none: 0rem;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
   --radius-full: 9999px;
 }
 
@@ -21,39 +34,71 @@
  * contract.
  *
  * `ThemeProvider` / `compileCssVars` inject the per-brand *values* at
- * runtime, scoped to a `[data-theme]` element. But Tailwind v4 only
- * *generates* a utility such as `bg-primary` if `--color-primary` is
- * declared in `@theme` at build time. Without these declarations the
- * utilities are never emitted at all, so every colour class in every
- * component silently resolves to nothing — the runtime values are set
- * correctly and then read by no one.
+ * runtime, scoped to a `[data-theme]` element, under shadcn/ui's own
+ * canonical variable names (`--primary`, `--card`, `--sidebar-ring`, ...
+ * see `compile-css-vars.ts`). But Tailwind v4 only *generates* a utility
+ * such as `bg-primary` if `--color-primary` is declared in `@theme` at
+ * build time. Without these declarations the utilities are never emitted at
+ * all, so every colour class in every component silently resolves to
+ * nothing — the runtime values are set correctly and then read by no one.
  *
  * `inline` is what makes the self-reference work: it tells Tailwind to
- * inline the value into each utility (`background-color: var(--color-primary)`)
+ * inline the value into each utility (`background-color: var(--primary)`)
  * rather than emit its own `--color-primary` declaration on `:root`. The
  * utility therefore resolves against whichever `[data-theme]` scope it
  * lands in, which is exactly the runtime-swappable behaviour the theme
  * package promises.
  *
- * Keep this list in sync with `Tier1Schema` in @feel-your-website/tokens.
+ * Keep this list in sync with `Tier1Schema` in @feel-your-website/tokens —
+ * both the mapping below and the radius scale it derives are shadcn/ui's
+ * own canonical Tailwind v4 registration, so a component vendored straight
+ * from the shadcn registry needs no rewrites to resolve against this theme.
  */
 @theme inline {
-  --color-background: var(--color-background);
-  --color-foreground: var(--color-foreground);
-  --color-primary: var(--color-primary);
-  --color-primary-foreground: var(--color-primary-foreground);
-  --color-secondary: var(--color-secondary);
-  --color-secondary-foreground: var(--color-secondary-foreground);
-  --color-muted: var(--color-muted);
-  --color-muted-foreground: var(--color-muted-foreground);
-  --color-accent: var(--color-accent);
-  --color-accent-foreground: var(--color-accent-foreground);
-  --color-destructive: var(--color-destructive);
-  --color-destructive-foreground: var(--color-destructive-foreground);
-  --color-border: var(--color-border);
-  --color-ring: var(--color-ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-  --radius: var(--radius);
+  /*
+   * shadcn/ui's canonical 4-step radius scale, derived from the single
+   * `--radius` value ThemeProvider injects. This used to be declared
+   * per-app (each app's own styles.css); centralised here so every
+   * consumer of this preset gets it once, in one place.
+   */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
   --font-sans: var(--font-sans), var(--font-sans-fallback);
   --font-mono: var(--font-mono), var(--font-mono-fallback);
 }
