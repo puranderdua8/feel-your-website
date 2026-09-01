@@ -31,10 +31,19 @@ export const PrimitivesSchema = z.object({
 /**
  * Tier 1 — core semantic tokens. This is the minimum set any theme must
  * (eventually, once resolved) define.
+ *
+ * The names and pairings mirror shadcn/ui's canonical Tailwind v4 token
+ * vocabulary 1:1 (`background`/`foreground`, `card`, `popover`, `input`,
+ * `chart1`..`chart5`, `sidebar*`), so a component vendored straight from the
+ * shadcn registry resolves against this theme with no rewrites.
  */
 export const Tier1Schema = z.object({
   background: colorValue,
   foreground: colorValue,
+  card: colorValue,
+  cardForeground: colorValue,
+  popover: colorValue,
+  popoverForeground: colorValue,
   primary: colorValue,
   primaryForeground: colorValue,
   secondary: colorValue,
@@ -46,7 +55,21 @@ export const Tier1Schema = z.object({
   destructive: colorValue,
   destructiveForeground: colorValue,
   border: colorValue,
+  input: colorValue,
   ring: colorValue,
+  chart1: colorValue,
+  chart2: colorValue,
+  chart3: colorValue,
+  chart4: colorValue,
+  chart5: colorValue,
+  sidebar: colorValue,
+  sidebarForeground: colorValue,
+  sidebarPrimary: colorValue,
+  sidebarPrimaryForeground: colorValue,
+  sidebarAccent: colorValue,
+  sidebarAccentForeground: colorValue,
+  sidebarBorder: colorValue,
+  sidebarRing: colorValue,
   radius: cssLength,
   fontSans: z.string(),
   fontMono: z.string(),

@@ -37,7 +37,7 @@ describe("theming contract", () => {
     });
 
     // Each themed scope must carry its own compiled custom properties.
-    const primaries = scopes.map((el) => el.style.getPropertyValue("--color-primary"));
+    const primaries = scopes.map((el) => el.style.getPropertyValue("--primary"));
     expect(primaries.every(Boolean)).toBe(true);
     expect(new Set(primaries).size).toBe(primaries.length);
 
@@ -97,7 +97,7 @@ describe("theming contract", () => {
     expect(dark?.className).toContain("dark");
 
     const lightness = (el: HTMLElement | null) =>
-      Number(/oklch\(([\d.]+)/.exec(el?.style.getPropertyValue("--color-background") ?? "")?.[1]);
+      Number(/oklch\(([\d.]+)/.exec(el?.style.getPropertyValue("--background") ?? "")?.[1]);
 
     expect(lightness(dark)).toBeLessThan(lightness(light));
   });
@@ -123,7 +123,7 @@ describe("theming contract", () => {
     const primaryOf = (name: string) =>
       container
         .querySelector<HTMLElement>(`[data-name="${name}"] [data-theme]`)
-        ?.style.getPropertyValue("--color-primary");
+        ?.style.getPropertyValue("--primary");
 
     expect(primaryOf("corporate")).toBeTruthy();
     expect(primaryOf("corporate")).not.toBe(primaryOf("base"));

@@ -34,7 +34,8 @@
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {
-    "@feel-your-website/tokens": "workspace:*"
+    "@feel-your-website/tokens": "workspace:*",
+    "tw-animate-css": "catalog:"
   },
   "peerDependencies": {
     "react": ">=18",

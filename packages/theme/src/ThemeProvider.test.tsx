@@ -31,8 +31,8 @@ describe("ThemeProvider — multi-theme reuse", () => {
 
     expect(corporateScope).toBeTruthy();
     expect(playfulScope).toBeTruthy();
-    expect(corporateScope.style.getPropertyValue("--color-primary")).not.toBe(
-      playfulScope.style.getPropertyValue("--color-primary"),
+    expect(corporateScope.style.getPropertyValue("--primary")).not.toBe(
+      playfulScope.style.getPropertyValue("--primary"),
     );
     // corporate is a "simple" theme (Tier 1 only) — its radius still resolves
     // to a real value even though it never sets Tier 2 itself.
@@ -52,11 +52,11 @@ describe("ThemeProvider — multi-theme reuse", () => {
     const outerScope = container.querySelector('[data-theme="corporate"]') as HTMLElement;
     const innerScope = container.querySelector('[data-theme="playful"]') as HTMLElement;
 
-    expect(outerScope.style.getPropertyValue("--color-primary")).not.toBe(
-      innerScope.style.getPropertyValue("--color-primary"),
+    expect(outerScope.style.getPropertyValue("--primary")).not.toBe(
+      innerScope.style.getPropertyValue("--primary"),
     );
     // The outer scope's own explicit value is untouched by the nested override.
-    expect(outerScope.style.getPropertyValue("--color-primary")).toBe("oklch(0.38 0.09 250)");
+    expect(outerScope.style.getPropertyValue("--primary")).toBe("oklch(0.38 0.09 250)");
   });
 
   it("accepts an inline ThemeConfig object instead of a registered theme name — for one-off, per-app-only themes never added to the shared registry", () => {
@@ -67,7 +67,7 @@ describe("ThemeProvider — multi-theme reuse", () => {
     );
 
     const scope = container.querySelector('[data-theme="custom"]') as HTMLElement;
-    expect(scope.style.getPropertyValue("--color-primary")).toBe("oklch(0.4 0.2 10)");
+    expect(scope.style.getPropertyValue("--primary")).toBe("oklch(0.4 0.2 10)");
   });
 
   it("layers a one-off `overrides` prop on top of a named theme without registering a new theme", () => {
@@ -80,7 +80,7 @@ describe("ThemeProvider — multi-theme reuse", () => {
     const scope = container.querySelector('[data-theme="corporate"]') as HTMLElement;
     expect(scope.style.getPropertyValue("--radius")).toBe("0rem");
     // Everything corporate set that the override didn't touch is untouched.
-    expect(scope.style.getPropertyValue("--color-primary")).toBe("oklch(0.38 0.09 250)");
+    expect(scope.style.getPropertyValue("--primary")).toBe("oklch(0.38 0.09 250)");
   });
 
   it("useTheme() resolves to the nearest ThemeProvider, not an outer one", () => {
