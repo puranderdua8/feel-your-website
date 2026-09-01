@@ -409,18 +409,21 @@ way) but is deliberately smaller in a few specific ways:
   `loadContent` from a route — so the two example keys stand in for whatever a
   real project's UI kit actually exports. A real project replaces the list;
   nothing that imports it needs to change.
-- **It is its own Netlify site, not the same one as `apps/shell`.** `apps/cms`
-  has its own `netlify.toml` (`base = "/"`, matching the root file's — this is
-  still one pnpm workspace with one lockfile at the repo root, so `base`
-  points at where the lockfile and this file live, not at `apps/cms/`) and its
-  own `netlify()` Vite plugin. A site pointed at this repo has to be told
-  which config file is its: `apps/shell`'s picks up the repo-root
-  `netlify.toml` by default, so `apps/cms`'s site needs "Netlify configuration
-  file" set explicitly, in that site's own dashboard, to
-  `apps/cms/netlify.toml` — otherwise it silently builds and publishes the
-  shell instead. **Set `AUTH_PROVIDER=supabase` on that site before anyone can
-  reach it publicly.** Left at the default `mock`, `MockAuthProvider`'s one
-  hardcoded account (`editor@example.com` / `demo`, in
+- **It is its own Netlify site, not the same one as `apps/shell`.** Both
+  `apps/cms` and `apps/shell` have their own `netlify.toml` (`base = "/"` in
+  each — still one pnpm workspace with one lockfile at the repo root) and
+  their own `netlify()` Vite plugin, and **neither file lives at the repo
+  root.** That's load-bearing, not a style choice: Netlify has a documented
+  limitation where a repository-root `netlify.toml` is always used for
+  _every_ site pointed at that repo, and a nested one is never reached once a
+  root file exists — confirmed the hard way, not just read about, when a
+  root-level file shadowed `apps/cms/netlify.toml` even with that site's own
+  "Package directory" set correctly. Each site instead needs its dashboard's
+  **Package directory** set to its own app folder (`apps/shell` /
+  `apps/cms`), with no root-level `netlify.toml` left to shadow it. **Set
+  `AUTH_PROVIDER=supabase` on the `cms` site before anyone can reach it
+  publicly.** Left at the default `mock`, `MockAuthProvider`'s one hardcoded
+  account (`editor@example.com` / `demo`, in
   `apps/cms/src/server/adapters.ts`) holds every permission this platform
   defines — fine for a local dev server nobody else can reach, a real backdoor
   on a public URL.

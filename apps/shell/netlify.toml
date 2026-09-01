@@ -1,7 +1,17 @@
-# Netlify build configuration.
+# Netlify build configuration for the shell's own site.
 #
-# Lives at the repo root because this is a pnpm workspace: Netlify installs
-# from the root lockfile, then builds only the shell.
+# Lives inside apps/shell/, not the repo root — see apps/cms/netlify.toml's
+# own comment for why: Netlify has a documented limitation where a
+# repository-root netlify.toml is always used for every site pointed at that
+# repo, and a nested one (discovered via a site's own "Package directory"
+# setting) is never reached once a root file exists. Two sites sharing this
+# repo means neither can have a root-level netlify.toml — each needs the
+# Netlify dashboard's "Package directory" set to its own app folder
+# (apps/shell for this site) instead.
+#
+# `base = "/"` even so: this is still one pnpm workspace with one lockfile at
+# the repo root, and `base` is what Netlify installs from and resolves this
+# file's own relative paths against — not `apps/shell/`.
 
 [build]
   base = "/"

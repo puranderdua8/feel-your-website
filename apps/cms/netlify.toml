@@ -1,17 +1,20 @@
 # Netlify build configuration for the CMS's own site.
 #
-# `apps/shell` has the repo-root `netlify.toml`, read by any Netlify site
-# that doesn't say otherwise. This one is for a *second* site pointed at the
-# same repo: in that site's own dashboard (Site configuration → Build & deploy
-# → Continuous deployment → Build settings), set "Netlify configuration file"
-# to `apps/cms/netlify.toml` — otherwise it silently picks up the root file
-# and builds/publishes the shell instead.
+# Lives inside apps/cms/, not the repo root — deliberately, and not merely by
+# convention. Netlify has a documented limitation where a repository-root
+# netlify.toml is always used for every site pointed at that repo, and a
+# nested one is never reached once a root file exists — confirmed the hard
+# way here: with a root-level file present, this site's own "Package
+# directory: apps/cms" setting alone did not stop Netlify from reading the
+# root file and building/publishing apps/shell instead. See
+# apps/shell/netlify.toml — that one used to be the repo-root file and moved
+# for the same reason. Each site's dashboard needs "Package directory" set to
+# its own app folder (apps/cms for this one) with no root-level file left to
+# shadow it.
 #
-# `base = "/"` here for the same reason the root file uses it, not
-# `apps/cms/`: this is a pnpm workspace with a single lockfile at the repo
-# root, and `base` changes where Netlify looks for both the lockfile and this
-# very file. Both sites clone the full repo and run `pnpm install` once from
-# the root either way; only `command`/`publish` differ per site.
+# `base = "/"` even so: this is still one pnpm workspace with one lockfile at
+# the repo root, and `base` is what Netlify installs from and resolves this
+# file's own relative paths against — not `apps/cms/`.
 
 [build]
   base = "/"
