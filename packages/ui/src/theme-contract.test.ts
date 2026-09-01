@@ -48,6 +48,10 @@ const EXTERNALLY_PROVIDED = new Set<string>([
   "--radix-navigation-menu-viewport-width",
   // Set by `<ToggleGroup>` itself: `style={{ "--gap": spacing }}`.
   "--gap",
+  // Layout constants `<SidebarProvider>` sets on itself via inline `style`
+  // (`SIDEBAR_WIDTH` / `SIDEBAR_WIDTH_ICON`) — not palette tokens.
+  "--sidebar-width",
+  "--sidebar-width-icon",
 ]);
 
 describe("components ↔ theme variable contract", () => {
