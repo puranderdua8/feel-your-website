@@ -23,7 +23,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".output/**", ".netlify/**", "storybook-static/**"]
+      "outputs": ["dist/**", ".output/**", ".netlify/**"]
     },
     "lint": {
       "dependsOn": ["^build"]
