@@ -7,10 +7,29 @@ import { axe } from "vitest-axe";
 // @feel-your-website/config's shared Vitest setup file).
 import "vitest-axe/extend-expect";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./components/ui/alert-dialog";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Checkbox } from "./components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "./components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +47,7 @@ import {
 } from "./components/ui/dropdown-menu";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "./components/ui/radio-group";
 import {
   Select,
@@ -185,6 +205,55 @@ describe("registry components — default render has no axe violations", () => {
       </Dialog>,
     );
     expect(await axe(document.body, axeOptions)).toHaveNoViolations();
+  });
+
+  it("AlertDialog", async () => {
+    render(
+      <AlertDialog defaultOpen>
+        <AlertDialogTrigger asChild>
+          <Button>Delete</Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>,
+    );
+    expect(await axe(document.body, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Popover", async () => {
+    render(
+      <Popover defaultOpen>
+        <PopoverTrigger asChild>
+          <Button>Open</Button>
+        </PopoverTrigger>
+        <PopoverContent aria-label="Details">Popover body</PopoverContent>
+      </Popover>,
+    );
+    expect(await axe(document.body, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Command", async () => {
+    const { container } = render(
+      <Command>
+        <CommandInput placeholder="Search…" />
+        <CommandList>
+          <CommandEmpty>No results.</CommandEmpty>
+          <CommandGroup heading="Suggestions">
+            <CommandItem>Calendar</CommandItem>
+            <CommandItem>Search</CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </Command>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
   });
 
   it("DropdownMenu", async () => {

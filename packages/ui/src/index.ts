@@ -14,18 +14,27 @@
 
 export { cn } from "./lib/utils.js";
 
+export * from "./components/ui/alert-dialog.js";
 export * from "./components/ui/badge.js";
 export * from "./components/ui/button.js";
 export * from "./components/ui/card.js";
 export * from "./components/ui/checkbox.js";
+export * from "./components/ui/command.js";
+export * from "./components/ui/context-menu.js";
 export * from "./components/ui/dialog.js";
+export * from "./components/ui/drawer.js";
 export * from "./components/ui/dropdown-menu.js";
 export * from "./components/ui/form.js";
+export * from "./components/ui/hover-card.js";
 export * from "./components/ui/input.js";
 export * from "./components/ui/input-otp.js";
 export * from "./components/ui/label.js";
+export * from "./components/ui/menubar.js";
+export * from "./components/ui/navigation-menu.js";
+export * from "./components/ui/popover.js";
 export * from "./components/ui/radio-group.js";
 export * from "./components/ui/select.js";
+export * from "./components/ui/sheet.js";
 export * from "./components/ui/switch.js";
 export * from "./components/ui/tabs.js";
 export * from "./components/ui/textarea.js";
