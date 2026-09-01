@@ -16,6 +16,12 @@ export const Route = createRootRoute({
   // The locale needs no argument: it rides on the request cookie, so the
   // server resolves it before rendering anything.
   loader: async (): Promise<BootstrapPayload> => loadBootstrap(),
+  // `src/routes/$.tsx` `throw notFound()`s for a path with no published
+  // route bundle. Configured here, at the root, rather than per-route, so it
+  // is also what TanStack Router itself falls back to for any path no route
+  // claims at all — one component covers both "no CMS route" and "no route
+  // file", which are the same experience for a visitor either way.
+  notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -58,6 +64,22 @@ function RootComponent() {
         </PermissionsProvider>
       </I18nProvider>
     </RootDocument>
+  );
+}
+
+/**
+ * Plain English, deliberately, unlike the rest of this app's copy: this is
+ * what renders when there is no CMS content to fall back to in the first
+ * place — the whole reason a route led here — so it cannot itself depend on
+ * a `bootstrap.*` message key existing. Same reasoning as `apps/cms`'s own
+ * hardcoded chrome.
+ */
+function NotFoundPage() {
+  return (
+    <main className="mx-auto flex max-w-lg flex-col gap-2 p-8 text-center">
+      <h1 className="text-2xl font-semibold">Page not found</h1>
+      <p className="text-muted-foreground">No published route exists at this address.</p>
+    </main>
   );
 }
 

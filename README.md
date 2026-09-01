@@ -308,12 +308,14 @@ happened while building this).
   to.
 - **The seed vs. contract-fixture split in `dev-content.sql`.** That file
   seeds `content_messages` (genuinely rendered — the home page's bootstrap
-  copy) but not `content_items`: nothing in `apps/shell` reads `content_items`
-  yet, and the one time this file tried to seed it under the same key names
-  `CONTRACT_FIXTURE` uses (`guidance`, `legal`), it collided with the contract
-  suite's own `beforeAll`. Real app data and a package's test fixtures
-  drawing from the same namespace was the bug; the fix was giving the fixture
-  clearly test-scoped names, not carving out an exception for the seed.
+  copy) but not `content_items`, and the one time it tried to, under the same
+  key names `CONTRACT_FIXTURE` uses (`guidance`, `legal`), it collided with
+  the contract suite's own `beforeAll`. Real app data and a package's test
+  fixtures drawing from the same namespace was the bug; the fix was giving
+  the fixture clearly test-scoped names, not carving out an exception for the
+  seed. `apps/shell` does read `content_items` now (see "Rendering
+  CMS-authored routes" below) — the seed still leaves it empty locally,
+  deliberately, since nothing about that original collision risk has changed.
 
 ## The config-bundle and content-write adapters
 
@@ -405,10 +407,11 @@ way) but is deliberately smaller in a few specific ways:
   useful axis of configuration.
 - **The route bundle editor's template catalog
   (`src/content/template-keys.ts`) is a placeholder.** This boilerplate ships
-  no real templates or a renderer for them yet — nothing in `apps/shell` calls
-  `loadContent` from a route — so the two example keys stand in for whatever a
-  real project's UI kit actually exports. A real project replaces the list;
-  nothing that imports it needs to change.
+  no _real_ templates — `hero`, `guidance`, `footer` are examples, not a
+  design system's actual output — but `apps/shell` does render whatever this
+  catalog declares now (see "Rendering CMS-authored routes" below). A real
+  project replaces the catalog and the registry that renders it together;
+  nothing that imports either needs to change.
 - **It is its own Netlify site, not the same one as `apps/shell`.** Both
   `apps/cms` and `apps/shell` have their own `netlify.toml` (`base = "/"` in
   each — still one pnpm workspace with one lockfile at the repo root) and
@@ -427,6 +430,40 @@ way) but is deliberately smaller in a few specific ways:
   `apps/cms/src/server/adapters.ts`) holds every permission this platform
   defines — fine for a local dev server nobody else can reach, a real backdoor
   on a public URL.
+
+## Rendering CMS-authored routes
+
+Publishing a route bundle in the CMS makes it queryable — that much was true
+from Phase 4 (`published_route_manifest` is a real, public, correctly-RLS'd
+view) — but until now nothing in `apps/shell` ever called
+`getRouteManifest()`. Two small pieces close that loop:
+
+- **`src/routes/$.tsx`** — a catch-all route. TanStack Router always prefers
+  a static file match (`index.tsx`, `admin.tsx`) over a splat one, so this
+  only ever sees a path nothing else claimed. Its loader calls
+  `loadRoutePage()` (`src/server/bff.ts`), which looks the path up in the
+  manifest and fetches each listed template key's content, in the bundle's
+  own order. No match → `throw notFound()`, handled by the root route's
+  `notFoundComponent`.
+- **`src/templates/registry.tsx`** — maps a `template_key` to the component
+  that renders it. The three keys registered (`hero`, `guidance`, `footer`,
+  plus `help` for the one fixture route `content-adapter-memory`'s seed
+  ships) match `apps/cms/src/content/template-keys.ts`'s own placeholder
+  catalog exactly, on purpose — local dev with no backend at all still has to
+  render something real at `/help`. An unregistered key or missing content
+  renders a visible placeholder rather than silently shortening the page —
+  a CMS author publishing ahead of a template existing is a real, expected
+  sequence, not a failure mode to hide.
+
+**This only reflects what a given deployment's `shell` site is actually
+pointed at.** `getRouteManifest()` goes through the same `ContentAdapter`
+`getContentAdapter()` resolves everywhere else — `CONTENT_ADAPTER=memory`
+(the default) means `MemoryContentAdapter`'s own fixture routes, not
+whatever the CMS has published. Seeing a CMS-published route on a deployed
+`shell` site needs that site's own `CONTENT_ADAPTER=supabase` and
+`SUPABASE_URL`/`SUPABASE_ANON_KEY` pointed at the _same_ project the `cms`
+site writes to — two independently-configured Netlify sites agreeing to
+share one backend, not something either `netlify.toml` wires up for you.
 
 ## Infrastructure
 

@@ -122,6 +122,56 @@ export const setLocale = createServerFn({ method: "POST" })
     return { locale: data.locale };
   });
 
+export interface RoutePageItem {
+  templateKey: string;
+  content: Content | null;
+}
+
+export interface RoutePage {
+  path: string;
+  items: readonly RoutePageItem[];
+}
+
+/**
+ * Resolves a request path against the published route manifest and fetches
+ * each listed template's content, in order — the piece that turns a CMS
+ * author publishing a route bundle into an actual page. See
+ * `src/templates/registry.tsx` for what renders the result and
+ * `src/routes/$.tsx` for the route that calls this.
+ *
+ * Returns `null` for a path with no published bundle, rather than throwing —
+ * "this route doesn't exist" is exactly what `notFound()` is for at the
+ * route layer, not a BFF-level error.
+ */
+export const loadRoutePage = createServerFn({ method: "GET" })
+  .validator((input: unknown): { path: string } => {
+    const path = (input as { path?: unknown })?.path;
+    if (typeof path !== "string" || path.trim() === "") {
+      throw new Error("path is required.");
+    }
+    return { path };
+  })
+  .handler(async ({ data }): Promise<RoutePage | null> => {
+    const locale = resolveLocale();
+
+    // `getRouteManifest` ignores its own locale argument (route structure is
+    // shared across locales — see that method's own doc), so there is no
+    // per-locale manifest to pick between; only the content fetched per item
+    // below varies by locale.
+    const manifest = await getContentAdapter().getRouteManifest(locale);
+    const bundle = manifest.find((candidate) => candidate.path === data.path);
+    if (!bundle) return null;
+
+    const items = await Promise.all(
+      bundle.items.map(async (templateKey): Promise<RoutePageItem> => ({
+        templateKey,
+        content: await getContentAdapter().getContent(templateKey, locale),
+      })),
+    );
+
+    return { path: bundle.path, items };
+  });
+
 /** Resolves one template's content, honouring locale fallback. */
 export const loadContent = createServerFn({ method: "GET" })
   .validator((input: unknown): { templateKey: string; locale: string } => {
