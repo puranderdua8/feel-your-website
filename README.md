@@ -128,15 +128,15 @@ Two copies can disagree. **If you change the catalog, regenerate the seed.**
 
 Three guards exist, and it is worth knowing what each does **not** cover:
 
-| Guard                                      | Covers                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `assertSeedMatchesCatalog()` in CI         | Code ↔ the committed seed file                                                        |
-| Startup check                              | Seed file ↔ the **running database** — CI cannot see a deploy that skipped migrations |
-| Table grants limited to the migration role | Out-of-band edits via SQL or Supabase Studio                                          |
+| Guard                                      | Covers                                                                                | Status                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `assertSeedMatchesCatalog()` in CI         | Code ↔ the committed seed file                                                        | Built — `packages/rbac/src/seed-drift.test.ts`                    |
+| Startup check                              | Seed file ↔ the **running database** — CI cannot see a deploy that skipped migrations | Not yet — needs a live connection, lands with the Phase 5 adapter |
+| Table grants limited to the migration role | Out-of-band edits via SQL or Supabase Studio                                          | Built — see `supabase/migrations`                                 |
 
 **Role CRUD carries none of this risk.** Roles are pure data with no mirror.
 Only catalog changes — the rare, developer-initiated ones — need the seed
-regenerated.
+regenerated: `pnpm --filter @feel-your-website/rbac generate:seed`.
 
 ## Layout
 
@@ -155,11 +155,11 @@ packages/
   content-adapter-memory/   fixtures — dev, tests, Storybook
   content-adapter-supabase/ (Phase 5)
   config-schema/            ConfigBundle substrate: versioning, audit, contract suite
-  i18n-core/                locale negotiation, routing, message provider (Phase 3)
+  i18n-core/                locale negotiation, routing, message provider
   wizard/                   config-driven wizard + validator registry (Phase 7)
   config/                   shared eslint/prettier/tsconfig/vitest
-supabase/    declarative schema, migrations, edge functions (Phase 4)
-infra/       Terraform (Phase 4)
+supabase/    schema, RLS policies, the auth hook, migrations, the generated permission seed
+infra/       Terraform: Supabase project settings, Netlify site settings
 ```
 
 ### Why the design system lives here
@@ -201,6 +201,64 @@ behaviour that actually differs: error shape, pagination semantics, locale
 fallback, and idempotency.
 
 `pnpm test:contracts` runs them. A new adapter is finished when it passes.
+
+## Database
+
+`supabase/migrations` is the Postgres half of `config-schema` and `rbac`:
+the `config_bundles` substrate (roles and route bundles), the permission
+mirror, the Custom Access Token auth hook, and public-read `content_items` /
+`content_messages` / `published_route_manifest` for the content side.
+
+A few things worth knowing before extending it:
+
+- **Writes go through `SECURITY DEFINER` RPCs
+  (`save_role_bundle`/`save_route_bundle`/`delete_config_bundle`), never
+  direct table access.** Every table `INSERT`/`UPDATE`/`DELETE` grant is
+  revoked from `anon`/`authenticated` — Postgres's default grants hand a new
+  table to both, so this is revoked explicitly rather than left to RLS alone.
+  A write is four things that must succeed or fail together (check the
+  version, update the header, replace the items, append the audit row); the
+  RPC is what makes that one round trip instead of four, and what makes the
+  permission check (`has_permission('manage:roles')`, checked first, inside
+  the function) impossible to route around.
+- **Optimistic concurrency is enforced in SQL, not application code.** The
+  version check is the predicate of the `UPDATE` itself
+  (`write_bundle_header` in `..._config_bundle_writes.sql`), not a preceding
+  `SELECT` — a check-then-write is exactly the race this exists to close. A
+  mismatch raises with `errcode = 'PT409'`, which PostgREST turns into an
+  HTTP 409 for `ConfigConflictError` to map.
+- **RLS is split by audience, and it is easy to get this wrong in the
+  direction that fails silently.** `published_route_manifest` is declared
+  `security_invoker = true` (avoiding the RLS-bypass footgun a definer view
+  would be), which means it only returns rows the _querying role_ — not the
+  view's owner — can see on the underlying tables. That requires
+  `config_bundles`/`route_bundles`/`route_templates` to carry their own read
+  policies for anonymous visitors, or the view silently returns nothing to a
+  real site visitor while looking correct in every test run as the owning
+  role. See `..._bundle_read_policies.sql` for the actual split: published
+  route data is public, role/permission data never is, and audit history
+  needs `view:audit` specifically rather than reusing `manage:roles`.
+- **The delete path re-stamps staleness explicitly, ahead of the cascade.**
+  Deleting a role bundle cascades into `role_permissions` and `user_roles`,
+  and nothing orders that cascade relative to the trigger that marks holders'
+  tokens stale — so `delete_config_bundle` finds the holders and calls
+  `touch_permission_state` itself, before the delete, rather than trusting a
+  trigger to still have something to find.
+
+Everything above was exercised against a real local Postgres (`supabase db
+reset`, and `psql` sessions simulating both an unauthorized caller and an
+authorized one) while building it, not just read back from the SQL — CI does
+the same replay on every PR (see the `supabase` job in `ci.yml`).
+
+## Infrastructure
+
+`infra/` is Terraform for what used to be a dashboard checkbox with no
+record of who set it or when: registering the Custom Access Token hook on
+the Supabase project, and the Netlify build settings and environment
+variables. See [`infra/README.md`](infra/README.md) — in particular, what it
+deliberately does not manage (creating the Supabase organization or the
+Netlify team, linking the git repository) and why nothing in it has been
+applied yet.
 
 ## Getting started
 

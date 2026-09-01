@@ -30,6 +30,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "generate:seed": "node scripts/generate-seed.mjs",
     "clean": "rm -rf dist .turbo"
   },
   "peerDependencies": {

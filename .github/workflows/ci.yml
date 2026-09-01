@@ -41,3 +41,66 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Contract tests
+        run: pnpm test:contracts
+
+  supabase:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # `db start` rather than `start`: it brings up Postgres alone — with
+      # the same `auth` schema, roles and `auth.uid()` that a full project
+      # has — and skips Studio, Realtime, Storage and the Vector log
+      # collector. Verified by hand that this is enough: the auth hook
+      # migration references `auth.users` and `supabase_auth_admin`, and both
+      # exist under `db start`. The full stack was also the thing that
+      # intermittently failed its own health check locally (see the
+      # `[analytics] enabled = false` note in config.toml) — narrower here is
+      # also more reliable, not just faster.
+      - name: Start Postgres
+        run: supabase db start
+
+      # Applies every migration to a fresh database in order, then the
+      # generated seed — the same replay a fresh clone or a real deploy does.
+      # A migration that only worked against a hand-edited local database, or
+      # a seed file nobody regenerated, fails here instead of at the first
+      # real deploy.
+      - name: Reset and replay migrations + seed
+        run: supabase db reset
+
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.16"
+
+      - name: Format check
+        run: terraform fmt -check -diff
+
+      # `validate` checks resource/data-source arguments against each
+      # provider's real schema, not just HCL syntax — it needs the providers
+      # installed (`init`) but no credentials and touches no real
+      # infrastructure. It cannot catch everything `plan`/`apply` would (a
+      # nonexistent Supabase org, a site name that doesn't match), which is
+      # why infra/README.md is explicit that nothing here has been applied.
+      - name: Init
+        run: terraform init -backend=false
+
+      - name: Validate
+        run: terraform validate

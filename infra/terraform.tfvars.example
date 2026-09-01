@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars for local use. terraform.tfvars is gitignored;
+# this file is not, so — same rule as .env.example — it must never contain a
+# real value.
+
+supabase_organization_id = "your-org-slug"
+netlify_team_slug        = "your-team-slug"
+
+# supabase_project_name   = "feel-your-website"
+# supabase_region         = "us-east-1"
+# supabase_instance_size  = "micro"
+# netlify_site_name       = "feel-your-website"
+
+# Not here: supabase_database_password. Pass it as
+# TF_VAR_supabase_database_password so it never touches a file at all — see
+# README.md.

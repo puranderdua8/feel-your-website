@@ -162,12 +162,17 @@ supabase/.branches
 
 # Terraform local state. Remote state is configured in infra/backend.tf;
 # these are the local artefacts that must never be committed.
+#
+# `.terraform.lock.hcl` is deliberately NOT here — unlike the rest of this
+# list, it is meant to be committed. It pins the exact provider versions
+# Terraform resolved, the same job pnpm-lock.yaml does for npm packages;
+# ignoring it would mean every clone (and CI) can silently resolve a
+# different provider version.
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
-.terraform.lock.hcl
 
 # Local Claude Code config (e.g. dev-server launch config for the Browser
 # preview tool). Machine-local, never committed.
