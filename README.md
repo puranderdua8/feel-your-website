@@ -409,6 +409,21 @@ way) but is deliberately smaller in a few specific ways:
   `loadContent` from a route — so the two example keys stand in for whatever a
   real project's UI kit actually exports. A real project replaces the list;
   nothing that imports it needs to change.
+- **It is its own Netlify site, not the same one as `apps/shell`.** `apps/cms`
+  has its own `netlify.toml` (`base = "/"`, matching the root file's — this is
+  still one pnpm workspace with one lockfile at the repo root, so `base`
+  points at where the lockfile and this file live, not at `apps/cms/`) and its
+  own `netlify()` Vite plugin. A site pointed at this repo has to be told
+  which config file is its: `apps/shell`'s picks up the repo-root
+  `netlify.toml` by default, so `apps/cms`'s site needs "Netlify configuration
+  file" set explicitly, in that site's own dashboard, to
+  `apps/cms/netlify.toml` — otherwise it silently builds and publishes the
+  shell instead. **Set `AUTH_PROVIDER=supabase` on that site before anyone can
+  reach it publicly.** Left at the default `mock`, `MockAuthProvider`'s one
+  hardcoded account (`editor@example.com` / `demo`, in
+  `apps/cms/src/server/adapters.ts`) holds every permission this platform
+  defines — fine for a local dev server nobody else can reach, a real backdoor
+  on a public URL.
 
 ## Infrastructure
 

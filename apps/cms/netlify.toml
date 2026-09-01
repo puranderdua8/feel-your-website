@@ -1,0 +1,43 @@
+# Netlify build configuration for the CMS's own site.
+#
+# `apps/shell` has the repo-root `netlify.toml`, read by any Netlify site
+# that doesn't say otherwise. This one is for a *second* site pointed at the
+# same repo: in that site's own dashboard (Site configuration → Build & deploy
+# → Continuous deployment → Build settings), set "Netlify configuration file"
+# to `apps/cms/netlify.toml` — otherwise it silently picks up the root file
+# and builds/publishes the shell instead.
+#
+# `base = "/"` here for the same reason the root file uses it, not
+# `apps/cms/`: this is a pnpm workspace with a single lockfile at the repo
+# root, and `base` changes where Netlify looks for both the lockfile and this
+# very file. Both sites clone the full repo and run `pnpm install` once from
+# the root either way; only `command`/`publish` differ per site.
+
+[build]
+  base = "/"
+  publish = "apps/cms/dist/client"
+
+  command = "pnpm turbo run build --filter=@feel-your-website/cms..."
+
+[build.environment]
+  # Same reasoning as the root file: keep in sync with .nvmrc, not a second
+  # place to drift, and >= 22.23.x for the corepack/pnpm signing-key fix.
+  NETLIFY_USE_PNPM = "true"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Defense in depth alongside the `<meta name="robots">` tag in
+    # `src/routes/__root.tsx` — an authoring tool has no public audience, and
+    # a header survives even a page that fails to render.
+    X-Robots-Tag = "noindex, nofollow"
+
+# Hashed build assets are immutable by construction, so they can be cached
+# hard. No service-worker or manifest headers here — this app ships neither.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
