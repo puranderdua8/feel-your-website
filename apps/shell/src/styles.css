@@ -12,8 +12,10 @@
 
 /*
  * Tailwind v4 scans files relative to this stylesheet, which misses the
- * component package entirely. Without this, every utility class that only
- * appears inside @feel-your-website/ui is treated as unused and stripped —
- * components render structurally correct and completely unstyled.
+ * workspace packages entirely. Without this, every utility class that only
+ * appears inside @feel-your-website/ui or @feel-your-website/section-registry
+ * is treated as unused and stripped — components render structurally correct
+ * and completely unstyled.
  */
 @source "../../../packages/ui/src";
+@source "../../../packages/section-registry/src";

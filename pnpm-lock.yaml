@@ -119,6 +119,9 @@ importers:
       '@feel-your-website/rbac':
         specifier: workspace:*
         version: link:../../packages/rbac
+      '@feel-your-website/section-registry':
+        specifier: workspace:*
+        version: link:../../packages/section-registry
       '@feel-your-website/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -210,6 +213,9 @@ importers:
       '@feel-your-website/rbac':
         specifier: workspace:*
         version: link:../../packages/rbac
+      '@feel-your-website/section-registry':
+        specifier: workspace:*
+        version: link:../../packages/section-registry
       '@feel-your-website/theme':
         specifier: workspace:*
         version: link:../../packages/theme
@@ -567,6 +573,49 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 4.7.0(supports-color@7.2.0)(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.33.0)(terser@5.51.2))
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      jsdom:
+        specifier: 'catalog:'
+        version: 25.0.1(supports-color@7.2.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+      tsup:
+        specifier: 'catalog:'
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.26)(supports-color@7.2.0)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1(supports-color@7.2.0))(lightningcss@1.33.0)(supports-color@7.2.0)(terser@5.51.2)
+
+  packages/section-registry:
+    dependencies:
+      '@feel-your-website/content-core':
+        specifier: workspace:*
+        version: link:../content-core
+    devDependencies:
+      '@feel-your-website/config':
+        specifier: workspace:*
+        version: link:../config
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.5(@types/react@19.2.18)
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 4.7.0(supports-color@7.2.0)(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.33.0)(terser@5.51.2))

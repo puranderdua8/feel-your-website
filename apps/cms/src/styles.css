@@ -11,6 +11,9 @@
 
 /*
  * Same Tailwind v4 content-scanning gap apps/shell works around: without
- * this, classes that only appear inside @feel-your-website/ui are stripped.
+ * this, classes that only appear inside a workspace package are stripped.
+ * section-registry is scanned here too — the CMS renders its section
+ * components in the route-editor preview.
  */
 @source "../../../packages/ui/src";
+@source "../../../packages/section-registry/src";
