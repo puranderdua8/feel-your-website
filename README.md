@@ -128,11 +128,11 @@ Two copies can disagree. **If you change the catalog, regenerate the seed.**
 
 Three guards exist, and it is worth knowing what each does **not** cover:
 
-| Guard                                      | Covers                                                                                | Status                                                            |
-| ------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `assertSeedMatchesCatalog()` in CI         | Code ↔ the committed seed file                                                        | Built — `packages/rbac/src/seed-drift.test.ts`                    |
-| Startup check                              | Seed file ↔ the **running database** — CI cannot see a deploy that skipped migrations | Not yet — needs a live connection, lands with the Phase 5 adapter |
-| Table grants limited to the migration role | Out-of-band edits via SQL or Supabase Studio                                          | Built — see `supabase/migrations`                                 |
+| Guard                                      | Covers                                                                                | Status                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assertSeedMatchesCatalog()` in CI         | Code ↔ the committed seed file                                                        | Built — `packages/rbac/src/seed-drift.test.ts`                                                                                                                                                                                                                                                                            |
+| Startup check                              | Seed file ↔ the **running database** — CI cannot see a deploy that skipped migrations | Not yet. `permissions_read` is `authenticated`-only RLS (Phase 4), so this needs the service-role key, which `apps/shell` does not otherwise use anywhere — see `content-adapter-supabase`'s and `auth-supabase`'s docs on why the anon key was enough for both. Deferred rather than adding that plumbing for one check. |
+| Table grants limited to the migration role | Out-of-band edits via SQL or Supabase Studio                                          | Built — see `supabase/migrations`                                                                                                                                                                                                                                                                                         |
 
 **Role CRUD carries none of this risk.** Roles are pure data with no mirror.
 Only catalog changes — the rare, developer-initiated ones — need the seed
@@ -151,9 +151,10 @@ packages/
   ui/                       the component library
   rbac/                     permission catalog + resolution + guards
   auth/                     AuthProvider interface, mock, contract suite
+  auth-supabase/            AuthProvider backed by Supabase Auth
   content-core/             ContentAdapter + TemplateKey + contract suite
   content-adapter-memory/   fixtures — dev, tests, Storybook
-  content-adapter-supabase/ (Phase 5)
+  content-adapter-supabase/ ContentAdapter backed by Supabase Postgres
   config-schema/            ConfigBundle substrate: versioning, audit, contract suite
   i18n-core/                locale negotiation, routing, message provider
   wizard/                   config-driven wizard + validator registry (Phase 7)
@@ -250,6 +251,54 @@ reset`, and `psql` sessions simulating both an unauthorized caller and an
 authorized one) while building it, not just read back from the SQL — CI does
 the same replay on every PR (see the `supabase` job in `ci.yml`).
 
+## The Supabase adapters
+
+`content-adapter-supabase` and `auth-supabase` are the first real
+implementations of `ContentAdapter` and `AuthProvider` — set
+`CONTENT_ADAPTER=supabase` / `AUTH_PROVIDER=supabase` (see `.env.example`) to
+use them. Both pass the exact same contract suites the mock/memory adapters
+do, run against a real local Supabase rather than mocked — `supabase start`,
+then each package's `pnpm test:contracts` — because a contract this code only
+compiled against, never actually sent over the wire, would have missed real
+things: the RLS gap in the Database section above, or a fixture that collides
+with `supabase/seed/dev-content.sql`'s row of the same key (both actually
+happened while building this).
+
+- **`content-adapter-supabase` reads with the `anon` key only.** Every table
+  it touches is public-read RLS (see Database, above), so there is no session
+  to carry and no service-role key anywhere in `apps/shell`. Locale fallback
+  (`getContent`'s `translated: false` case) happens in this adapter's own
+  TypeScript, not SQL — one query for `[requested, default]`, then prefer the
+  requested row per template key — because the content volume this platform
+  serves is pages and templates, not a firehose large enough to earn a
+  bespoke SQL function for a rule already expressed correctly in five lines.
+- **`auth-supabase` reads every claim through `getClaims()`, never
+  `getSession()`'s own `session.user`.** `@supabase/ssr`'s own docs call that
+  object untrustworthy when the storage medium is cookies — exactly this
+  case — so `app_permissions` is always freshly verified against the Auth
+  server's signing key, not merely carried along from whenever the cookie was
+  written.
+- **Session persistence is dependency-injected, not framework-specific.**
+  `auth-supabase` exports a `CookieAdapter` interface (`getAll`/`setAll`) —
+  the same shape `@supabase/ssr` itself wants — rather than depending on
+  TanStack Start directly. `apps/shell/src/server/adapters.ts` supplies one
+  backed by the real request; the contract suite supplies
+  `MemoryCookieAdapter`, a `Map`, so `createProvider()` gets what the contract
+  requires: a fresh, genuinely isolated session per test.
+- **The TanStack cookie glue lives inside `adapters.ts` itself, not its own
+  file.** `seam.test.ts` enforces that exactly one module may import a
+  concrete backend package; the glue has to name `auth-supabase` for the
+  `CookieAdapter` type it implements, so it stays inside the one file allowed
+  to.
+- **The seed vs. contract-fixture split in `dev-content.sql`.** That file
+  seeds `content_messages` (genuinely rendered — the home page's bootstrap
+  copy) but not `content_items`: nothing in `apps/shell` reads `content_items`
+  yet, and the one time this file tried to seed it under the same key names
+  `CONTRACT_FIXTURE` uses (`guidance`, `legal`), it collided with the contract
+  suite's own `beforeAll`. Real app data and a package's test fixtures
+  drawing from the same namespace was the bug; the fix was giving the fixture
+  clearly test-scoped names, not carving out an exception for the seed.
+
 ## Infrastructure
 
 `infra/` is Terraform for what used to be a dashboard checkbox with no
@@ -262,7 +311,7 @@ applied yet.
 
 ## Getting started
 
-Requires Node 22.13+ (see `.nvmrc`) and pnpm 11.
+Requires Node 22.23.2+ (see `.nvmrc`) and pnpm 11.
 
 ```bash
 pnpm install
@@ -270,6 +319,13 @@ pnpm install
 
 No credentials are needed — not locally, not in CI, not on Netlify. Every
 dependency resolves from public npm or from this workspace.
+
+The app itself runs against `MemoryContentAdapter`/`MockAuthProvider` with no
+further setup (`pnpm --filter @feel-your-website/shell dev`). To run it
+against a real Supabase instead: `supabase start` (needs Docker), then set
+`CONTENT_ADAPTER=supabase` / `AUTH_PROVIDER=supabase` and the three
+`SUPABASE_*` variables in `apps/shell/.env` — see `.env.example` for what
+each one is and where it's safe to expose.
 
 ## Scripts
 

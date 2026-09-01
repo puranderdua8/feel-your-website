@@ -27,14 +27,19 @@ function sourceFiles(dir: string): string[] {
 }
 
 /**
- * Tokens that name *how* a locale is carried or stored. Any of these outside
- * the strategy directory means the mechanism has leaked.
+ * Tokens that name *how a locale specifically* is carried or stored. Any of
+ * these outside the strategy directory means the mechanism has leaked.
+ *
+ * Deliberately not `getCookie`/`setCookie`/`document.cookie` themselves:
+ * those are TanStack's (or the platform's) generic cookie primitives, not a
+ * locale mechanism — `auth-supabase`'s session persistence legitimately uses
+ * the same primitives from `src/server/adapters.ts` for an unrelated cookie.
+ * `LOCALE_COOKIE` is the precise signal: it is the locale cookie's actual
+ * name, so a file outside this directory that references it is reimplementing
+ * *this* mechanism specifically, not merely reading some other cookie.
  */
 const MECHANISM = [
   "LOCALE_COOKIE",
-  "setCookie",
-  "getCookie",
-  "document.cookie",
   "localStorage",
   "localizePath",
   "deLocalizePath",

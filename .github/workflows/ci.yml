@@ -49,32 +49,66 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # The fixed local-dev project keys `supabase start`/`db start` always
+    # provision — not a secret. They are baked into the CLI's own default
+    # `config.toml` (a fixed local JWT signing secret), the same for every
+    # developer's machine and every CI run; nothing behind them is reachable
+    # from outside this job's network namespace anyway. Real, per-environment
+    # keys are the ones in Netlify's env vars and the hosted project.
+    env:
+      SUPABASE_URL: http://127.0.0.1:54321
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
     steps:
       - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      # `db start` rather than `start`: it brings up Postgres alone — with
-      # the same `auth` schema, roles and `auth.uid()` that a full project
-      # has — and skips Studio, Realtime, Storage and the Vector log
-      # collector. Verified by hand that this is enough: the auth hook
-      # migration references `auth.users` and `supabase_auth_admin`, and both
-      # exist under `db start`. The full stack was also the thing that
-      # intermittently failed its own health check locally (see the
-      # `[analytics] enabled = false` note in config.toml) — narrower here is
-      # also more reliable, not just faster.
-      - name: Start Postgres
-        run: supabase db start
+      # The full stack, not `db start`: the live contract suites below talk
+      # to `SUPABASE_URL` over HTTP — real GoTrue sign-ins, real PostgREST
+      # queries — and `db start` brings up only the Postgres container, no
+      # gateway on port 54321 at all. (An earlier draft of this job used `db
+      # start` on the mistaken assumption that having the `auth` schema was
+      # the whole requirement; it is enough to apply migrations directly with
+      # `psql`, which is all that was being verified at the time, but not
+      # enough for anything that goes through the HTTP API, which is
+      # everything the adapters themselves do.) Analytics/Vector are disabled
+      # in config.toml specifically so this stays reliable in CI — that
+      # config predates this job and was the fix for the health-check flake
+      # the full stack hit locally.
+      - name: Start Supabase
+        run: supabase start
 
-      # Applies every migration to a fresh database in order, then the
-      # generated seed — the same replay a fresh clone or a real deploy does.
-      # A migration that only worked against a hand-edited local database, or
-      # a seed file nobody regenerated, fails here instead of at the first
-      # real deploy.
+      # Reset on top of `start`'s own migration/seed run, so this job proves
+      # a from-scratch replay explicitly rather than incidentally depending
+      # on `start` having done it.
       - name: Reset and replay migrations + seed
         run: supabase db reset
+
+      - name: Build the adapter packages
+        run: pnpm --filter @feel-your-website/content-adapter-supabase --filter @feel-your-website/auth-supabase build
+
+      # The two live suites this repo has, run against the database this job
+      # just built — real PostgREST queries, real GoTrue sign-ins, real RLS,
+      # not a mock of either. See each package's `src/contract.test.ts` for
+      # what they seed and why a live backend is the point.
+      - name: Content adapter contract tests (live)
+        run: pnpm --filter @feel-your-website/content-adapter-supabase test:contracts
+
+      - name: Auth provider contract tests (live)
+        run: pnpm --filter @feel-your-website/auth-supabase test:contracts
 
   terraform:
     runs-on: ubuntu-latest

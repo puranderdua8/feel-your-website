@@ -42,6 +42,13 @@ catalog:
   jsdom: ^25.0.1
   "@testing-library/react": ^16.1.0
 
+  # Supabase — the concrete backend for the content-core, auth and
+  # config-schema interfaces. Versioned together since @supabase/ssr's
+  # cookie-based session handling is written against a specific
+  # @supabase/supabase-js major.
+  "@supabase/supabase-js": ^2.112.4
+  "@supabase/ssr": ^0.12.5
+
 allowBuilds:
   esbuild: true
   sharp: true

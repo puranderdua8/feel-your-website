@@ -1,0 +1,43 @@
+{
+  "name": "@feel-your-website/auth-supabase",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Supabase Auth-backed AuthProvider. Passes the same contract suite as the mock.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude '**/contract.test.ts'",
+    "test:contracts": "vitest run src/contract.test.ts",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@feel-your-website/auth": "workspace:*",
+    "@supabase/ssr": "catalog:",
+    "@supabase/supabase-js": "catalog:"
+  },
+  "devDependencies": {
+    "@feel-your-website/config": "workspace:*",
+    "eslint": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

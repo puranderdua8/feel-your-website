@@ -4,7 +4,22 @@
   // CONTENT_ADAPTER=supabase must not be reused for a memory-adapter build.
   // `DEV` is Vite's compile-time flag rather than a process variable, listed
   // only to satisfy the lint rule that scans for undeclared inputs.
-  "globalEnv": ["NODE_ENV", "CONTENT_ADAPTER", "DEV"],
+  //
+  // The three SUPABASE_* vars gate content-adapter-supabase's and
+  // auth-supabase's `test:contracts` (see each package's contract.test.ts):
+  // present and pointed at a live local Supabase, the live suite runs;
+  // absent, it skips. That is a cache-relevant input too — a cached "passed"
+  // from a run where it skipped must not stand in for a run where it
+  // actually exercised the backend.
+  "globalEnv": [
+    "NODE_ENV",
+    "CONTENT_ADAPTER",
+    "AUTH_PROVIDER",
+    "DEV",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

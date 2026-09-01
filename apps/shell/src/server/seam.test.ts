@@ -30,8 +30,10 @@ function sourceFiles(dir: string): string[] {
 /** Packages that name or embed a specific backend. */
 const CONCRETE_BACKENDS = [
   "@supabase/supabase-js",
+  "@supabase/ssr",
   "@feel-your-website/content-adapter-memory",
   "@feel-your-website/content-adapter-supabase",
+  "@feel-your-website/auth-supabase",
 ];
 
 describe("the adapter seam", () => {
