@@ -36,6 +36,10 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "input-otp": "^1.5.0",
+    "lucide-react": "^1.39.0",
+    "radix-ui": "^1.6.7",
+    "react-hook-form": "^7.87.0",
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
