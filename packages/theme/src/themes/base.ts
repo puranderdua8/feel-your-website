@@ -98,11 +98,15 @@ export const baseDark: ThemeConfig = {
     border: darkBorder,
     input: darkBorder,
     ring: darkRing,
+    // The primitive ramps taper chroma hard below step 500 (see
+    // `primitives/colors.ts`), so `green[400]` etc. are almost grey — no
+    // good for a chart palette. The `500` step keeps full saturation and its
+    // ~0.6 lightness still reads on a dark ground.
     chart1: darkPrimary,
-    chart2: green[400],
-    chart3: amber[400],
-    chart4: violet[400],
-    chart5: red[400],
+    chart2: green[500],
+    chart3: amber[500],
+    chart4: violet[500],
+    chart5: red[500],
     sidebar: darkBackground,
     sidebarForeground: darkForeground,
     sidebarPrimary: darkPrimary,

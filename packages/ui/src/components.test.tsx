@@ -7,9 +7,9 @@ import { axe } from "vitest-axe";
 // @feel-your-website/config's shared Vitest setup file).
 import "vitest-axe/extend-expect";
 
-import { Badge } from "./components/badge/badge";
-import { Button } from "./components/button/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/card/card";
+import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,30 +17,25 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./components/dialog/dialog";
+} from "./components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "./components/dropdown-menu/dropdown-menu";
-import { Input } from "./components/input/input";
-import { Label } from "./components/label/label";
+} from "./components/ui/dropdown-menu";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./components/select/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/tabs/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./components/tooltip/tooltip";
+} from "./components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
 
 // jsdom doesn't implement these; Radix's positioning / scroll-into-view
 // logic touches them even when a portal-based primitive is just mounted
