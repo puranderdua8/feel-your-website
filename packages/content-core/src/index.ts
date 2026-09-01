@@ -1,6 +1,7 @@
 export * from "./types.js";
 export * from "./errors.js";
 export * from "./adapter.js";
+export * from "./writer.js";
 export * from "./template-keys.js";
 export * from "./contract-fixture.js";
 

@@ -1,0 +1,47 @@
+{
+  "name": "@feel-your-website/cms",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "vite start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf .output dist .turbo"
+  },
+  "dependencies": {
+    "@feel-your-website/auth": "workspace:*",
+    "@feel-your-website/auth-supabase": "workspace:*",
+    "@feel-your-website/config-bundle-supabase": "workspace:*",
+    "@feel-your-website/config-schema": "workspace:*",
+    "@feel-your-website/content-adapter-memory": "workspace:*",
+    "@feel-your-website/content-adapter-supabase": "workspace:*",
+    "@feel-your-website/content-core": "workspace:*",
+    "@feel-your-website/rbac": "workspace:*",
+    "@feel-your-website/theme": "workspace:*",
+    "@feel-your-website/tokens": "workspace:*",
+    "@feel-your-website/ui": "workspace:*",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@feel-your-website/config": "workspace:*",
+    "@tailwindcss/vite": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/node": "^22.10.5",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "eslint": "catalog:",
+    "jsdom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

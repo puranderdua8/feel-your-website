@@ -28,6 +28,23 @@ export interface ConfigBundle<TItem extends string = string> {
   updatedAt: string;
   /** Subject id of the last writer. The audit trail's "who". */
   updatedBy: string;
+  /**
+   * The route this bundle renders at. Present only for the route-template
+   * vocabulary — a role bundle has no path, and is never given one.
+   *
+   * This lives on the generic bundle rather than in a separate route-only
+   * type because the substrate is meant to be one store per vocabulary, not
+   * one store plus a parallel type per vocabulary's extra concerns. It stays
+   * optional, and every store but a route-backed one simply never sets it.
+   */
+  path?: string;
+  /**
+   * Whether a route bundle is live. `getRouteManifest` (see
+   * `@feel-your-website/content-core`) only ever sees `published: true`
+   * bundles — this is the flag a store's own persistence enforces that with.
+   * Same "route-only" caveat as `path`.
+   */
+  published?: boolean;
 }
 
 /** A point-in-time copy of a bundle, written on every change. */
@@ -45,11 +62,17 @@ export interface ConfigBundleVersion<TItem extends string = string> {
 export interface CreateBundleInput<TItem extends string = string> {
   name: string;
   items: readonly TItem[];
+  /** Route-vocabulary only — see {@link ConfigBundle.path}. */
+  path?: string;
+  /** Route-vocabulary only — see {@link ConfigBundle.published}. Defaults to `false`. */
+  published?: boolean;
 }
 
 export interface UpdateBundleInput<TItem extends string = string> {
   name?: string;
   items?: readonly TItem[];
+  path?: string;
+  published?: boolean;
 }
 
 /**

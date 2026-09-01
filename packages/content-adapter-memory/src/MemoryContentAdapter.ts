@@ -2,6 +2,7 @@ import {
   ContentAdapterError,
   type Content,
   type ContentAdapter,
+  type ContentWriter,
   type ListContentQuery,
   type Locale,
   type JsonValue,
@@ -42,7 +43,7 @@ export interface MemoryContentAdapterOptions {
   failWith?: ContentAdapterError;
 }
 
-export class MemoryContentAdapter implements ContentAdapter {
+export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
   readonly #seed: Required<Pick<MemoryContentSeed, "content" | "defaultLocale" | "updatedAt">> &
     MemoryContentSeed;
   readonly #failWith?: ContentAdapterError;
@@ -117,6 +118,46 @@ export class MemoryContentAdapter implements ContentAdapter {
     // An unknown locale yields an empty map, never null: the app falls back to
     // its bootstrap bundle, and a null would force a guard at every call site.
     return this.#seed.messages?.[locale] ?? {};
+  }
+
+  // ContentWriter — see that interface's own doc for why this is not part of
+  // ContentAdapter. Implemented on the same class rather than a separate
+  // `MemoryContentWriter` purely because there is nothing to separate here:
+  // both already share this one mutable `#seed`, unlike the Supabase pair,
+  // where reads run anon and writes run as a permission-checked session —
+  // two genuinely different concerns split into two classes.
+
+  async saveContentItem(
+    templateKey: string,
+    locale: Locale,
+    fields: Readonly<Record<string, JsonValue>>,
+  ): Promise<Content> {
+    this.#guard();
+
+    this.#seed.content[templateKey] ??= {};
+    this.#seed.content[templateKey][locale] = { ...fields };
+
+    return this.#toContent(templateKey, locale, fields, true);
+  }
+
+  async deleteContentItem(templateKey: string, locale: Locale): Promise<void> {
+    this.#guard();
+    // Idempotent by contract: deleting what is already absent is a no-op,
+    // not an error — `delete` on a missing key is simply a no-op already.
+    delete this.#seed.content[templateKey]?.[locale];
+  }
+
+  async saveMessage(locale: Locale, key: string, value: string): Promise<void> {
+    this.#guard();
+
+    this.#seed.messages ??= {};
+    this.#seed.messages[locale] ??= {};
+    this.#seed.messages[locale][key] = value;
+  }
+
+  async deleteMessage(locale: Locale, key: string): Promise<void> {
+    this.#guard();
+    delete this.#seed.messages?.[locale]?.[key];
   }
 
   #guard(): void {

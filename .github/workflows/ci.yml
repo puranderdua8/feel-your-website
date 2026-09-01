@@ -98,17 +98,22 @@ jobs:
         run: supabase db reset
 
       - name: Build the adapter packages
-        run: pnpm --filter @feel-your-website/content-adapter-supabase --filter @feel-your-website/auth-supabase build
+        run: pnpm --filter @feel-your-website/content-adapter-supabase --filter @feel-your-website/auth-supabase --filter @feel-your-website/config-bundle-supabase build
 
-      # The two live suites this repo has, run against the database this job
-      # just built — real PostgREST queries, real GoTrue sign-ins, real RLS,
-      # not a mock of either. See each package's `src/contract.test.ts` for
-      # what they seed and why a live backend is the point.
+      # The live suites this repo has, run against the database this job just
+      # built — real PostgREST queries, real GoTrue sign-ins, real RLS, not a
+      # mock of any of it. See each package's `src/contract.test.ts` (or, for
+      # `config-bundle-supabase` and the write half of content,
+      # `src/live.test.ts` / `src/writer.live.test.ts`) for what they seed and
+      # why a live backend is the point.
       - name: Content adapter contract tests (live)
         run: pnpm --filter @feel-your-website/content-adapter-supabase test:contracts
 
       - name: Auth provider contract tests (live)
         run: pnpm --filter @feel-your-website/auth-supabase test:contracts
+
+      - name: Config bundle store contract tests (live)
+        run: pnpm --filter @feel-your-website/config-bundle-supabase test:contracts
 
   terraform:
     runs-on: ubuntu-latest

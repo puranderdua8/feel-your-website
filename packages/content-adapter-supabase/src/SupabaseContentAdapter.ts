@@ -46,8 +46,9 @@ interface ContentItemRow {
  *
  * Every query here runs with the `anon` key: nothing this adapter reads is
  * permission-gated (see `..._content.sql`), so there is no session to carry.
- * Writing content is `apps/cms`'s concern (Phase 6), not this adapter's —
- * this interface has no write methods at all.
+ * Writing content is `apps/cms`'s concern — `ContentAdapter` itself has no
+ * write methods at all; see `SupabaseContentWriter` in this same package for
+ * the session-authenticated counterpart that does.
  */
 export class SupabaseContentAdapter implements ContentAdapter {
   readonly #client: SupabaseClient;

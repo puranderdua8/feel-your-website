@@ -1,3 +1,17 @@
+// @vitest-environment node
+//
+// The workspace default (`environment: "jsdom"`, see
+// @feel-your-website/config/vitest/base) makes `globalThis.window` exist,
+// which auth-js's `isBrowser()` check takes as license to open a real
+// `BroadcastChannel` for every session-persisting client this file signs in
+// — Node's own `BroadcastChannel` has an interop bug with the `MessageEvent`
+// its own `postMessage` produces, and enough of these instances sharing one
+// storage key crashes the process with an unhandled exception (found by
+// actually running this suite, not by reading the library's source — it
+// passes all 14 assertions while doing it, which is what made the crash easy
+// to miss). Plain Node has no `window`, `isBrowser()` returns false, and
+// GoTrue never touches `BroadcastChannel` at all — the fix removes the cause
+// rather than working around the symptom.
 import { AuthError } from "@feel-your-website/auth";
 import {
   AUTH_CONTRACT_FIXTURE,

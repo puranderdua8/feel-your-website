@@ -4,6 +4,16 @@ export type ConfigErrorCode =
   | "invalid_items"
   /** Another writer changed the bundle first. */
   | "conflict"
+  /**
+   * The actor lacks the permission this store's writes require.
+   *
+   * Unreachable for `MemoryConfigBundleStore` — it has no notion of a
+   * caller's permissions, only of the vocabulary itself — but a real
+   * backend's write path (`manage:roles`/`manage:routes`, enforced inside the
+   * database, not merely by the CMS hiding the button) can and does refuse a
+   * write this way.
+   */
+  | "forbidden"
   | "unavailable"
   | "timeout";
 

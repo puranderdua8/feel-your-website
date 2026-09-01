@@ -143,7 +143,7 @@ regenerated: `pnpm --filter @feel-your-website/rbac generate:seed`.
 ```
 apps/
   shell/     end-user PWA — BFF, RBAC enforcement, CMS-driven slots
-  cms/       authoring — content, roles, route bundles, wizard configs
+  cms/       authoring — content, roles, route bundles (wizard configs: Phase 7)
   demo/      proving app: exercises all three mechanisms end to end
 packages/
   tokens/                   design tokens (primitive → semantic → extended)
@@ -152,10 +152,11 @@ packages/
   rbac/                     permission catalog + resolution + guards
   auth/                     AuthProvider interface, mock, contract suite
   auth-supabase/            AuthProvider backed by Supabase Auth
-  content-core/             ContentAdapter + TemplateKey + contract suite
+  content-core/             ContentAdapter + ContentWriter + TemplateKey + contract suite
   content-adapter-memory/   fixtures — dev, tests, Storybook
-  content-adapter-supabase/ ContentAdapter backed by Supabase Postgres
+  content-adapter-supabase/ ContentAdapter + ContentWriter backed by Supabase Postgres
   config-schema/            ConfigBundle substrate: versioning, audit, contract suite
+  config-bundle-supabase/   ConfigBundleStore backed by Supabase Postgres
   i18n-core/                locale negotiation, routing, message provider
   wizard/                   config-driven wizard + validator registry (Phase 7)
   config/                   shared eslint/prettier/tsconfig/vitest
@@ -201,7 +202,12 @@ site then has to know which one it is talking to. The contracts pin the
 behaviour that actually differs: error shape, pagination semantics, locale
 fallback, and idempotency.
 
-`pnpm test:contracts` runs them. A new adapter is finished when it passes.
+`pnpm test:contracts` runs them. A new adapter is finished when it passes —
+with one exception, and it's worth knowing which: `config-bundle-supabase`
+does **not** run `config-schema`'s shared contract. See
+"The config-bundle and content-write adapters" below for why a
+session-authenticated backend cannot honour that contract's `actor` parameter
+the way `MemoryConfigBundleStore` does, and what it runs instead.
 
 ## Database
 
@@ -245,6 +251,16 @@ A few things worth knowing before extending it:
   tokens stale — so `delete_config_bundle` finds the holders and calls
   `touch_permission_state` itself, before the delete, rather than trusting a
   trigger to still have something to find.
+- **Content writes are a plain upsert, not the bundle apparatus.**
+  `save_content_item` / `delete_content_item` / `save_content_message` /
+  `delete_content_message` (`..._content_writes.sql`) exist for the same
+  `has_permission('manage:content')`-checked-first, `SECURITY DEFINER` reason
+  as the bundle RPCs, but carry no optimistic-concurrency check: content is a
+  field-bag per `(template key, locale)` or `(locale, key)`, not a versioned,
+  audited bundle drawn from a fixed vocabulary, so there is no version to
+  conflict on. See `ContentWriter` in `content-core` for the write-side
+  interface this backs — deliberately separate from the read-only
+  `ContentAdapter` (see that interface's own doc for why).
 
 Everything above was exercised against a real local Postgres (`supabase db
 reset`, and `psql` sessions simulating both an unauthorized caller and an
@@ -299,6 +315,101 @@ happened while building this).
   drawing from the same namespace was the bug; the fix was giving the fixture
   clearly test-scoped names, not carving out an exception for the seed.
 
+## The config-bundle and content-write adapters
+
+`config-bundle-supabase` (`SupabaseConfigBundleStore`) and the write half of
+`content-adapter-supabase` (`SupabaseContentWriter`) are `apps/cms`'s
+backends: one store per vocabulary — `"permission"` for the role editor,
+`"template_key"` for the route bundle editor — and one writer for content
+items and messages. Unlike the read-only adapters above, every method here
+runs as the _signed-in caller_, not the anon key: the RPCs check
+`has_permission()` against that session's own JWT claims, so these classes
+build their client with `@supabase/ssr`'s `createServerClient` and a
+`CookieAdapter`, the same shape `auth-supabase` already exports (declared
+again in each package rather than imported from it — see each package's own
+`CookieAdapter.ts` for why a structural type stays cheaper to duplicate three
+times than to introduce a cross-adapter dependency for).
+
+- **`SupabaseConfigBundleStore` does not run `config-schema`'s shared
+  `runConfigBundleStoreContract`, and that is a real finding, not a gap.**
+  The contract asserts that a caller-supplied `actor` string round-trips
+  verbatim into `updatedBy` — true for `MemoryConfigBundleStore`, which
+  trusts whatever it is given, and false for any backend where `updated_by`
+  is `auth.uid()` of the authenticated session (`save_role_bundle` /
+  `save_route_bundle` never even accept an actor parameter — see
+  `..._config_bundle_writes.sql`). A client claiming to be someone else is
+  exactly what session-derived authorship exists to prevent, so this is not a
+  bug to fix — it is two genuinely different notions of "actor" that the
+  shared contract cannot describe at once. `config-bundle-supabase/src/live.test.ts`
+  exercises the same behaviours (versioning, conflict detection, vocabulary
+  validation, deletion, audit history) by hand instead, asserting against the
+  real signed-in user's id.
+- **Route bundles need `path` and `published`, which `config_bundles` itself
+  does not have** — they live in a separate `route_bundles` satellite table
+  (see Database, above). Rather than a second, route-only type alongside
+  `ConfigBundleStore`, `config-schema`'s `ConfigBundle` / `CreateBundleInput` /
+  `UpdateBundleInput` simply carry them as optional fields, unset by every
+  vocabulary that has no use for them (roles).
+- **`route_bundles.path` carries a real, global `unique` constraint that the
+  store's own test-isolation namespace does nothing to protect**, and found
+  the hard way: `live.test.ts` originally reused the literal path `/draft`
+  across two tests, and the second one failed with a bare "backend
+  unreachable" — `mapConfigError`'s catch-all fallback, because Postgres's
+  `23505` (unique violation) wasn't one of the codes it switched on yet. Fixed
+  in two places: distinct paths per test, and a real `23505` branch in
+  `mapConfigError` reporting _that_, not a manufactured outage.
+- **Node's `BroadcastChannel` and multiple signed-in `GoTrueClient` instances
+  do not mix, and it is not merely the library's own "multiple clients"
+  warning.** Every live suite that signs in more than a couple of sessions in
+  one process (this file, and `content-adapter-supabase`'s
+  `writer.live.test.ts`, which holds two _different_ real sessions — an
+  editor and a permission-less outsider — alive at once to prove the database
+  itself refuses the write) crashed with `TypeError: The "event" argument
+must be an instance of Event. Received an instance of MessageEvent`, from
+  Node's own `BroadcastChannel` — auth-js's `isBrowser()` check finds the
+  `window` the workspace's default jsdom Vitest environment provides and
+  opens a real cross-tab sync channel it would never touch under plain Node.
+  Every affected file now pins `// @vitest-environment node` at the top, and
+  `SupabaseContentWriter` additionally takes an optional `storageKey` so two
+  concurrently-live sessions in one test don't share a channel name even
+  incidentally. Discovered by running the suites, not by reading the
+  library's source — every one of the 22 real assertions in
+  `writer.live.test.ts` still passed while the process crashed underneath
+  them, which is what made it easy to miss.
+
+## The CMS app
+
+`apps/cms` mirrors `apps/shell`'s seam (`src/server/adapters.ts` is the only
+module allowed to name a concrete backend; `seam.test.ts` checks it the same
+way) but is deliberately smaller in a few specific ways:
+
+- **One route, three tabs, not three routes.** Nobody bookmarks "the roles
+  tab" — the only thing gating access is the signed-in session's permissions,
+  loaded once by `/`'s own loader. `Can` (from `@feel-your-website/rbac/react`)
+  gates each tab's content exactly as `apps/shell`'s `admin.tsx` does: hiding
+  a tab is a display decision, and every server function behind it is refused
+  independently by the database.
+- **No `i18n-core` dependency, and its own English chrome hardcoded.** This is
+  an internal authoring tool with one real audience — whoever holds a CMS
+  permission — not a localized end-user surface, and its own UI cannot
+  sensibly be driven by the CMS it is itself the authoring tool for without a
+  chicken-and-egg dependency on content that might not exist yet.
+- **The role and route-bundle stores follow `AUTH_PROVIDER`, not a config-bundle-specific
+  env var.** A config-bundle write is only ever meaningful against a _real_
+  signed-in session — `has_permission()` reads that session's own JWT claims
+  — so `AUTH_PROVIDER=mock` gets `MemoryConfigBundleStore` (which cannot check
+  a real permission anyway) and `AUTH_PROVIDER=supabase` gets
+  `SupabaseConfigBundleStore` sharing that same session's cookies. A separate
+  `CONFIG_BUNDLE_STORE` variable would only ever need to agree with
+  `AUTH_PROVIDER`, which is a variable that can disagree with itself, not a
+  useful axis of configuration.
+- **The route bundle editor's template catalog
+  (`src/content/template-keys.ts`) is a placeholder.** This boilerplate ships
+  no real templates or a renderer for them yet — nothing in `apps/shell` calls
+  `loadContent` from a route — so the two example keys stand in for whatever a
+  real project's UI kit actually exports. A real project replaces the list;
+  nothing that imports it needs to change.
+
 ## Infrastructure
 
 `infra/` is Terraform for what used to be a dashboard checkbox with no
@@ -320,12 +431,17 @@ pnpm install
 No credentials are needed — not locally, not in CI, not on Netlify. Every
 dependency resolves from public npm or from this workspace.
 
-The app itself runs against `MemoryContentAdapter`/`MockAuthProvider` with no
-further setup (`pnpm --filter @feel-your-website/shell dev`). To run it
-against a real Supabase instead: `supabase start` (needs Docker), then set
-`CONTENT_ADAPTER=supabase` / `AUTH_PROVIDER=supabase` and the three
-`SUPABASE_*` variables in `apps/shell/.env` — see `.env.example` for what
-each one is and where it's safe to expose.
+Both apps run against `MemoryContentAdapter`/`MockAuthProvider` with no
+further setup — `pnpm --filter @feel-your-website/shell dev` (port 3000) or
+`pnpm --filter @feel-your-website/cms dev` (port 3001; sign in with one of
+`MockAuthProvider`'s accounts, see `apps/cms/src/server/adapters.ts`). To run
+either against a real Supabase instead: `supabase start` (needs Docker), then
+set `CONTENT_ADAPTER=supabase` / `AUTH_PROVIDER=supabase` and the three
+`SUPABASE_*` variables in that app's own `.env` — see `.env.example` for what
+each one is and where it's safe to expose. `apps/cms` needs a real user
+granted a real permission to do anything useful against Supabase: seed one
+the same way `config-bundle-supabase/src/live.test.ts` does (`admin.auth.admin.createUser`,
+a `config_bundles` row of `role_permissions`, a `user_roles` assignment).
 
 ## Scripts
 

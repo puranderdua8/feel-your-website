@@ -73,6 +73,8 @@ export class MemoryConfigBundleStore<
       version: 1,
       updatedAt: this.#now().toISOString(),
       updatedBy: actor,
+      path: input.path,
+      published: input.published,
     };
 
     this.#bundles.set(bundle.id, bundle);
@@ -103,6 +105,8 @@ export class MemoryConfigBundleStore<
       version: existing.version + 1,
       updatedAt: this.#now().toISOString(),
       updatedBy: actor,
+      path: input.path ?? existing.path,
+      published: input.published ?? existing.published,
     };
 
     this.#bundles.set(id, updated);

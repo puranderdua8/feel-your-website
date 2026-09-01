@@ -39,6 +39,9 @@
       // every TanStack Start app added later (cms, demo).
       "dependsOn": ["^build", "build"]
     },
+    "@feel-your-website/cms#typecheck": {
+      "dependsOn": ["^build", "build"]
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
