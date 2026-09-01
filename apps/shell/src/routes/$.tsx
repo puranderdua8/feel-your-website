@@ -1,7 +1,7 @@
+import { renderTemplate } from "@feel-your-website/section-registry";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { Fragment } from "react";
 
-import { renderTemplate } from "@/templates/registry";
 import { loadRoutePage, type RoutePage } from "@/server/bff";
 
 /**
@@ -11,9 +11,9 @@ import { loadRoutePage, type RoutePage } from "@/server/bff";
  *
  * This is the piece that makes a CMS-authored route bundle actually appear
  * on the site — see `src/server/bff.ts`'s `loadRoutePage` for the manifest
- * lookup and `src/templates/registry.tsx` for what turns each item into
- * markup. Before this file existed, `published_route_manifest` was real and
- * queryable but nothing in this app ever read it.
+ * lookup and `@feel-your-website/section-registry` for what turns each item
+ * into markup. Before this file existed, `published_route_manifest` was real
+ * and queryable but nothing in this app ever read it.
  */
 export const Route = createFileRoute("/$")({
   loader: async ({ location }): Promise<RoutePage> => {

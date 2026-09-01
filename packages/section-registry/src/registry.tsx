@@ -8,7 +8,9 @@ import type { Content, JsonValue } from "@feel-your-website/content-core";
  * adapters flagged as not built yet: the CMS can author a route bundle and
  * the database serves it correctly, but nothing consumed
  * `getRouteManifest()`/`getContent()` to actually render a page from it.
- * This module and `src/routes/$.tsx` are that consumer.
+ * `apps/shell`'s catch-all route (`src/routes/$.tsx`) is that consumer;
+ * this registry lives in its own package so `apps/cms` can reuse it to
+ * render a preview of the same components.
  *
  * The three keys here match `apps/cms/src/content/template-keys.ts`'s own
  * placeholder catalog exactly, plus `help` (the one real fixture route

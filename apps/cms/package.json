@@ -21,6 +21,7 @@
     "@feel-your-website/content-adapter-supabase": "workspace:*",
     "@feel-your-website/content-core": "workspace:*",
     "@feel-your-website/rbac": "workspace:*",
+    "@feel-your-website/section-registry": "workspace:*",
     "@feel-your-website/theme": "workspace:*",
     "@feel-your-website/tokens": "workspace:*",
     "@feel-your-website/ui": "workspace:*",
