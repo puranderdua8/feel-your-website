@@ -535,12 +535,23 @@ Each app ships its own image — `apps/shell/Dockerfile`, `apps/cms/Dockerfile`
 docker compose up --build
 ```
 
-`shell` on `http://localhost:3000`, `cms` on `http://localhost:3001` (sign in
-`editor@example.com` / `demo`). As with `pnpm dev`, the containers default to
-`MemoryContentAdapter` / `MockAuthProvider`, so this needs no secrets and no
-database. Point the cms at a real Supabase by setting `CONTENT_ADAPTER` /
-`AUTH_PROVIDER` / the `SUPABASE_*` vars in `compose.yaml` (runtime env, never
-baked into a layer).
+`shell` on `http://localhost:3000` (in-memory adapter, mock auth — no
+dependencies, starts immediately). `cms` on `http://localhost:3001`, running
+against a **local Supabase** the same compose file brings up: Postgres +
+GoTrue + PostgREST behind an nginx gateway on `http://localhost:54321` —
+trimmed to what the apps actually call (no Studio, Storage or Realtime),
+wired the way Supabase's own self-host compose wires it. Sign in
+`editor@example.com` / `password`.
+
+A one-shot `migrate` service applies the migrations, the seed, and a dev
+admin user the first time the database volume is created. It is a no-op on
+later `up`s; `docker compose down -v` forces a fresh run. The JWT secret and
+anon key in `compose.yaml` are the fixed Supabase local-dev values (the same
+ones `.github/workflows/ci.yml` commits), so a token minted here also
+validates under `supabase start`.
+
+To run the cms on the in-memory adapter instead — no database at all — set
+`CONTENT_ADAPTER=memory` / `AUTH_PROVIDER=mock` on the `cms` service.
 
 How the image is built and run:
 
@@ -555,6 +566,13 @@ How the image is built and run:
   `{ fetch }` handler — the same shape Netlify's adapter wraps). `server.js`
   serves `dist/client` and hands everything else to that handler, using
   `srvx` (TanStack Start's own server layer). It listens on `$PORT`.
+- **The gateway** (`docker/gateway.nginx.conf`) routes only `/auth/v1/*` →
+  GoTrue and `/rest/v1/*` → PostgREST, because that is all
+  `@supabase/supabase-js` / `@supabase/ssr` call in this codebase. GoTrue
+  registers the Custom Access Token hook
+  (`supabase/migrations/..._auth_hook.sql`) via `GOTRUE_HOOK_*` env — the
+  same thing `config.toml` does for `supabase start` — so the cms's
+  permission checks work.
 - **Netlify is untouched.** `netlify.toml` still drives both production
   sites; the Dockerfiles are an additional target, not a replacement.
 

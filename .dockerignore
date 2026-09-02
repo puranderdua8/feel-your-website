@@ -29,3 +29,8 @@ infra
 supabase/.temp
 supabase/.branches
 **/.DS_Store
+
+# Not needed inside the app images (compose-only).
+docker
+compose.yaml
+compose.*.yaml
