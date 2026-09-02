@@ -62,7 +62,9 @@ export const contractSeed: MemoryContentSeed = {
     {
       id: "route-help",
       path: "/help",
-      items: ["help"],
+      // One root section, no slots — the flat case. `items` is derived from
+      // this by `getRouteManifest`.
+      tree: [{ instanceId: "help-root", ref: { key: "help", variant: "" }, slots: {} }],
       version: 1,
       updatedAt: "2026-01-01T00:00:00.000Z",
     },

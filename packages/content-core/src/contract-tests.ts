@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ContentAdapter } from "./adapter.js";
+import { flattenTree } from "./compose.js";
 import { CONTRACT_FIXTURE } from "./contract-fixture.js";
 import { ContentAdapterError, isContentAdapterError } from "./errors.js";
+import type { RouteSectionNode } from "./types.js";
 
 /**
  * The behavioural contract every ContentAdapter must satisfy.
@@ -254,6 +256,35 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
         const manifest = await adapter.getRouteManifest("zz");
 
         expect(Array.isArray(manifest)).toBe(true);
+      });
+
+      it("exposes a section-instance tree whose nodes are well-formed", async () => {
+        const adapter = await createAdapter();
+        const manifest = await adapter.getRouteManifest(f.defaultLocale);
+
+        const assertNode = (node: RouteSectionNode): void => {
+          expect(typeof node.instanceId).toBe("string");
+          expect(node.instanceId.length).toBeGreaterThan(0);
+          expect(typeof node.ref.key).toBe("string");
+          expect(typeof node.ref.variant).toBe("string");
+          for (const children of Object.values(node.slots)) {
+            for (const child of children) assertNode(child);
+          }
+        };
+
+        for (const bundle of manifest) {
+          expect(Array.isArray(bundle.tree)).toBe(true);
+          for (const node of bundle.tree) assertNode(node);
+        }
+      });
+
+      it("keeps the deprecated `items` as the pre-order flatten of `tree`", async () => {
+        const adapter = await createAdapter();
+        const manifest = await adapter.getRouteManifest(f.defaultLocale);
+
+        for (const bundle of manifest) {
+          expect([...bundle.items]).toEqual(flattenTree(bundle.tree).map((ref) => ref.key));
+        }
       });
     });
 

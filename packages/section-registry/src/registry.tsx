@@ -1,28 +1,28 @@
 import type { Content, JsonValue } from "@feel-your-website/content-core";
 
 /**
- * Maps a `template_key` (route-bundle items, see `@feel-your-website/config-schema`
- * and `published_route_manifest`) to the component that renders it.
+ * Maps a section key to the React component that renders it — the one
+ * registry the shell (rendering published routes) and the CMS (previewing
+ * them) both use.
  *
- * This is the piece the README's own notes on `apps/cms` and the Supabase
- * adapters flagged as not built yet: the CMS can author a route bundle and
- * the database serves it correctly, but nothing consumed
- * `getRouteManifest()`/`getContent()` to actually render a page from it.
- * `apps/shell`'s catch-all route (`src/routes/$.tsx`) is that consumer;
- * this registry lives in its own package so `apps/cms` can reuse it to
- * render a preview of the same components.
+ * The keys here match `apps/cms/src/content/sections.ts`'s catalog: `hero` /
+ * `guidance` / `footer` plus the atoms (`icon`, `text`, `image`, `button`)
+ * and the composite `card`, and `help` (the one real fixture route
+ * `content-adapter-memory` ships, at `/help`). A real project replaces this
+ * registry alongside that catalog.
  *
- * The three keys here match `apps/cms/src/content/template-keys.ts`'s own
- * placeholder catalog exactly, plus `help` (the one real fixture route
- * `content-adapter-memory`'s seed ships, at `/help`) — both sides of this
- * boilerplate's example vocabulary have to agree for local dev to work with
- * no backend at all. A real project replaces both this registry and that
- * catalog together; neither is meant to be the final template set.
+ * Every component takes the same `{ fields, slots }` shape. Leaf sections
+ * ignore `slots`; a composite like `card` reads `slots.icon` / `slots.body`,
+ * which `renderComposition` has already rendered from the route's tree.
  */
 
-type TemplateComponent = (props: {
+export interface SectionComponentProps {
   fields: Readonly<Record<string, JsonValue>>;
-}) => React.JSX.Element;
+  /** Rendered slot children, keyed by `SectionSlotSpec.name`. `{}` for a leaf. */
+  slots: Readonly<Record<string, React.ReactNode>>;
+}
+
+export type SectionComponent = (props: SectionComponentProps) => React.JSX.Element;
 
 /** Reads a field as a string, defaulting to "" rather than rendering "undefined". */
 function text(fields: Readonly<Record<string, JsonValue>>, key: string): string {
@@ -30,7 +30,7 @@ function text(fields: Readonly<Record<string, JsonValue>>, key: string): string 
   return typeof value === "string" ? value : "";
 }
 
-const HeroTemplate: TemplateComponent = ({ fields }) => (
+const HeroSection: SectionComponent = ({ fields }) => (
   <section className="border-border flex flex-col gap-2 border-b pb-8">
     <h1 className="text-3xl font-semibold">{text(fields, "title")}</h1>
     {text(fields, "subtitle") && (
@@ -40,53 +40,100 @@ const HeroTemplate: TemplateComponent = ({ fields }) => (
 );
 
 /** Shared by `guidance` and `help` — both are a heading over a paragraph. */
-const TitleBodyTemplate: TemplateComponent = ({ fields }) => (
+const TitleBodySection: SectionComponent = ({ fields }) => (
   <section className="flex flex-col gap-2">
     <h2 className="text-xl font-medium">{text(fields, "title")}</h2>
     <p className="text-muted-foreground">{text(fields, "body")}</p>
   </section>
 );
 
-const FooterTemplate: TemplateComponent = ({ fields }) => (
+const FooterSection: SectionComponent = ({ fields }) => (
   <footer className="border-border text-muted-foreground border-t pt-4 text-sm">
     {text(fields, "text")}
   </footer>
 );
 
-const TEMPLATE_REGISTRY: Readonly<Record<string, TemplateComponent>> = {
-  hero: HeroTemplate,
-  guidance: TitleBodyTemplate,
-  help: TitleBodyTemplate,
-  footer: FooterTemplate,
+const IconSection: SectionComponent = ({ fields }) => (
+  <span className="text-muted-foreground text-sm" data-icon={text(fields, "name")}>
+    {text(fields, "name")}
+  </span>
+);
+
+const TextSection: SectionComponent = ({ fields }) => (
+  <p className="text-muted-foreground">{text(fields, "value")}</p>
+);
+
+const ImageSection: SectionComponent = ({ fields }) =>
+  text(fields, "src") ? (
+    <img
+      src={text(fields, "src")}
+      alt={text(fields, "alt")}
+      className="max-w-full rounded-[var(--radius)]"
+    />
+  ) : (
+    <span className="text-muted-foreground text-sm">(no image)</span>
+  );
+
+const ButtonSection: SectionComponent = ({ fields }) => (
+  <a
+    href={text(fields, "href") || "#"}
+    className="bg-primary text-primary-foreground inline-flex w-fit items-center rounded-[var(--radius)] px-3 py-1.5 text-sm font-medium"
+  >
+    {text(fields, "label")}
+  </a>
+);
+
+const CardSection: SectionComponent = ({ fields, slots }) => (
+  <section className="border-border flex flex-col gap-3 rounded-[var(--radius)] border p-4">
+    {slots.icon}
+    {text(fields, "heading") && <h3 className="font-medium">{text(fields, "heading")}</h3>}
+    {slots.body}
+  </section>
+);
+
+export const SECTION_REGISTRY: Readonly<Record<string, SectionComponent>> = {
+  hero: HeroSection,
+  guidance: TitleBodySection,
+  help: TitleBodySection,
+  footer: FooterSection,
+  icon: IconSection,
+  text: TextSection,
+  image: ImageSection,
+  button: ButtonSection,
+  card: CardSection,
 };
 
+function Placeholder({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="border-border text-muted-foreground rounded-[var(--radius)] border border-dashed p-4 text-sm">
+      {children}
+    </div>
+  );
+}
+
 /**
- * Renders one route bundle item.
+ * Renders one section: its component, fed the resolved content and its
+ * already-rendered slot children.
  *
- * Missing content and an unregistered template key are rendered visibly
- * rather than silently skipped — a CMS author publishing a route with a key
- * this build doesn't know about (or content that hasn't been filled in yet)
- * is a mistake worth seeing on the page, not one that quietly produces a
- * shorter page than intended.
+ * A missing component or missing content is rendered visibly rather than
+ * skipped — a route published against a key this build doesn't know, or a
+ * variant nobody has filled in yet, is a mistake worth seeing on the page.
+ */
+export function renderSection(
+  sectionKey: string,
+  content: Content | null,
+  slots: Readonly<Record<string, React.ReactNode>> = {},
+): React.JSX.Element {
+  const Component = SECTION_REGISTRY[sectionKey];
+  if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
+  if (!content) return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
+  return <Component fields={content.fields} slots={slots} />;
+}
+
+/**
+ * @deprecated Use `renderComposition` / `renderSection`. Kept while the shell
+ * and CMS finish moving to the section-tree model; dropped in the B5 cleanup.
  */
 export function renderTemplate(templateKey: string, content: Content | null): React.JSX.Element {
-  const Component = TEMPLATE_REGISTRY[templateKey];
-
-  if (!Component) {
-    return (
-      <div className="border-border text-muted-foreground rounded-[var(--radius)] border border-dashed p-4 text-sm">
-        No template registered for “{templateKey}”.
-      </div>
-    );
-  }
-
-  if (!content) {
-    return (
-      <div className="border-border text-muted-foreground rounded-[var(--radius)] border border-dashed p-4 text-sm">
-        “{templateKey}” has no content yet.
-      </div>
-    );
-  }
-
-  return <Component fields={content.fields} />;
+  return renderSection(templateKey, content);
 }

@@ -12,8 +12,8 @@ import { defineSections } from "@feel-your-website/content-core";
  * A real project replaces this list alongside the components in
  * `registry.tsx`.
  *
- * Rendering these (and materialising slot defaults) is the route-composition
- * work's job — `renderTemplate` here still drives the shell today.
+ * `renderComposition` in `compose.tsx` renders a route's tree of these and
+ * materialises any unfilled slot defaults.
  */
 export const sectionCatalog = defineSections([
   {

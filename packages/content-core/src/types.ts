@@ -45,12 +45,36 @@ export interface TemplateKeyCatalog<TKey extends string> {
  * content; a name selects an alternative (see {@link Content.variant}).
  *
  * The unit the CMS composes a route from, and the unit a route's section
- * slot can be overridden to point at. Route composition itself (a tree of
- * these) arrives with the route-composition work; this is the leaf.
+ * slot can be overridden to point at.
  */
 export interface SectionRef {
   readonly key: string;
   readonly variant: string;
+}
+
+/**
+ * One instance in a route's composition tree.
+ *
+ * A tree of *values*, not a graph of shared references: a node owns its own
+ * `slots`, so there is no back-edge and no structural cycle risk. Two nodes
+ * may carry the same {@link SectionRef} — that is reuse (the same `icon`
+ * variant in two cards), not a cycle.
+ */
+export interface RouteSectionNode {
+  /**
+   * Stable id — the React key, and the write target a slot override splices
+   * into. Client-minted (a uuid) so a whole tree can be persisted in one
+   * pre-order pass without round-tripping generated ids.
+   */
+  readonly instanceId: string;
+  readonly ref: SectionRef;
+  /**
+   * Children filling this node's slots, keyed by `SectionSlotSpec.name`. A
+   * slot key absent here (or mapped to `[]`) means "materialise the slot's
+   * declared default at render time", not "render nothing" — see
+   * `renderComposition` in `@feel-your-website/section-registry`.
+   */
+  readonly slots: Readonly<Record<string, readonly RouteSectionNode[]>>;
 }
 
 /**
@@ -80,12 +104,21 @@ export interface Content<TKey extends string = string> {
   updatedAt: string;
 }
 
-/** A route's composition: which templates render, in what order. */
+/** A route's composition: the section-instance tree that renders at a path. */
 export interface RouteBundle<TKey extends string = string> {
   id: string;
   /** The route path this bundle renders at, e.g. `/help`. */
   path: string;
-  /** Template keys in render order. Validated against the catalog at publish. */
+  /**
+   * Root section instances in render order. Each owns its own slot fills —
+   * this is the shape the shell renders and the CMS route editor edits.
+   */
+  tree: readonly RouteSectionNode[];
+  /**
+   * @deprecated Pre-order flatten of the tree's `ref.key`s — a compatibility
+   * shim for callers not yet moved to `tree`. Derive it with
+   * `flattenTree(tree)`; it is dropped in the B5 cleanup.
+   */
   items: readonly TKey[];
   version: number;
   updatedAt: string;
