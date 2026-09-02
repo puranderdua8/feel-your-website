@@ -49,7 +49,7 @@ function ContentItems() {
   const [pending, setPending] = useState(false);
 
   async function refresh() {
-    setItems(await listContentItems());
+    setItems(await listContentItems({ data: { locale: "en" } }));
   }
 
   useEffect(() => {

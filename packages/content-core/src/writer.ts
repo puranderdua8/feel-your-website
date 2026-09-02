@@ -17,15 +17,22 @@ import type { Content, JsonValue, Locale } from "./types.js";
  * database does an upsert here rather than a version-checked update).
  */
 export interface ContentWriter<TKey extends string = string> {
-  /** Creates or replaces one template's content in one locale. */
+  /**
+   * Creates or replaces one template's content in one locale, for the given
+   * variant (`variant` defaults to `""`, the default/global content).
+   */
   saveContentItem(
     templateKey: TKey,
     locale: Locale,
     fields: Readonly<Record<string, JsonValue>>,
+    variant?: string,
   ): Promise<Content<TKey>>;
 
-  /** Removes one template's content in one locale. Idempotent: deleting an absent row is not an error. */
-  deleteContentItem(templateKey: TKey, locale: Locale): Promise<void>;
+  /**
+   * Removes one template's content in one locale for the given variant
+   * (default `""`). Idempotent: deleting an absent row is not an error.
+   */
+  deleteContentItem(templateKey: TKey, locale: Locale, variant?: string): Promise<void>;
 
   /** Creates or replaces one UI-chrome message. */
   saveMessage(locale: Locale, key: string, value: string): Promise<void>;

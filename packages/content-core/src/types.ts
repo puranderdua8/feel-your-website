@@ -44,6 +44,13 @@ export interface TemplateKeyCatalog<TKey extends string> {
  */
 export interface Content<TKey extends string = string> {
   templateKey: TKey;
+  /**
+   * The named content variant. `""` is the section's default/global content;
+   * a named variant (`"star"`, `"short"`, …) is an independently-selectable
+   * alternative the CMS can point a route's slot at. Locale fallback applies
+   * within a variant; there is no fallback between variants.
+   */
+  variant: string;
   /** The locale actually served, which may differ from the one requested. */
   locale: Locale;
   /**
@@ -85,6 +92,11 @@ export interface Page<TItem> {
 
 export interface ListContentQuery {
   locale: Locale;
+  /**
+   * Restrict to one content variant. Omitted lists only the default
+   * variant (`""`); pass a name to list that variant's rows instead.
+   */
+  variant?: string;
   /** Restrict to these template keys. Omitted means all. */
   templateKeys?: readonly string[];
   /** Page size. Adapters must clamp to their own maximum rather than error. */

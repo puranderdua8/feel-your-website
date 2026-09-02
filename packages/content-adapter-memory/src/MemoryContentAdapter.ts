@@ -21,8 +21,14 @@ import {
  */
 
 export interface MemoryContentSeed {
-  /** `templateKey -> locale -> fields` */
+  /** Default-variant content: `templateKey -> locale -> fields` */
   content: Record<string, Record<Locale, Record<string, JsonValue>>>;
+  /**
+   * Named non-default content variants:
+   * `templateKey -> variant -> locale -> fields`. Additive — the default
+   * variant (`""`) always lives in `content`, never here.
+   */
+  variants?: Record<string, Record<string, Record<Locale, Record<string, JsonValue>>>>;
   /** `locale -> messages` */
   messages?: Record<Locale, Record<string, string>>;
   routes?: readonly RouteBundle[];
@@ -57,16 +63,17 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
     this.#failWith = options.failWith;
   }
 
-  async getContent(templateKey: string, locale: Locale): Promise<Content | null> {
+  async getContent(templateKey: string, locale: Locale, variant = ""): Promise<Content | null> {
     this.#guard();
 
-    const byLocale = this.#seed.content[templateKey];
-    // A missing template is an expected outcome, not a failure.
+    const byLocale = this.#localesFor(templateKey, variant);
+    // A missing template — or a missing variant of it — is an expected
+    // outcome, not a failure. No fallback between variants.
     if (!byLocale) return null;
 
     const requested = byLocale[locale];
     if (requested) {
-      return this.#toContent(templateKey, locale, requested, true);
+      return this.#toContent(templateKey, variant, locale, requested, true);
     }
 
     const fallback = byLocale[this.#seed.defaultLocale];
@@ -74,13 +81,33 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
 
     // Served, but flagged: the caller must be able to tell it did not get the
     // locale it asked for.
-    return this.#toContent(templateKey, this.#seed.defaultLocale, fallback, false);
+    return this.#toContent(templateKey, variant, this.#seed.defaultLocale, fallback, false);
+  }
+
+  /** The `locale -> fields` map for one (templateKey, variant), or undefined. */
+  #localesFor(
+    templateKey: string,
+    variant: string,
+  ): Record<Locale, Record<string, JsonValue>> | undefined {
+    return variant === ""
+      ? this.#seed.content[templateKey]
+      : this.#seed.variants?.[templateKey]?.[variant];
   }
 
   async listContent(query: ListContentQuery): Promise<Page<Content>> {
     this.#guard();
 
-    const keys = Object.keys(this.#seed.content)
+    // Omitting `variant` lists the default (`""`) rows, from `content`; a
+    // named variant lists the keys that have that variant, from `variants`.
+    const variant = query.variant ?? "";
+    const source =
+      variant === ""
+        ? Object.keys(this.#seed.content)
+        : Object.keys(this.#seed.variants ?? {}).filter(
+            (key) => this.#seed.variants?.[key]?.[variant],
+          );
+
+    const keys = source
       .filter((key) => !query.templateKeys || query.templateKeys.includes(key))
       // Sorted so cursors stay stable across calls — an unstable order is how
       // cursor pagination silently skips or repeats rows.
@@ -96,7 +123,7 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
 
     while (index < keys.length && items.length < limit) {
       const key = keys[index] as string;
-      const content = await this.getContent(key, query.locale);
+      const content = await this.getContent(key, query.locale, variant);
       if (content) items.push(content);
       index += 1;
     }
@@ -131,20 +158,32 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
     templateKey: string,
     locale: Locale,
     fields: Readonly<Record<string, JsonValue>>,
+    variant = "",
   ): Promise<Content> {
     this.#guard();
 
-    this.#seed.content[templateKey] ??= {};
-    this.#seed.content[templateKey][locale] = { ...fields };
+    if (variant === "") {
+      this.#seed.content[templateKey] ??= {};
+      this.#seed.content[templateKey][locale] = { ...fields };
+    } else {
+      this.#seed.variants ??= {};
+      this.#seed.variants[templateKey] ??= {};
+      this.#seed.variants[templateKey][variant] ??= {};
+      this.#seed.variants[templateKey][variant][locale] = { ...fields };
+    }
 
-    return this.#toContent(templateKey, locale, fields, true);
+    return this.#toContent(templateKey, variant, locale, fields, true);
   }
 
-  async deleteContentItem(templateKey: string, locale: Locale): Promise<void> {
+  async deleteContentItem(templateKey: string, locale: Locale, variant = ""): Promise<void> {
     this.#guard();
     // Idempotent by contract: deleting what is already absent is a no-op,
     // not an error — `delete` on a missing key is simply a no-op already.
-    delete this.#seed.content[templateKey]?.[locale];
+    if (variant === "") {
+      delete this.#seed.content[templateKey]?.[locale];
+    } else {
+      delete this.#seed.variants?.[templateKey]?.[variant]?.[locale];
+    }
   }
 
   async saveMessage(locale: Locale, key: string, value: string): Promise<void> {
@@ -166,12 +205,14 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
 
   #toContent(
     templateKey: string,
+    variant: string,
     locale: Locale,
     fields: Record<string, JsonValue>,
     translated: boolean,
   ): Content {
     return {
       templateKey,
+      variant,
       locale,
       translated,
       fields,

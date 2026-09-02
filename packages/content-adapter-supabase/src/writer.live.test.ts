@@ -180,6 +180,21 @@ if (hasLocalSupabase) {
       expect(afterDelete?.translated).toBe(false);
     });
 
+    it("round-trips a named variant without touching the default variant", async () => {
+      await editor.saveContentItem(templateKey, "en", { title: "Default" });
+      await editor.saveContentItem(templateKey, "en", { title: "Star icon" }, "star");
+
+      expect((await reader.getContent(templateKey, "en"))?.fields).toEqual({ title: "Default" });
+      const starred = await reader.getContent(templateKey, "en", "star");
+      expect(starred?.variant).toBe("star");
+      expect(starred?.fields).toEqual({ title: "Star icon" });
+
+      await editor.deleteContentItem(templateKey, "en", "star");
+      expect(await reader.getContent(templateKey, "en", "star")).toBeNull();
+      // The default variant is untouched by the variant delete.
+      expect((await reader.getContent(templateKey, "en"))?.fields).toEqual({ title: "Default" });
+    });
+
     it("saves and deletes a message", async () => {
       await editor.saveMessage("en", messageKey, "Loading…");
       expect((await reader.getMessages("en"))[messageKey]).toBe("Loading…");

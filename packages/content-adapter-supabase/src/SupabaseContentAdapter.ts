@@ -35,6 +35,7 @@ export interface SupabaseContentAdapterOptions {
 
 interface ContentItemRow {
   template_key: string;
+  variant: string;
   locale: string;
   fields: Record<string, JsonValue>;
   updated_at: string;
@@ -80,14 +81,16 @@ export class SupabaseContentAdapter implements ContentAdapter {
     this.#failWith = options.failWith;
   }
 
-  async getContent(templateKey: string, locale: Locale): Promise<Content | null> {
+  async getContent(templateKey: string, locale: Locale, variant = ""): Promise<Content | null> {
     this.#guard();
 
     const locales = locale === this.#defaultLocale ? [locale] : [locale, this.#defaultLocale];
     const { data, error } = await this.#client
       .from("content_items")
-      .select("template_key, locale, fields, updated_at")
+      .select("template_key, variant, locale, fields, updated_at")
       .eq("template_key", templateKey)
+      // Exact match — locale falls back below, variant never does.
+      .eq("variant", variant)
       .in("locale", locales);
 
     if (error) throw mapContentError(error);
@@ -108,7 +111,9 @@ export class SupabaseContentAdapter implements ContentAdapter {
       query.locale === this.#defaultLocale ? [query.locale] : [query.locale, this.#defaultLocale];
     let builder = this.#client
       .from("content_items")
-      .select("template_key, locale, fields, updated_at")
+      .select("template_key, variant, locale, fields, updated_at")
+      // Omitting `variant` lists the default (`""`) rows.
+      .eq("variant", query.variant ?? "")
       .in("locale", locales);
     if (query.templateKeys) builder = builder.in("template_key", [...query.templateKeys]);
 
@@ -189,6 +194,7 @@ export class SupabaseContentAdapter implements ContentAdapter {
   #toContent(row: ContentItemRow, requestedLocale: Locale): Content {
     return {
       templateKey: row.template_key,
+      variant: row.variant,
       locale: row.locale,
       translated: row.locale === requestedLocale,
       fields: row.fields,

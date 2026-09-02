@@ -14,14 +14,16 @@ import type { Content, ListContentQuery, Locale, Page, RouteBundle } from "./typ
  */
 export interface ContentAdapter<TKey extends string = string> {
   /**
-   * Resolves one template's content in one locale.
+   * Resolves one template's content in one locale, optionally for a named
+   * variant (`variant` defaults to `""`, the default/global content).
    *
-   * Returns `null` when the template has no content at all — a missing
-   * resource is an expected outcome, not an error, so it is not thrown.
-   * Falling back to another locale sets `translated: false` rather than
-   * returning null.
+   * Returns `null` when the template — or the requested variant of it — has
+   * no content at all: a missing resource is an expected outcome, not an
+   * error, so it is not thrown. Falling back to another locale sets
+   * `translated: false` rather than returning null; there is no fallback
+   * between variants (an unknown variant of a known key returns `null`).
    */
-  getContent(templateKey: TKey, locale: Locale): Promise<Content<TKey> | null>;
+  getContent(templateKey: TKey, locale: Locale, variant?: string): Promise<Content<TKey> | null>;
 
   /** Lists content, cursor-paginated. */
   listContent(query: ListContentQuery): Promise<Page<Content<TKey>>>;

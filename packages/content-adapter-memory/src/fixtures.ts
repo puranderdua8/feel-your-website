@@ -26,6 +26,16 @@ export const contractSeed: MemoryContentSeed = {
       en: { title: "Help", body: "Contact support." },
     },
   },
+  // A named content variant of `guidance`, in the default locale only —
+  // proves variant selection, and that locale fallback still applies within
+  // a variant.
+  variants: {
+    [CONTRACT_FIXTURE.variantKey]: {
+      [CONTRACT_FIXTURE.variantName]: {
+        en: { title: "Guidance (short)", body: "Hold it close." },
+      },
+    },
+  },
   // Keys deliberately match the i18n bootstrap set, so this fixture
   // demonstrates the real behaviour: CMS copy overriding the built-in
   // strings, in each locale. Keys that are absent here keep their bootstrap

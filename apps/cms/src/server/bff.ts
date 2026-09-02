@@ -95,42 +95,57 @@ function asFields(input: unknown): Record<string, JsonValue> {
   return input as Record<string, JsonValue>;
 }
 
-export const listContentItems = createServerFn({ method: "GET" }).handler(
-  async (): Promise<readonly Content[]> => {
-    const page = await getContentAdapter().listContent({ locale: "en", limit: 100 });
+export const listContentItems = createServerFn({ method: "GET" })
+  .validator((input: unknown): { locale: string } => {
+    const locale = (input as { locale?: unknown } | undefined)?.locale;
+    return { locale: typeof locale === "string" && locale.trim() !== "" ? locale : "en" };
+  })
+  .handler(async ({ data }): Promise<readonly Content[]> => {
+    // Default-variant rows for the chosen locale — the Sections surface (a
+    // later phase) lists named variants separately.
+    const page = await getContentAdapter().listContent({ locale: data.locale, limit: 100 });
     return page.items;
-  },
-);
+  });
 
 export const saveContentItem = createServerFn({ method: "POST" })
   .validator(
     (
       input: unknown,
-    ): { templateKey: string; locale: string; fields: Record<string, JsonValue> } => {
-      const { templateKey, locale, fields } = (input ?? {}) as Record<string, unknown>;
+    ): {
+      templateKey: string;
+      locale: string;
+      fields: Record<string, JsonValue>;
+      variant: string;
+    } => {
+      const { templateKey, locale, fields, variant } = (input ?? {}) as Record<string, unknown>;
       if (typeof templateKey !== "string" || templateKey.trim() === "") {
         throw new Error("templateKey is required.");
       }
       if (typeof locale !== "string" || locale.trim() === "") {
         throw new Error("locale is required.");
       }
-      return { templateKey, locale, fields: asFields(fields) };
+      return {
+        templateKey,
+        locale,
+        fields: asFields(fields),
+        variant: typeof variant === "string" ? variant : "",
+      };
     },
   )
   .handler(async ({ data }): Promise<Content> =>
-    getContentWriter().saveContentItem(data.templateKey, data.locale, data.fields),
+    getContentWriter().saveContentItem(data.templateKey, data.locale, data.fields, data.variant),
   );
 
 export const deleteContentItem = createServerFn({ method: "POST" })
-  .validator((input: unknown): { templateKey: string; locale: string } => {
-    const { templateKey, locale } = (input ?? {}) as Record<string, unknown>;
+  .validator((input: unknown): { templateKey: string; locale: string; variant: string } => {
+    const { templateKey, locale, variant } = (input ?? {}) as Record<string, unknown>;
     if (typeof templateKey !== "string" || typeof locale !== "string") {
       throw new Error("templateKey and locale are required.");
     }
-    return { templateKey, locale };
+    return { templateKey, locale, variant: typeof variant === "string" ? variant : "" };
   })
   .handler(async ({ data }): Promise<void> => {
-    await getContentWriter().deleteContentItem(data.templateKey, data.locale);
+    await getContentWriter().deleteContentItem(data.templateKey, data.locale, data.variant);
   });
 
 export const listMessages = createServerFn({ method: "GET" })
