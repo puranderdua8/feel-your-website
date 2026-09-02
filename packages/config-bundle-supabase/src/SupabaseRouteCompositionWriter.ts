@@ -56,8 +56,6 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
   ): Promise<RouteBundle> {
     void actor; // the RPC derives the writer from auth.uid(), not this string.
 
-    const items = flattenTree(input.tree).map((ref) => ref.key);
-
     const { data, error } = await this.#client.rpc("save_route_composition", {
       p_id: bundleId,
       p_name: input.name,
@@ -65,7 +63,8 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       p_published: input.published,
       p_expected_version: expectedVersion,
       p_tree: input.tree,
-      p_items: items,
+      // The audit trail still records a flat key list alongside the tree.
+      p_items: flattenTree(input.tree).map((ref) => ref.key),
     });
     if (error) throw mapRouteCompositionError(error, expectedVersion);
 
@@ -76,7 +75,6 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       // Echoed: the RPC returns only the bundle header, and this is exactly
       // what was just written.
       tree: input.tree,
-      items,
       version: row.version,
       updatedAt: row.updated_at,
     };

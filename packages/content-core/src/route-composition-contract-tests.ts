@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { flattenTree } from "./compose.js";
 import { isRouteCompositionError, RouteCompositionConflictError } from "./errors.js";
 import type { RouteCompositionWriter } from "./route-composition-writer.js";
 import type { RouteSectionNode } from "./types.js";
@@ -74,10 +75,9 @@ export function runRouteCompositionWriterContract(
       expect(bundle.version).toBe(1);
       expect(bundle.path).toBe(f.path);
       expect(bundle.tree.map((node) => node.ref.key)).toEqual(["hero"]);
-      expect([...bundle.items]).toEqual(["hero"]);
     });
 
-    it("round-trips a nested slot tree and flattens items pre-order", async () => {
+    it("round-trips a nested slot tree", async () => {
       const writer = await createWriter();
 
       const bundle = await writer.saveComposition(
@@ -87,7 +87,7 @@ export function runRouteCompositionWriterContract(
         "user-1",
       );
 
-      expect([...bundle.items]).toEqual(["card", "icon"]);
+      expect(flattenTree(bundle.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
       expect(bundle.tree[0]?.slots.icon?.[0]?.ref).toEqual({ key: "icon", variant: "star" });
     });
 
@@ -108,7 +108,7 @@ export function runRouteCompositionWriterContract(
       );
 
       expect(updated.version).toBe(created.version + 1);
-      expect([...updated.items]).toEqual(["card", "icon"]);
+      expect(flattenTree(updated.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
     });
 
     it("rejects a write against a stale version", async () => {

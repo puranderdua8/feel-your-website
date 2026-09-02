@@ -29,10 +29,11 @@ export interface ContentAdapter<TKey extends string = string> {
   listContent(query: ListContentQuery): Promise<Page<Content<TKey>>>;
 
   /**
-   * The published route manifest: which templates render at which paths.
-   * Only published bundles are returned; drafts never reach the shell.
+   * The published route manifest: the section-instance tree that renders at
+   * each path. Only published bundles are returned; drafts never reach the
+   * shell.
    */
-  getRouteManifest(locale: Locale): Promise<readonly RouteBundle<TKey>[]>;
+  getRouteManifest(locale: Locale): Promise<readonly RouteBundle[]>;
 
   /**
    * UI chrome messages for a locale, as ICU MessageFormat strings.
