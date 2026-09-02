@@ -526,6 +526,38 @@ granted a real permission to do anything useful against Supabase: seed one
 the same way `config-bundle-supabase/src/live.test.ts` does (`admin.auth.admin.createUser`,
 a `config_bundles` row of `role_permissions`, a `user_roles` assignment).
 
+## Running in Docker
+
+Each app ships its own image — `apps/shell/Dockerfile`, `apps/cms/Dockerfile`
+— and `compose.yaml` runs both:
+
+```bash
+docker compose up --build
+```
+
+`shell` on `http://localhost:3000`, `cms` on `http://localhost:3001` (sign in
+`editor@example.com` / `demo`). As with `pnpm dev`, the containers default to
+`MemoryContentAdapter` / `MockAuthProvider`, so this needs no secrets and no
+database. Point the cms at a real Supabase by setting `CONTENT_ADAPTER` /
+`AUTH_PROVIDER` / the `SUPABASE_*` vars in `compose.yaml` (runtime env, never
+baked into a layer).
+
+How the image is built and run:
+
+- **Build** is one multi-stage Dockerfile per app, from the repo root
+  context (the whole pnpm workspace is needed to resolve the `workspace:*`
+  packages). It runs `pnpm --filter <app>... build`, then
+  `pnpm --filter <app> deploy --prod` to get a self-contained tree with a
+  production-only `node_modules` — no vite, tsup, eslint or vitest in the
+  runtime image.
+- **Runtime** is `apps/<app>/server.js`: `vite build` emits a host-agnostic
+  output (`dist/client/` static assets + `dist/server/server.js`, a Web
+  `{ fetch }` handler — the same shape Netlify's adapter wraps). `server.js`
+  serves `dist/client` and hands everything else to that handler, using
+  `srvx` (TanStack Start's own server layer). It listens on `$PORT`.
+- **Netlify is untouched.** `netlify.toml` still drives both production
+  sites; the Dockerfiles are an additional target, not a replacement.
+
 ## Scripts
 
 | Command               | Does                                                 |
