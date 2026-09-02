@@ -2,6 +2,7 @@ import type {
   JsonValue,
   RouteCompositionSummary,
   RouteSectionNode,
+  RouteSeo,
 } from "@feel-your-website/content-core";
 import { Can } from "@feel-your-website/rbac/react";
 import {
@@ -30,6 +31,7 @@ import { RoutePreview } from "./route-preview.js";
 import { PublishBar } from "./publish-bar.js";
 import { SectionFieldForm } from "./section-field-form.js";
 import { SectionTree } from "./section-tree.js";
+import { SeoPanel } from "./seo-panel.js";
 import { findNode, setNodeContent } from "./tree-ops.js";
 
 /**
@@ -57,6 +59,7 @@ type OpenRoute = {
   path: string;
   published: boolean;
   tree: readonly RouteSectionNode[];
+  seo: Readonly<Record<string, RouteSeo>>;
 };
 
 const BLANK: OpenRoute = {
@@ -66,6 +69,7 @@ const BLANK: OpenRoute = {
   path: "/",
   published: false,
   tree: [],
+  seo: {},
 };
 
 function RouteEditorInner({ actor }: { actor: string }) {
@@ -99,6 +103,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
       path: composition.path,
       published: composition.published,
       tree: composition.tree,
+      seo: composition.seo,
     });
   }, []);
 
@@ -120,6 +125,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
           path: open.path,
           published,
           tree: open.tree,
+          seo: open.seo,
           expectedVersion: open.version ?? undefined,
           actor,
         },
@@ -257,6 +263,20 @@ function RouteEditorInner({ actor }: { actor: string }) {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">SEO</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SeoPanel
+                key={contentLocale}
+                locale={contentLocale}
+                seo={open.seo[contentLocale] ?? {}}
+                onChange={(seo) => setOpen({ ...open, seo: { ...open.seo, [contentLocale]: seo } })}
+              />
+            </CardContent>
+          </Card>
 
           <RoutePreview tree={open.tree} locale={contentLocale} />
 
