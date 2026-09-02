@@ -118,6 +118,20 @@ if (hasLocalSupabase) {
         .from("route_templates")
         .insert({ bundle_id: routeBundleId, ordinal: 0, template_key: thirdKey });
       if (routeTemplateError) throw routeTemplateError;
+
+      // `getRouteManifest` reads `published_route_sections` (the section-tree
+      // read model), not `published_route_manifest`, so seed a root instance
+      // too — `save_route_bundle` would mirror both, but this fixture writes
+      // the tables directly.
+      const { error: routeSectionError } = await admin.from("route_section_instances").insert({
+        bundle_id: routeBundleId,
+        parent_instance_id: null,
+        parent_slot: null,
+        ordinal: 0,
+        section_key: thirdKey,
+        section_variant: "",
+      });
+      if (routeSectionError) throw routeSectionError;
     });
 
     afterAll(async () => {

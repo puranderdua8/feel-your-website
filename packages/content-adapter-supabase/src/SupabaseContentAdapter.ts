@@ -1,7 +1,10 @@
 import {
+  assembleSectionTree,
   ContentAdapterError,
+  flattenTree,
   type Content,
   type ContentAdapter,
+  type FlatSectionRow,
   type JsonValue,
   type ListContentQuery,
   type Locale,
@@ -156,29 +159,52 @@ export class SupabaseContentAdapter implements ContentAdapter {
     // structure is shared across locales; only content within it translates.
     void locale;
 
+    // Flat instance rows, one per section of every published route. The tree
+    // is assembled here in TypeScript via the shared helper — no recursive
+    // CTE, so this adapter and the memory one build it identically.
     const { data, error } = await this.#client
-      .from("published_route_manifest")
-      .select("bundle_id, path, version, updated_at, items");
+      .from("published_route_sections")
+      .select(
+        "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, section_variant",
+      );
     if (error) throw mapContentError(error);
 
-    return (data ?? []).map((row) => {
-      const items = row.items as readonly string[];
+    const byBundle = new Map<
+      string,
+      { path: string; version: number; updatedAt: string; rows: FlatSectionRow[] }
+    >();
+
+    for (const row of data ?? []) {
+      const bundleId = row.bundle_id as string;
+      let entry = byBundle.get(bundleId);
+      if (!entry) {
+        entry = {
+          path: row.path as string,
+          version: row.version as number,
+          updatedAt: row.updated_at as string,
+          rows: [],
+        };
+        byBundle.set(bundleId, entry);
+      }
+      entry.rows.push({
+        instanceId: row.instance_id as string,
+        parentInstanceId: (row.parent_instance_id as string | null) ?? null,
+        parentSlot: (row.parent_slot as string | null) ?? null,
+        ordinal: row.ordinal as number,
+        sectionKey: row.section_key as string,
+        sectionVariant: (row.section_variant as string | null) ?? "",
+      });
+    }
+
+    return [...byBundle.entries()].map(([id, entry]) => {
+      const tree = assembleSectionTree(entry.rows);
       return {
-        id: row.bundle_id as string,
-        path: row.path as string,
-        // Until the route-composition tables land, the published manifest is
-        // still a flat ordered list of section keys — lifted here into a
-        // roots-only tree (no slot fills) so every consumer already speaks
-        // `RouteBundle.tree`. `instanceId` is derived from the bundle id +
-        // position so it is stable across reads.
-        tree: items.map((key, index) => ({
-          instanceId: `${row.bundle_id as string}:${index}`,
-          ref: { key, variant: "" },
-          slots: {},
-        })),
-        items,
-        version: row.version as number,
-        updatedAt: row.updated_at as string,
+        id,
+        path: entry.path,
+        tree,
+        items: flattenTree(tree).map((ref) => ref.key),
+        version: entry.version,
+        updatedAt: entry.updatedAt,
       };
     });
   }
