@@ -8,6 +8,12 @@ import { axe } from "vitest-axe";
 import "vitest-axe/extend-expect";
 
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./components/ui/accordion";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -18,6 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
@@ -142,6 +149,32 @@ describe("registry components — default render has no axe violations", () => {
 
   it("Textarea", async () => {
     const { container } = render(<Textarea aria-label="Example textarea" />);
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Accordion", async () => {
+    const { container } = render(
+      <Accordion type="single" collapsible defaultValue="a">
+        <AccordionItem value="a">
+          <AccordionTrigger>Section A</AccordionTrigger>
+          <AccordionContent>Body A</AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="b">
+          <AccordionTrigger>Section B</AccordionTrigger>
+          <AccordionContent>Body B</AccordionContent>
+        </AccordionItem>
+      </Accordion>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Avatar", async () => {
+    const { container } = render(
+      <Avatar>
+        <AvatarImage src="" alt="User avatar" />
+        <AvatarFallback>AB</AvatarFallback>
+      </Avatar>,
+    );
     expect(await axe(container, axeOptions)).toHaveNoViolations();
   });
 

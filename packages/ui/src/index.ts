@@ -14,11 +14,15 @@
 
 export { cn } from "./lib/utils.js";
 
+export * from "./components/ui/accordion.js";
 export * from "./components/ui/alert-dialog.js";
+export * from "./components/ui/aspect-ratio.js";
+export * from "./components/ui/avatar.js";
 export * from "./components/ui/badge.js";
 export * from "./components/ui/button.js";
 export * from "./components/ui/card.js";
 export * from "./components/ui/checkbox.js";
+export * from "./components/ui/collapsible.js";
 export * from "./components/ui/command.js";
 export * from "./components/ui/context-menu.js";
 export * from "./components/ui/dialog.js";
@@ -33,8 +37,13 @@ export * from "./components/ui/menubar.js";
 export * from "./components/ui/navigation-menu.js";
 export * from "./components/ui/popover.js";
 export * from "./components/ui/radio-group.js";
+export * from "./components/ui/resizable.js";
+export * from "./components/ui/scroll-area.js";
 export * from "./components/ui/select.js";
+export * from "./components/ui/separator.js";
 export * from "./components/ui/sheet.js";
+export * from "./components/ui/sidebar.js";
+export * from "./components/ui/skeleton.js";
 export * from "./components/ui/switch.js";
 export * from "./components/ui/tabs.js";
 export * from "./components/ui/textarea.js";
