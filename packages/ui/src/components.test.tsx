@@ -10,6 +10,7 @@ import "vitest-axe/extend-expect";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
+import { Checkbox } from "./components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
 } from "./components/ui/dropdown-menu";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
+import { RadioGroup, RadioGroupItem } from "./components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -34,7 +36,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./components/ui/select";
+import { Switch } from "./components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { Textarea } from "./components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "./components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
 
 // jsdom doesn't implement these; Radix's positioning / scroll-into-view
@@ -112,6 +117,56 @@ describe("registry components — default render has no axe violations", () => {
 
   it("Badge", async () => {
     const { container } = render(<Badge>Badge</Badge>);
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Textarea", async () => {
+    const { container } = render(<Textarea aria-label="Example textarea" />);
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Checkbox", async () => {
+    const { container } = render(
+      <div>
+        <Checkbox id="terms" />
+        <Label htmlFor="terms">Accept terms</Label>
+      </div>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Switch", async () => {
+    const { container } = render(<Switch aria-label="Enable notifications" />);
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("RadioGroup", async () => {
+    const { container } = render(
+      <RadioGroup defaultValue="one" aria-label="Pick one">
+        <div>
+          <RadioGroupItem value="one" id="r-one" />
+          <Label htmlFor="r-one">One</Label>
+        </div>
+        <div>
+          <RadioGroupItem value="two" id="r-two" />
+          <Label htmlFor="r-two">Two</Label>
+        </div>
+      </RadioGroup>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("ToggleGroup", async () => {
+    const { container } = render(
+      <ToggleGroup type="single" defaultValue="bold" aria-label="Text style">
+        <ToggleGroupItem value="bold" aria-label="Bold">
+          B
+        </ToggleGroupItem>
+        <ToggleGroupItem value="italic" aria-label="Italic">
+          I
+        </ToggleGroupItem>
+      </ToggleGroup>,
+    );
     expect(await axe(container, axeOptions)).toHaveNoViolations();
   });
 

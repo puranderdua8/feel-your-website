@@ -60,3 +60,4 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - "@puranderdua8/theme@0.3.0"
   - "@puranderdua8/tokens@0.3.0"
+  - lucide-react@1.39.0

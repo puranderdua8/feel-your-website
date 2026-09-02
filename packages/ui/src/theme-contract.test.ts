@@ -35,11 +35,18 @@ function componentSources(): { name: string; source: string }[] {
 }
 
 /**
- * Variables supplied by something other than the theme package. Tailwind's
- * own generated properties would belong here. Empty today — every variable
- * the components reference should come from the theme.
+ * Variables supplied by something other than the theme package — Radix
+ * primitives that publish measured values as CSS custom properties, and
+ * vars a component sets on itself via inline `style`. These are not theme
+ * tokens and are never expected to come from `compileCssVars`.
  */
-const EXTERNALLY_PROVIDED = new Set<string>([]);
+const EXTERNALLY_PROVIDED = new Set<string>([
+  // Published by @radix-ui's Select on the content element.
+  "--radix-select-trigger-height",
+  "--radix-select-trigger-width",
+  // Set by `<ToggleGroup>` itself: `style={{ "--gap": spacing }}`.
+  "--gap",
+]);
 
 describe("components ↔ theme variable contract", () => {
   const emitted = new Set(Object.keys(compileCssVars(resolveTheme("base"))));
