@@ -24,8 +24,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
 import { Badge } from "./components/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "./components/ui/breadcrumb";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Checkbox } from "./components/ui/checkbox";
@@ -64,6 +73,15 @@ import {
   SelectValue,
 } from "./components/ui/select";
 import { Switch } from "./components/ui/switch";
+import { Progress } from "./components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Textarea } from "./components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "./components/ui/toggle-group";
@@ -329,6 +347,58 @@ describe("registry components — default render has no axe violations", () => {
         <TabsContent value="tab1">Content 1</TabsContent>
         <TabsContent value="tab2">Content 2</TabsContent>
       </Tabs>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Alert", async () => {
+    const { container } = render(
+      <Alert>
+        <AlertTitle>Heads up</AlertTitle>
+        <AlertDescription>Something you should know.</AlertDescription>
+      </Alert>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Breadcrumb", async () => {
+    const { container } = render(
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="#">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Current</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>,
+    );
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Progress", async () => {
+    const { container } = render(<Progress value={60} aria-label="Loading" />);
+    expect(await axe(container, axeOptions)).toHaveNoViolations();
+  });
+
+  it("Table", async () => {
+    const { container } = render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Role</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>Ada</TableCell>
+            <TableCell>Engineer</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
     );
     expect(await axe(container, axeOptions)).toHaveNoViolations();
   });

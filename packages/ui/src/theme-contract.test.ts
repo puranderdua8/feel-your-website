@@ -41,6 +41,9 @@ function componentSources(): { name: string; source: string }[] {
  * tokens and are never expected to come from `compileCssVars`.
  */
 const EXTERNALLY_PROVIDED = new Set<string>([
+  // Tailwind v4 core: the spacing-scale base, defined by Tailwind's own
+  // default `@theme`, not by this design system.
+  "--spacing",
   // Published by @radix-ui primitives as measured values on their own nodes.
   "--radix-select-trigger-height",
   "--radix-select-trigger-width",
