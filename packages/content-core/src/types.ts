@@ -115,6 +115,26 @@ export interface Content<TKey extends string = string> {
   updatedAt: string;
 }
 
+/**
+ * A route's search-engine and social metadata, for one locale. Every field is
+ * optional — a route may set only a title, or nothing at all. The shell turns
+ * this into `<head>` tags; the CMS authors it per locale alongside the tree.
+ */
+export interface RouteSeo {
+  /** `<title>` and `og:title`. */
+  readonly title?: string;
+  /** `<meta name="description">` and `og:description`. */
+  readonly description?: string;
+  /** Absolute canonical URL for this route in this locale — `<link rel="canonical">`. */
+  readonly canonical?: string;
+  /** `og:image` URL. */
+  readonly ogImage?: string;
+  /** `<meta name="keywords">`, comma-joined by the shell. */
+  readonly keywords?: readonly string[];
+  /** `<meta name="robots">`, e.g. `"index, follow"` or `"noindex"`. */
+  readonly robots?: string;
+}
+
 /** A route's composition: the section-instance tree that renders at a path. */
 export interface RouteBundle {
   id: string;
@@ -125,6 +145,11 @@ export interface RouteBundle {
    * this is the shape the shell renders and the CMS route editor edits.
    */
   tree: readonly RouteSectionNode[];
+  /**
+   * SEO metadata per locale: `locale -> RouteSeo`. `{}` when the route has
+   * none; a locale absent here has no metadata (no fallback to another).
+   */
+  seo: Readonly<Record<Locale, RouteSeo>>;
   version: number;
   updatedAt: string;
 }

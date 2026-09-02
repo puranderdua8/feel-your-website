@@ -1,4 +1,4 @@
-import type { RouteBundle, RouteSectionNode } from "./types.js";
+import type { Locale, RouteBundle, RouteSectionNode, RouteSeo } from "./types.js";
 
 /**
  * The write half of route composition, deliberately kept out of both
@@ -21,6 +21,8 @@ export interface RouteCompositionInput {
   readonly published: boolean;
   /** Root section instances in render order — the whole tree, replaced wholesale. */
   readonly tree: readonly RouteSectionNode[];
+  /** SEO metadata per locale, replaced wholesale with the tree. `{}` for none. */
+  readonly seo: Readonly<Record<Locale, RouteSeo>>;
 }
 
 export interface RouteCompositionWriter {
@@ -75,6 +77,8 @@ export interface RouteCompositionSummary {
  */
 export interface RouteComposition extends RouteCompositionSummary {
   readonly tree: readonly RouteSectionNode[];
+  /** SEO metadata per locale, drafts included — what the editor's SEO panel edits. */
+  readonly seo: Readonly<Record<Locale, RouteSeo>>;
 }
 
 /**

@@ -80,7 +80,7 @@ export function runRouteCompositionWriterContract(
 
       const bundle = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
@@ -95,32 +95,40 @@ export function runRouteCompositionWriterContract(
 
       const bundle = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: true, tree: cardTree() },
+        {
+          name: f.name,
+          path: f.path,
+          published: true,
+          tree: cardTree(),
+          seo: { en: { title: "Card page", keywords: ["a", "b"] } },
+        },
         null,
         "user-1",
       );
 
       expect(flattenTree(bundle.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
       expect(bundle.tree[0]?.slots.icon?.[0]?.ref).toEqual({ key: "icon", variant: "star" });
-      // The saved bundle echoes the per-instance content it was given, at the
-      // root and inside a slot. (A full storage round-trip through
-      // `getComposition` is exercised by each backend's own read tests.)
+      // The saved bundle echoes what it was given — per-instance content at the
+      // root and inside a slot, and the per-locale SEO. (A full storage
+      // round-trip through `getComposition` is exercised by each backend's own
+      // read tests.)
       expect(bundle.tree[0]?.content).toEqual({ en: { heading: "Card" } });
       expect(bundle.tree[0]?.slots.icon?.[0]?.content).toEqual({ en: { name: "star" } });
+      expect(bundle.seo).toEqual({ en: { title: "Card page", keywords: ["a", "b"] } });
     });
 
     it("updates in place, incrementing the version", async () => {
       const writer = await createWriter();
       const created = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
 
       const updated = await writer.saveComposition(
         created.id,
-        { name: f.name, path: f.path, published: true, tree: cardTree() },
+        { name: f.name, path: f.path, published: true, tree: cardTree(), seo: {} },
         created.version,
         "user-1",
       );
@@ -133,13 +141,13 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const created = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
       await writer.saveComposition(
         created.id,
-        { name: f.name, path: f.path, published: false, tree: cardTree() },
+        { name: f.name, path: f.path, published: false, tree: cardTree(), seo: {} },
         created.version,
         "user-1",
       );
@@ -147,7 +155,7 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           created.id,
-          { name: f.name, path: f.path, published: false, tree: heroTree() },
+          { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
           created.version,
           "user-1",
         );
@@ -166,7 +174,7 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           f.unknownId,
-          { name: f.name, path: f.path, published: false, tree: heroTree() },
+          { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
           1,
           "user-1",
         );
@@ -180,7 +188,7 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const created = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
@@ -198,7 +206,7 @@ export function runRouteCompositionWriterContract(
       // Gone: recreating at the same path now succeeds at version 1.
       const recreated = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
