@@ -76,7 +76,7 @@ function SectionNode({
   onAddSlotChild: (parentId: string, slot: string, key: string) => void;
   onRemoveDescendant: (id: string) => void;
 }) {
-  const def = sectionCatalog.byKey.get(node.ref.key);
+  const def = sectionCatalog.byKey.get(node.sectionKey);
   const [open, setOpen] = useState(depth === 0);
   const hasSlots = (def?.slots.length ?? 0) > 0;
 
@@ -105,7 +105,7 @@ function SectionNode({
               : "hover:bg-accent/50"
           }`}
         >
-          <span className="font-medium">{node.ref.key}</span>
+          <span className="font-medium">{node.sectionKey}</span>
         </button>
         {onMoveUp && (
           <Button type="button" size="sm" variant="ghost" onClick={onMoveUp} aria-label="Move up">

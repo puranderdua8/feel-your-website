@@ -33,5 +33,5 @@ function renderNode(node: RouteSectionNode, locale: Locale): React.JSX.Element {
     ));
   }
 
-  return renderSection(node.ref.key, node.content[locale] ?? null, slots);
+  return renderSection(node.sectionKey, node.content[locale] ?? null, slots);
 }

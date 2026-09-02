@@ -8,12 +8,7 @@ import type { JsonValue, Locale, RouteSectionNode } from "@feel-your-website/con
 
 /** A fresh node with a client-minted uuid and no content yet. */
 export function newNode(sectionKey: string): RouteSectionNode {
-  return {
-    instanceId: crypto.randomUUID(),
-    ref: { key: sectionKey, variant: "" },
-    content: {},
-    slots: {},
-  };
+  return { instanceId: crypto.randomUUID(), sectionKey, content: {}, slots: {} };
 }
 
 /** Replaces one locale's field bag on a node, leaving its other locales intact. */

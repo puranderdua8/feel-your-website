@@ -81,7 +81,6 @@ if (hasLocalSupabase) {
           parent_slot: null,
           ordinal: 0,
           section_key: sectionKey,
-          section_variant: "",
         })
         .select()
         .single();

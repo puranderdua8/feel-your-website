@@ -41,7 +41,7 @@ export const contractSeed: MemoryContentSeed = {
       tree: [
         {
           instanceId: "help-root",
-          ref: { key: "help", variant: "" },
+          sectionKey: "help",
           content: {
             en: { title: "Help", body: "Contact support." },
             hi: { title: "सहायता", body: "समर्थन से संपर्क करें।" },

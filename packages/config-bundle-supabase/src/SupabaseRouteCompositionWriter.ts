@@ -64,7 +64,7 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       p_expected_version: expectedVersion,
       p_tree: input.tree,
       // The audit trail still records a flat key list alongside the tree.
-      p_items: flattenTree(input.tree).map((ref) => ref.key),
+      p_items: [...flattenTree(input.tree)],
       p_seo: input.seo,
     });
     if (error) throw mapRouteCompositionError(error, expectedVersion);

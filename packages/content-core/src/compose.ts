@@ -1,4 +1,4 @@
-import type { JsonValue, Locale, RouteSectionNode, SectionRef } from "./types.js";
+import type { JsonValue, Locale, RouteSectionNode } from "./types.js";
 
 /**
  * Route-composition helpers, shared by both adapters and the CMS.
@@ -23,7 +23,6 @@ export interface FlatSectionRow {
   /** Order within `(parentInstanceId, parentSlot)`. */
   readonly ordinal: number;
   readonly sectionKey: string;
-  readonly sectionVariant: string;
   /**
    * This instance's content, `locale -> field bag`. Omitted is treated as
    * `{}` — an instance with no content rows yet.
@@ -64,7 +63,7 @@ export function assembleSectionTree(rows: readonly FlatSectionRow[]): readonly R
 
     return {
       instanceId: row.instanceId,
-      ref: { key: row.sectionKey, variant: row.sectionVariant },
+      sectionKey: row.sectionKey,
       content: row.content ?? {},
       slots,
     };
@@ -85,11 +84,11 @@ function* walk(tree: readonly RouteSectionNode[]): Generator<RouteSectionNode> {
 }
 
 /**
- * Pre-order list of the refs actually present in the tree. This is what
+ * Pre-order list of the section keys present in the tree. This is what
  * derives the audit `items` list a route write records.
  */
-export function flattenTree(tree: readonly RouteSectionNode[]): readonly SectionRef[] {
-  return [...walk(tree)].map((node) => node.ref);
+export function flattenTree(tree: readonly RouteSectionNode[]): readonly string[] {
+  return [...walk(tree)].map((node) => node.sectionKey);
 }
 
 /**

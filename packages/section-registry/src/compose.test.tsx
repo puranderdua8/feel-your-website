@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { renderComposition } from "./compose.js";
 
 const node = (
-  over: Partial<RouteSectionNode> & Pick<RouteSectionNode, "instanceId" | "ref">,
+  over: Partial<RouteSectionNode> & Pick<RouteSectionNode, "instanceId" | "sectionKey">,
 ): RouteSectionNode => ({ content: {}, slots: {}, ...over });
 
 describe("renderComposition", () => {
@@ -13,12 +13,12 @@ describe("renderComposition", () => {
     const tree: RouteSectionNode[] = [
       node({
         instanceId: "h",
-        ref: { key: "hero", variant: "" },
+        sectionKey: "hero",
         content: { en: { title: "Top" } },
       }),
       node({
         instanceId: "f",
-        ref: { key: "footer", variant: "" },
+        sectionKey: "footer",
         content: { en: { text: "Bottom" } },
       }),
     ];
@@ -33,20 +33,20 @@ describe("renderComposition", () => {
     const tree: RouteSectionNode[] = [
       node({
         instanceId: "card",
-        ref: { key: "card", variant: "" },
+        sectionKey: "card",
         content: { en: { heading: "Card A" } },
         slots: {
           icon: [
             node({
               instanceId: "ic",
-              ref: { key: "icon", variant: "" },
+              sectionKey: "icon",
               content: { en: { name: "star" } },
             }),
           ],
           body: [
             node({
               instanceId: "t",
-              ref: { key: "text", variant: "" },
+              sectionKey: "text",
               content: { en: { value: "Body copy" } },
             }),
           ],
@@ -65,7 +65,7 @@ describe("renderComposition", () => {
     const tree: RouteSectionNode[] = [
       node({
         instanceId: "card",
-        ref: { key: "card", variant: "" },
+        sectionKey: "card",
         content: { en: { heading: "Bare" } },
       }),
     ];
@@ -79,7 +79,7 @@ describe("renderComposition", () => {
     const tree: RouteSectionNode[] = [
       node({
         instanceId: "h",
-        ref: { key: "hero", variant: "" },
+        sectionKey: "hero",
         content: { en: { title: "English only" } },
       }),
     ];

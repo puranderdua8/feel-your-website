@@ -347,13 +347,13 @@ if (hasLocalSupabase) {
           tree: [
             {
               instanceId: cardId,
-              ref: { key: "card", variant: "" },
+              sectionKey: "card",
               content: { en: { heading: "Card" } },
               slots: {
                 icon: [
                   {
                     instanceId: iconId,
-                    ref: { key: "icon", variant: "star" },
+                    sectionKey: "icon",
                     content: { en: { name: "star" } },
                     slots: {},
                   },
@@ -371,12 +371,12 @@ if (hasLocalSupabase) {
       );
 
       expect(created.version).toBe(1);
-      expect(flattenTree(created.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
+      expect(flattenTree(created.tree)).toEqual(["card", "icon"]);
 
       // The recursive insert actually wrote a parent and a slot child.
       const { data: rows, error } = await admin
         .from("route_section_instances")
-        .select("id, parent_instance_id, parent_slot, section_key, section_variant, ordinal")
+        .select("id, parent_instance_id, parent_slot, section_key, ordinal")
         .eq("bundle_id", created.id);
       if (error) throw error;
 
@@ -389,7 +389,6 @@ if (hasLocalSupabase) {
         parent_instance_id: cardId,
         parent_slot: "icon",
         section_key: "icon",
-        section_variant: "star",
       });
 
       // Each node's per-locale content was persisted alongside its instance,
@@ -435,7 +434,7 @@ if (hasLocalSupabase) {
           tree: [
             {
               instanceId: randomUUID(),
-              ref: { key: "hero", variant: "" },
+              sectionKey: "hero",
               content: { en: { title: "Hero" } },
               slots: {},
             },
@@ -447,7 +446,7 @@ if (hasLocalSupabase) {
       );
 
       expect(updated.version).toBe(2);
-      expect(flattenTree(updated.tree).map((ref) => ref.key)).toEqual(["hero"]);
+      expect(flattenTree(updated.tree)).toEqual(["hero"]);
 
       const { count } = await admin
         .from("route_section_instances")
@@ -512,7 +511,7 @@ if (hasLocalSupabase) {
           tree: [
             {
               instanceId: randomUUID(),
-              ref: { key: "hero", variant: "" },
+              sectionKey: "hero",
               content: { en: { title: "Hero" } },
               slots: {},
             },
@@ -556,7 +555,7 @@ if (hasLocalSupabase) {
     });
 
     function root(key: string) {
-      return [{ instanceId: randomUUID(), ref: { key, variant: "" }, content: {}, slots: {} }];
+      return [{ instanceId: randomUUID(), sectionKey: key, content: {}, slots: {} }];
     }
   });
 } else {

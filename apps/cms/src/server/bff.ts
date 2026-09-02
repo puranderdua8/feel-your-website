@@ -14,7 +14,7 @@ import type {
   SiteLocale,
 } from "@feel-your-website/content-core";
 import {
-  findUnknownSectionRefs,
+  findUnknownSectionKeys,
   flattenNodes,
   flattenTree,
   validateSectionFields,
@@ -250,12 +250,11 @@ function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
 
   return value.map((raw): RouteSectionNode => {
     const node = asObject(raw ?? {}, "Every node");
-    const ref = (node.ref ?? {}) as Record<string, unknown>;
     if (typeof node.instanceId !== "string" || node.instanceId === "") {
       throw new Error("Every node needs a non-empty instanceId.");
     }
-    if (typeof ref.key !== "string" || ref.key === "") {
-      throw new Error("Every node needs a ref.key.");
+    if (typeof node.sectionKey !== "string" || node.sectionKey === "") {
+      throw new Error("Every node needs a non-empty sectionKey.");
     }
 
     // `content` is `locale -> field bag`; every value must be a plain object.
@@ -269,12 +268,7 @@ function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
       slots[name] = parseTree(children, depth + 1);
     }
 
-    return {
-      instanceId: node.instanceId,
-      ref: { key: ref.key, variant: typeof ref.variant === "string" ? ref.variant : "" },
-      content,
-      slots,
-    };
+    return { instanceId: node.instanceId, sectionKey: node.sectionKey, content, slots };
   });
 }
 
@@ -365,9 +359,9 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<RouteBundle> => {
-    const unknown = findUnknownSectionRefs(sectionCatalog, flattenTree(data.tree));
+    const unknown = findUnknownSectionKeys(sectionCatalog, flattenTree(data.tree));
     if (unknown.length > 0) {
-      throw new Error(`Unknown section(s): ${unknown.map((ref) => ref.key).join(", ")}`);
+      throw new Error(`Unknown section(s): ${unknown.join(", ")}`);
     }
 
     return getRouteCompositionWriter().saveComposition(
@@ -430,14 +424,14 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
     const gaps: PublishGap[] = [];
 
     for (const node of flattenNodes(data.tree)) {
-      const def = sectionCatalog.byKey.get(node.ref.key);
+      const def = sectionCatalog.byKey.get(node.sectionKey);
       for (const { locale } of locales) {
         const fields = node.content[locale] ?? {};
         if (Object.keys(fields).length === 0) {
           gaps.push({
             locale,
             instanceId: node.instanceId,
-            sectionKey: node.ref.key,
+            sectionKey: node.sectionKey,
             missing: ["*"],
           });
           continue;
@@ -447,7 +441,7 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
           gaps.push({
             locale,
             instanceId: node.instanceId,
-            sectionKey: node.ref.key,
+            sectionKey: node.sectionKey,
             missing: issues.map((issue) => issue.field),
           });
         }

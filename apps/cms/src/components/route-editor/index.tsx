@@ -250,7 +250,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
                 {selectedNode ? (
                   <SectionFieldForm
                     key={`${selectedNode.instanceId}:${contentLocale}`}
-                    sectionKey={selectedNode.ref.key}
+                    sectionKey={selectedNode.sectionKey}
                     locale={contentLocale}
                     fields={selectedNode.content[contentLocale] ?? {}}
                     onChange={editSelectedContent}
