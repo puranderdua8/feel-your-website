@@ -34,6 +34,9 @@ on:
     paths:
       - "supabase/migrations/**"
       - "supabase/config.toml"
+  # Manual trigger, for the one-time catch-up when the hosted project is
+  # behind and for re-running after a transient failure — no local CLI needed.
+  workflow_dispatch:
 
 # Never let two merges push migrations at once, and — unlike ci.yml's
 # top-level `ci-` group — never cancel one that is mid-push. A separate
