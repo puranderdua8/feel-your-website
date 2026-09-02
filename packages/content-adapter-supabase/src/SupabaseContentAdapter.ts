@@ -1,7 +1,6 @@
 import {
   assembleSectionTree,
   ContentAdapterError,
-  flattenTree,
   type Content,
   type ContentAdapter,
   type FlatSectionRow,
@@ -196,17 +195,13 @@ export class SupabaseContentAdapter implements ContentAdapter {
       });
     }
 
-    return [...byBundle.entries()].map(([id, entry]) => {
-      const tree = assembleSectionTree(entry.rows);
-      return {
-        id,
-        path: entry.path,
-        tree,
-        items: flattenTree(tree).map((ref) => ref.key),
-        version: entry.version,
-        updatedAt: entry.updatedAt,
-      };
-    });
+    return [...byBundle.entries()].map(([id, entry]) => ({
+      id,
+      path: entry.path,
+      tree: assembleSectionTree(entry.rows),
+      version: entry.version,
+      updatedAt: entry.updatedAt,
+    }));
   }
 
   async getMessages(locale: Locale): Promise<Readonly<Record<string, string>>> {

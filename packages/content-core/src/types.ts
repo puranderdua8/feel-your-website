@@ -105,7 +105,7 @@ export interface Content<TKey extends string = string> {
 }
 
 /** A route's composition: the section-instance tree that renders at a path. */
-export interface RouteBundle<TKey extends string = string> {
+export interface RouteBundle {
   id: string;
   /** The route path this bundle renders at, e.g. `/help`. */
   path: string;
@@ -114,12 +114,6 @@ export interface RouteBundle<TKey extends string = string> {
    * this is the shape the shell renders and the CMS route editor edits.
    */
   tree: readonly RouteSectionNode[];
-  /**
-   * @deprecated Pre-order flatten of the tree's `ref.key`s — a compatibility
-   * shim for callers not yet moved to `tree`. Derive it with
-   * `flattenTree(tree)`; it is dropped in the B5 cleanup.
-   */
-  items: readonly TKey[];
   version: number;
   updatedAt: string;
 }

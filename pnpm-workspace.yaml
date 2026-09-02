@@ -27,7 +27,7 @@ catalog:
   vite: ^8.2.1
   tsup: ^8.3.5
 
-  # Styling — Tailwind v4 is CSS-first; @puranderdua8/theme ships a CSS
+  # Styling — Tailwind v4 is CSS-first; @feel-your-website/theme ships a CSS
   # preset, not a JS one, so there is no tailwind.config.js anywhere.
   tailwindcss: ^4.0.0
   "@tailwindcss/vite": ^4.0.0
@@ -58,6 +58,4 @@ allowBuilds:
   sharp: true
 
 minimumReleaseAgeExclude:
-  - "@puranderdua8/theme@0.3.0"
-  - "@puranderdua8/tokens@0.3.0"
   - lucide-react@1.39.0

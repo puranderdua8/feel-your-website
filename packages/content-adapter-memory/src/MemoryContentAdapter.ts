@@ -1,6 +1,5 @@
 import {
   ContentAdapterError,
-  flattenTree,
   RouteCompositionConflictError,
   RouteCompositionError,
   type Content,
@@ -30,13 +29,11 @@ import { randomUUID } from "node:crypto";
  */
 
 /**
- * A seed route: `tree` is required, the deprecated `items` optional. `name`
- * and `published` mirror the config-bundle header — a seed that omits them
- * gets `name = path` and `published = true` (a fixture route is live by
- * default).
+ * A seed route: a {@link RouteBundle} plus the config-bundle header fields the
+ * CMS editor needs. A seed that omits them gets `name = path` and
+ * `published = true` (a fixture route is live by default).
  */
-export type RouteSeed = Omit<RouteBundle, "items"> & {
-  items?: readonly string[];
+export type RouteSeed = RouteBundle & {
   name?: string;
   published?: boolean;
 };
@@ -53,9 +50,7 @@ export interface MemoryContentSeed {
   /** `locale -> messages` */
   messages?: Record<Locale, Record<string, string>>;
   /**
-   * Published route bundles, tree-first. `items` is optional here — when
-   * omitted `getRouteManifest` derives it from `tree` via `flattenTree`, so a
-   * seed never has to keep the deprecated flat list in sync by hand.
+   * Published route bundles, as section-instance trees.
    *
    * Not `readonly`: `saveComposition` mutates this array in place, the same
    * way `saveContentItem` mutates `content` — one class over one mutable seed.
@@ -176,7 +171,6 @@ export class MemoryContentAdapter
         id: route.id,
         path: route.path,
         tree: route.tree,
-        items: route.items ?? flattenTree(route.tree).map((ref) => ref.key),
         version: route.version,
         updatedAt: route.updatedAt,
       }));
@@ -233,7 +227,6 @@ export class MemoryContentAdapter
     this.#seed.routes ??= [];
     const routes = this.#seed.routes;
     const now = new Date().toISOString();
-    const items = flattenTree(input.tree).map((ref) => ref.key);
 
     if (bundleId === null) {
       const created: RouteSeed = {
@@ -250,7 +243,6 @@ export class MemoryContentAdapter
         id: created.id,
         path: created.path,
         tree: created.tree,
-        items,
         version: 1,
         updatedAt: now,
       };
@@ -280,7 +272,6 @@ export class MemoryContentAdapter
       id: updated.id,
       path: updated.path,
       tree: updated.tree,
-      items,
       version: updated.version,
       updatedAt: now,
     };

@@ -8,6 +8,7 @@
 // `BroadcastChannel`/`MessageEvent` interop bug. Plain Node has no `window`,
 // so GoTrue never touches `BroadcastChannel` at all.
 import { ConfigConflictError, InvalidItemsError } from "@feel-your-website/config-schema";
+import { flattenTree } from "@feel-your-website/content-core";
 import { platformCatalog, SEED_ONLY_PERMISSIONS } from "@feel-your-website/rbac";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -417,7 +418,7 @@ if (hasLocalSupabase) {
       );
 
       expect(created.version).toBe(1);
-      expect([...created.items]).toEqual(["card", "icon"]);
+      expect(flattenTree(created.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
 
       // The recursive insert actually wrote a parent and a slot child.
       const { data: rows, error } = await admin
@@ -451,7 +452,7 @@ if (hasLocalSupabase) {
       );
 
       expect(updated.version).toBe(2);
-      expect([...updated.items]).toEqual(["hero"]);
+      expect(flattenTree(updated.tree).map((ref) => ref.key)).toEqual(["hero"]);
 
       const { count } = await admin
         .from("route_section_instances")
