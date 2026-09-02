@@ -1,17 +1,33 @@
-# Local container run of both apps. `docker compose up --build` brings up:
+# Full offline stack: `docker compose up --build`.
 #
-#   shell  http://localhost:3000
-#   cms    http://localhost:3001   (sign in editor@example.com / demo)
+#   shell     http://localhost:3000   (in-memory adapter, mock auth)
+#   cms       http://localhost:3001   (local Supabase; sign in editor@example.com / password)
+#   Supabase  http://localhost:54321  (PostgREST + GoTrue behind an nginx gateway)
+#   Postgres  localhost:54322         (postgres / postgres)
 #
-# Both run on the in-memory adapter and the mock auth provider, so this needs
-# no secrets and no database. Pointing the cms at a real Supabase (local or
-# hosted) is a later change — set CONTENT_ADAPTER=supabase / AUTH_PROVIDER=
-# supabase and the SUPABASE_* vars here, the same ones apps/cms/.env uses for
-# `pnpm dev`.
+# `shell` needs nothing and starts immediately. `cms` runs against a trimmed
+# Supabase — Postgres + GoTrue + PostgREST only, no Studio/Storage/Realtime,
+# which the apps do not use — wired the way Supabase's own self-host compose
+# wires it. The `migrate` one-shot applies supabase/migrations + supabase/seed
+# + a dev admin user the first time the database volume is created; delete the
+# volume (`docker compose down -v`) to re-run it.
+#
+# The JWT secret and anon key below are the fixed Supabase local-dev values,
+# the same ones .github/workflows/ci.yml commits — not secrets, and identical
+# to what `supabase start` uses, so a token minted here is valid there too.
+#
+# Netlify is unaffected: this is a local target, netlify.toml still drives
+# production.
 
 name: feel-your-website
 
+x-supabase-jwt-secret: &jwt-secret "super-secret-jwt-token-with-at-least-32-characters-long"
+x-supabase-anon-key: &anon-key "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+
 services:
+  # ---------------------------------------------------------------------
+  # The apps
+  # ---------------------------------------------------------------------
   shell:
     build:
       context: .
@@ -32,8 +48,124 @@ services:
     image: feel-your-website/cms
     environment:
       PORT: "3001"
-      CONTENT_ADAPTER: memory
-      AUTH_PROVIDER: mock
+      CONTENT_ADAPTER: supabase
+      AUTH_PROVIDER: supabase
+      # Reached over the compose network; on the host the same stack is
+      # http://localhost:54321.
+      SUPABASE_URL: http://gateway:8000
+      SUPABASE_ANON_KEY: *anon-key
     ports:
       - "3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      gateway:
+        condition: service_started
     restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # Supabase (trimmed): Postgres + GoTrue + PostgREST + an nginx gateway
+  # ---------------------------------------------------------------------
+  db:
+    image: supabase/postgres:17.4.1.075
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      JWT_SECRET: *jwt-secret
+      JWT_EXP: "3600"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "54322:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth:
+    image: supabase/auth:v2.177.0
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://localhost:54321
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:postgres@db:5432/postgres
+      GOTRUE_SITE_URL: http://localhost:3001
+      GOTRUE_URI_ALLOW_LIST: http://localhost:3000,http://localhost:3001
+      GOTRUE_JWT_SECRET: *jwt-secret
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      # The Custom Access Token hook — supabase/migrations/..._auth_hook.sql
+      # defines it; this is the registration config.toml does for `supabase
+      # start`. Without it the cms authenticates but authorises nothing.
+      GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED: "true"
+      GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI: pg-functions://postgres/public/custom_access_token_hook
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://authenticator:postgres@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: *jwt-secret
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_EXP: "3600"
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      auth:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    volumes:
+      - ./docker/gateway.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "54321:8000"
+    restart: unless-stopped
+
+  # One-shot: applies migrations + seed + a dev admin user the first time the
+  # db volume exists, then exits 0. A no-op on later `up`s (it detects the
+  # schema and skips). `docker compose down -v` to force a fresh run.
+  migrate:
+    image: postgres:17-alpine
+    # Only `db` — not `auth`. GoTrue's own startup does not depend on this
+    # one-shot, and making them depend on each other would deadlock (GoTrue
+    # migrates the `auth` schema; this script waits for `auth.users` to exist
+    # before it runs, see db-migrate.sh).
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    volumes:
+      - ./supabase:/repo/supabase:ro
+      - ./docker:/repo/docker:ro
+    entrypoint: ["sh", "/repo/docker/db-migrate.sh"]
+
+volumes:
+  db-data:
