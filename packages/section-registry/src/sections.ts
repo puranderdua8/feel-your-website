@@ -12,8 +12,8 @@ import { defineSections } from "@feel-your-website/content-core";
  * A real project replaces this list alongside the components in
  * `registry.tsx`.
  *
- * `renderComposition` in `compose.tsx` renders a route's tree of these and
- * materialises any unfilled slot defaults.
+ * `renderComposition` in `compose.tsx` renders a route's tree of these,
+ * taking each instance's content straight off its node.
  */
 /**
  * A self-contained placeholder image, so the `image` section's sample renders

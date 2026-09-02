@@ -1,4 +1,4 @@
-import type { RouteSectionNode, SectionRef } from "@feel-your-website/content-core";
+import type { JsonValue, Locale, RouteSectionNode } from "@feel-your-website/content-core";
 
 /**
  * Immutable edits on a `RouteSectionNode[]` keyed by `instanceId`. The route
@@ -6,13 +6,27 @@ import type { RouteSectionNode, SectionRef } from "@feel-your-website/content-co
  * (preview, publish check) from it, so every mutation returns a new tree.
  */
 
-export function refKey(ref: SectionRef): string {
-  return JSON.stringify([ref.key, ref.variant]);
+/** A fresh node with a client-minted uuid and no content yet. */
+export function newNode(sectionKey: string): RouteSectionNode {
+  return {
+    instanceId: crypto.randomUUID(),
+    ref: { key: sectionKey, variant: "" },
+    content: {},
+    slots: {},
+  };
 }
 
-/** A fresh node with a client-minted uuid. */
-export function newNode(key: string, variant: string): RouteSectionNode {
-  return { instanceId: crypto.randomUUID(), ref: { key, variant }, slots: {} };
+/** Replaces one locale's field bag on a node, leaving its other locales intact. */
+export function setNodeContent(
+  tree: readonly RouteSectionNode[],
+  instanceId: string,
+  locale: Locale,
+  fields: Readonly<Record<string, JsonValue>>,
+): RouteSectionNode[] {
+  return updateNode(tree, instanceId, (node) => ({
+    ...node,
+    content: { ...node.content, [locale]: fields },
+  }));
 }
 
 export function findNode(

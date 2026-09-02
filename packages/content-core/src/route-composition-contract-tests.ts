@@ -49,14 +49,27 @@ export function runRouteCompositionWriterContract(
   const f = ROUTE_COMPOSITION_FIXTURE;
 
   const heroTree = (): RouteSectionNode[] => [
-    { instanceId: f.rootHero, ref: { key: "hero", variant: "" }, slots: {} },
+    {
+      instanceId: f.rootHero,
+      ref: { key: "hero", variant: "" },
+      content: { en: { title: "Hero" }, hi: { title: "हीरो" } },
+      slots: {},
+    },
   ];
   const cardTree = (): RouteSectionNode[] => [
     {
       instanceId: f.rootCard,
       ref: { key: "card", variant: "" },
+      content: { en: { heading: "Card" } },
       slots: {
-        icon: [{ instanceId: f.slotIcon, ref: { key: "icon", variant: "star" }, slots: {} }],
+        icon: [
+          {
+            instanceId: f.slotIcon,
+            ref: { key: "icon", variant: "star" },
+            content: { en: { name: "star" } },
+            slots: {},
+          },
+        ],
       },
     },
   ];
@@ -89,6 +102,11 @@ export function runRouteCompositionWriterContract(
 
       expect(flattenTree(bundle.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
       expect(bundle.tree[0]?.slots.icon?.[0]?.ref).toEqual({ key: "icon", variant: "star" });
+      // The saved bundle echoes the per-instance content it was given, at the
+      // root and inside a slot. (A full storage round-trip through
+      // `getComposition` is exercised by each backend's own read tests.)
+      expect(bundle.tree[0]?.content).toEqual({ en: { heading: "Card" } });
+      expect(bundle.tree[0]?.slots.icon?.[0]?.content).toEqual({ en: { name: "star" } });
     });
 
     it("updates in place, incrementing the version", async () => {

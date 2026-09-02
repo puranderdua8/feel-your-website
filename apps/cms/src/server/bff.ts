@@ -5,7 +5,6 @@ import type {
   UpdateBundleInput,
 } from "@feel-your-website/config-schema";
 import type {
-  Content,
   JsonValue,
   RouteBundle,
   RouteComposition,
@@ -14,8 +13,8 @@ import type {
   SiteLocale,
 } from "@feel-your-website/content-core";
 import {
-  collectEffectiveRefs,
   findUnknownSectionRefs,
+  flattenNodes,
   flattenTree,
   validateSectionFields,
 } from "@feel-your-website/content-core";
@@ -106,74 +105,11 @@ export const signOut = createServerFn({ method: "POST" }).handler(async (): Prom
 
 // --- Content -----------------------------------------------------------
 
-function asFields(input: unknown): Record<string, JsonValue> {
-  if (typeof input !== "object" || input === null) {
-    throw new Error("fields must be a JSON object.");
-  }
-  return input as Record<string, JsonValue>;
-}
-
-export const saveContentItem = createServerFn({ method: "POST" })
-  .validator(
-    (
-      input: unknown,
-    ): {
-      templateKey: string;
-      locale: string;
-      fields: Record<string, JsonValue>;
-      variant: string;
-    } => {
-      const { templateKey, locale, fields, variant } = (input ?? {}) as Record<string, unknown>;
-      if (typeof templateKey !== "string" || templateKey.trim() === "") {
-        throw new Error("templateKey is required.");
-      }
-      if (typeof locale !== "string" || locale.trim() === "") {
-        throw new Error("locale is required.");
-      }
-      return {
-        templateKey,
-        locale,
-        fields: asFields(fields),
-        variant: typeof variant === "string" ? variant : "",
-      };
-    },
-  )
-  .handler(async ({ data }): Promise<Content> =>
-    getContentWriter().saveContentItem(data.templateKey, data.locale, data.fields, data.variant),
-  );
-
-export const deleteContentItem = createServerFn({ method: "POST" })
-  .validator((input: unknown): { templateKey: string; locale: string; variant: string } => {
-    const { templateKey, locale, variant } = (input ?? {}) as Record<string, unknown>;
-    if (typeof templateKey !== "string" || typeof locale !== "string") {
-      throw new Error("templateKey and locale are required.");
-    }
-    return { templateKey, locale, variant: typeof variant === "string" ? variant : "" };
-  })
-  .handler(async ({ data }): Promise<void> => {
-    await getContentWriter().deleteContentItem(data.templateKey, data.locale, data.variant);
-  });
-
-/**
- * One section's content for one exact `(key, variant, locale)` — for the
- * Sections editor to load whatever the author selected.
- *
- * A locale-fallback result (`translated: false`) is treated as "nothing
- * here": the editor edits one specific row, so surfacing the default
- * locale's copy under an untranslated locale would make an unfilled
- * language look filled. `null` in that case; the editor shows an empty form.
- */
-export const getSectionContent = createServerFn({ method: "GET" })
-  .validator((input: unknown): { key: string; variant: string; locale: string } => {
-    const { key, variant, locale } = (input ?? {}) as Record<string, unknown>;
-    if (typeof key !== "string" || key.trim() === "") throw new Error("key is required.");
-    if (typeof locale !== "string" || locale.trim() === "") throw new Error("locale is required.");
-    return { key, variant: typeof variant === "string" ? variant : "", locale };
-  })
-  .handler(async ({ data }): Promise<Content | null> => {
-    const content = await getContentAdapter().getContent(data.key, data.locale, data.variant);
-    return content && content.translated ? content : null;
-  });
+// Section content is no longer a thing the CMS reads or writes on its own:
+// it lives on each route section instance (see `saveRouteComposition` below),
+// so there is no `saveContentItem` / `getSectionContent` here any more. The
+// `content_items` table and `ContentWriter`'s item methods are dead code the
+// B6 cleanup removes.
 
 /**
  * The configured content locales — what the header language switcher, the
@@ -301,13 +237,21 @@ export const roleBundleHistory = createServerFn({ method: "GET" })
 
 // --- Route composition (section tree) ------------------------------------
 
+/** A plain JSON object (not an array, not null) or throws. */
+function asObject(value: unknown, what: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${what} must be a JSON object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
 /** Parses an untrusted value into a `RouteSectionNode[]`, rejecting anything malformed. */
 function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
   if (depth > 20) throw new Error("Section tree is nested too deeply.");
   if (!Array.isArray(value)) throw new Error("A section tree must be an array of nodes.");
 
   return value.map((raw): RouteSectionNode => {
-    const node = (raw ?? {}) as Record<string, unknown>;
+    const node = asObject(raw ?? {}, "Every node");
     const ref = (node.ref ?? {}) as Record<string, unknown>;
     if (typeof node.instanceId !== "string" || node.instanceId === "") {
       throw new Error("Every node needs a non-empty instanceId.");
@@ -316,15 +260,21 @@ function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
       throw new Error("Every node needs a ref.key.");
     }
 
-    const slotsIn = (node.slots ?? {}) as Record<string, unknown>;
+    // `content` is `locale -> field bag`; every value must be a plain object.
+    const content: Record<string, Record<string, JsonValue>> = {};
+    for (const [locale, bag] of Object.entries(asObject(node.content ?? {}, "Node content"))) {
+      content[locale] = asObject(bag, `Content for ${locale}`) as Record<string, JsonValue>;
+    }
+
     const slots: Record<string, readonly RouteSectionNode[]> = {};
-    for (const [name, children] of Object.entries(slotsIn)) {
+    for (const [name, children] of Object.entries(asObject(node.slots ?? {}, "Node slots"))) {
       slots[name] = parseTree(children, depth + 1);
     }
 
     return {
       instanceId: node.instanceId,
       ref: { key: ref.key, variant: typeof ref.variant === "string" ? ref.variant : "" },
+      content,
       slots,
     };
   });
@@ -418,9 +368,10 @@ export const deleteRouteComposition = createServerFn({ method: "POST" })
 
 export interface PublishGap {
   locale: string;
+  /** The offending section instance in the tree. */
+  instanceId: string;
   sectionKey: string;
-  variant: string;
-  /** Field names still missing, or `["*"]` when the section has no content in this locale at all. */
+  /** Field names still missing, or `["*"]` when the instance has no content in this locale at all. */
   missing: string[];
 }
 
@@ -430,37 +381,38 @@ export interface PublishReadiness {
 }
 
 /**
- * Whether a tree can be published: every section it effectively depends on
- * (including the default of a required slot left empty) must have complete,
- * translated content in every configured site locale. A locale-fallback
- * result counts as missing — an untranslated language is not "done".
+ * Whether a tree can be published: every section instance in it must have
+ * complete content — every required field present and well-typed — in every
+ * configured site locale. The route owns the content, so this walks the
+ * tree's nodes directly; there is no separate content store to consult.
  */
 export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
   .validator((input: unknown): { tree: RouteSectionNode[] } => ({
     tree: parseTree((input as { tree?: unknown } | undefined)?.tree),
   }))
   .handler(async ({ data }): Promise<PublishReadiness> => {
-    const [locales, refs] = [
-      await getSiteSettingsStore().getLocales(),
-      collectEffectiveRefs(sectionCatalog, data.tree),
-    ];
-    const adapter = getContentAdapter();
+    const locales = await getSiteSettingsStore().getLocales();
     const gaps: PublishGap[] = [];
 
-    for (const ref of refs) {
-      const def = sectionCatalog.byKey.get(ref.key);
+    for (const node of flattenNodes(data.tree)) {
+      const def = sectionCatalog.byKey.get(node.ref.key);
       for (const { locale } of locales) {
-        const content = await adapter.getContent(ref.key, locale, ref.variant);
-        if (!content || !content.translated) {
-          gaps.push({ locale, sectionKey: ref.key, variant: ref.variant, missing: ["*"] });
+        const fields = node.content[locale] ?? {};
+        if (Object.keys(fields).length === 0) {
+          gaps.push({
+            locale,
+            instanceId: node.instanceId,
+            sectionKey: node.ref.key,
+            missing: ["*"],
+          });
           continue;
         }
-        const issues = def ? validateSectionFields(def, content.fields) : [];
+        const issues = def ? validateSectionFields(def, fields) : [];
         if (issues.length > 0) {
           gaps.push({
             locale,
-            sectionKey: ref.key,
-            variant: ref.variant,
+            instanceId: node.instanceId,
+            sectionKey: node.ref.key,
             missing: issues.map((issue) => issue.field),
           });
         }

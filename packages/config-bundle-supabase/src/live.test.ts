@@ -348,8 +348,16 @@ if (hasLocalSupabase) {
             {
               instanceId: cardId,
               ref: { key: "card", variant: "" },
+              content: { en: { heading: "Card" } },
               slots: {
-                icon: [{ instanceId: iconId, ref: { key: "icon", variant: "star" }, slots: {} }],
+                icon: [
+                  {
+                    instanceId: iconId,
+                    ref: { key: "icon", variant: "star" },
+                    content: { en: { name: "star" } },
+                    slots: {},
+                  },
+                ],
               },
             },
           ],
@@ -386,7 +394,14 @@ if (hasLocalSupabase) {
           name: `live-test-rcw-${randomUUID()}`,
           path,
           published: true,
-          tree: [{ instanceId: randomUUID(), ref: { key: "hero", variant: "" }, slots: {} }],
+          tree: [
+            {
+              instanceId: randomUUID(),
+              ref: { key: "hero", variant: "" },
+              content: { en: { title: "Hero" } },
+              slots: {},
+            },
+          ],
         },
         created.version,
         "x",
@@ -460,7 +475,7 @@ if (hasLocalSupabase) {
     });
 
     function root(key: string) {
-      return [{ instanceId: randomUUID(), ref: { key, variant: "" }, slots: {} }];
+      return [{ instanceId: randomUUID(), ref: { key, variant: "" }, content: {}, slots: {} }];
     }
   });
 } else {

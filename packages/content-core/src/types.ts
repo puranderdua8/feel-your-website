@@ -40,15 +40,17 @@ export interface TemplateKeyCatalog<TKey extends string> {
 }
 
 /**
- * "A section" as something chosen into a route — which section, and which of
- * its named content variants. `variant: ""` is the section's default/global
- * content; a name selects an alternative (see {@link Content.variant}).
+ * "A section" as something chosen into a route — just which section. The
+ * `variant` field is vestigial: content is no longer keyed by section +
+ * variant, it lives on the route instance ({@link RouteSectionNode.content}),
+ * so every ref the CMS mints now carries `variant: ""`. Kept on the type
+ * only until the B6 cleanup drops it along with the `content_items` read path.
  *
- * The unit the CMS composes a route from, and the unit a route's section
- * slot can be overridden to point at.
+ * The unit the CMS composes a route from.
  */
 export interface SectionRef {
   readonly key: string;
+  /** @deprecated Always `""`. Removed in B6 with the section-content read path. */
   readonly variant: string;
 }
 
@@ -56,9 +58,9 @@ export interface SectionRef {
  * One instance in a route's composition tree.
  *
  * A tree of *values*, not a graph of shared references: a node owns its own
- * `slots`, so there is no back-edge and no structural cycle risk. Two nodes
- * may carry the same {@link SectionRef} — that is reuse (the same `icon`
- * variant in two cards), not a cycle.
+ * `slots` and its own `content`, so there is no back-edge and no structural
+ * cycle risk. Two nodes may carry the same {@link SectionRef} — that is the
+ * same *component* used twice, each with its own content, not a cycle.
  */
 export interface RouteSectionNode {
   /**
@@ -69,10 +71,19 @@ export interface RouteSectionNode {
   readonly instanceId: string;
   readonly ref: SectionRef;
   /**
+   * This instance's content, per site locale: `locale -> field bag`.
+   *
+   * The route owns it. A section is a container — it renders whatever its
+   * route hands it — so the same section placed on two routes, or twice on
+   * one route, has two independent `content` bags and there is no shared or
+   * "global" content behind them. A locale absent here has no content for
+   * this instance in that locale; `renderComposition` renders the section's
+   * placeholder rather than falling back to another locale.
+   */
+  readonly content: Readonly<Record<Locale, Readonly<Record<string, JsonValue>>>>;
+  /**
    * Children filling this node's slots, keyed by `SectionSlotSpec.name`. A
-   * slot key absent here (or mapped to `[]`) means "materialise the slot's
-   * declared default at render time", not "render nothing" — see
-   * `renderComposition` in `@feel-your-website/section-registry`.
+   * slot key absent here (or mapped to `[]`) renders nothing for that slot.
    */
   readonly slots: Readonly<Record<string, readonly RouteSectionNode[]>>;
 }

@@ -1,9 +1,4 @@
-import type {
-  Content,
-  JsonValue,
-  SectionDefinition,
-  SectionSampleChild,
-} from "@feel-your-website/content-core";
+import type { SectionDefinition, SectionSampleChild } from "@feel-your-website/content-core";
 import { Fragment } from "react";
 
 import { renderSection } from "./registry.js";
@@ -17,19 +12,6 @@ import { renderSection } from "./registry.js";
  * real data always comes from a route — this is just the shop window.
  */
 
-/** Wraps sample fields in the `Content` shape `renderSection` expects. */
-function sampleContent(sectionKey: string, fields: Readonly<Record<string, JsonValue>>): Content {
-  return {
-    templateKey: sectionKey,
-    variant: "",
-    // Not a real BCP-47 tag: nothing localises a gallery preview.
-    locale: "sample",
-    translated: true,
-    fields,
-    updatedAt: "",
-  };
-}
-
 function renderSampleChild(child: SectionSampleChild): React.JSX.Element {
   const slots: Record<string, React.ReactNode> = {};
   for (const [name, kids] of Object.entries(child.slots ?? {})) {
@@ -37,7 +19,7 @@ function renderSampleChild(child: SectionSampleChild): React.JSX.Element {
       <Fragment key={index}>{renderSampleChild(kid)}</Fragment>
     ));
   }
-  return renderSection(child.sectionKey, sampleContent(child.sectionKey, child.fields), slots);
+  return renderSection(child.sectionKey, child.fields, slots);
 }
 
 /**
@@ -51,9 +33,5 @@ export function renderSectionSample(def: SectionDefinition): React.JSX.Element {
       <Fragment key={index}>{renderSampleChild(kid)}</Fragment>
     ));
   }
-  return renderSection(
-    def.key,
-    def.sample ? sampleContent(def.key, def.sample.fields) : null,
-    slots,
-  );
+  return renderSection(def.key, def.sample?.fields ?? null, slots);
 }

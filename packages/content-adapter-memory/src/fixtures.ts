@@ -62,9 +62,20 @@ export const contractSeed: MemoryContentSeed = {
     {
       id: "route-help",
       path: "/help",
-      // One root section, no slots — the flat case. `items` is derived from
-      // this by `getRouteManifest`.
-      tree: [{ instanceId: "help-root", ref: { key: "help", variant: "" }, slots: {} }],
+      // One root section, no slots — the flat case. The route owns its
+      // content now: the copy lives on the node, per locale, not in a
+      // `content_items`-style store keyed by section.
+      tree: [
+        {
+          instanceId: "help-root",
+          ref: { key: "help", variant: "" },
+          content: {
+            en: { title: "Help", body: "Contact support." },
+            hi: { title: "सहायता", body: "समर्थन से संपर्क करें।" },
+          },
+          slots: {},
+        },
+      ],
       version: 1,
       updatedAt: "2026-01-01T00:00:00.000Z",
     },

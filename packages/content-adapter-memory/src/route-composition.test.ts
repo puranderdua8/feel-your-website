@@ -26,7 +26,14 @@ describe("MemoryContentAdapter route composition read/write", () => {
         name: "Pricing",
         path: "/pricing",
         published: false,
-        tree: [{ instanceId: crypto.randomUUID(), ref: { key: "hero", variant: "" }, slots: {} }],
+        tree: [
+          {
+            instanceId: crypto.randomUUID(),
+            ref: { key: "hero", variant: "" },
+            content: { en: { title: "Pricing" } },
+            slots: {},
+          },
+        ],
       },
       null,
       "user-1",
