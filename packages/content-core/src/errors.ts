@@ -44,3 +44,55 @@ export function isContentAdapterError(error: unknown): error is ContentAdapterEr
  * 5s is wrong if an adapter can block for 30.
  */
 export const CONTENT_TIMEOUT_MS = 5_000;
+
+/**
+ * Failure vocabulary for {@link RouteCompositionWriter}.
+ *
+ * Its own type rather than reusing `config-schema`'s `ConfigStoreError` — a
+ * route composition is written through a narrow, purpose-built seam, and
+ * `content-core` stays free of a dependency on `config-schema` (mirrors how
+ * this package owns `ContentAdapterError` for the read side).
+ */
+export type RouteCompositionErrorCode =
+  /** No route bundle with the given id. */
+  | "not_found"
+  /** The `expectedVersion` did not match — someone else wrote first. */
+  | "conflict"
+  /** The caller lacks `manage:routes`. */
+  | "forbidden"
+  /** The backend could not be reached. Retryable. */
+  | "unavailable";
+
+export class RouteCompositionError extends Error {
+  readonly code: RouteCompositionErrorCode;
+  readonly retryable: boolean;
+  readonly cause?: unknown;
+
+  constructor(code: RouteCompositionErrorCode, message: string, options: { cause?: unknown } = {}) {
+    super(message);
+    this.name = "RouteCompositionError";
+    this.code = code;
+    this.retryable = code === "unavailable";
+    this.cause = options.cause;
+  }
+}
+
+/** Raised when a save states a version other than the one on record. */
+export class RouteCompositionConflictError extends RouteCompositionError {
+  readonly expectedVersion: number;
+  readonly actualVersion: number;
+
+  constructor(expectedVersion: number, actualVersion: number) {
+    super(
+      "conflict",
+      `Route composition version conflict: expected ${expectedVersion}, found ${actualVersion}.`,
+    );
+    this.name = "RouteCompositionConflictError";
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+  }
+}
+
+export function isRouteCompositionError(error: unknown): error is RouteCompositionError {
+  return error instanceof RouteCompositionError;
+}

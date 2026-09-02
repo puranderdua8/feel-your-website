@@ -1,6 +1,8 @@
 import {
   ContentAdapterError,
   flattenTree,
+  RouteCompositionConflictError,
+  RouteCompositionError,
   type Content,
   type ContentAdapter,
   type ContentWriter,
@@ -9,7 +11,10 @@ import {
   type JsonValue,
   type Page,
   type RouteBundle,
+  type RouteCompositionInput,
+  type RouteCompositionWriter,
 } from "@feel-your-website/content-core";
+import { randomUUID } from "node:crypto";
 
 /**
  * An in-memory ContentAdapter backed by fixtures.
@@ -39,8 +44,11 @@ export interface MemoryContentSeed {
    * Published route bundles, tree-first. `items` is optional here — when
    * omitted `getRouteManifest` derives it from `tree` via `flattenTree`, so a
    * seed never has to keep the deprecated flat list in sync by hand.
+   *
+   * Not `readonly`: `saveComposition` mutates this array in place, the same
+   * way `saveContentItem` mutates `content` — one class over one mutable seed.
    */
-  routes?: readonly RouteSeed[];
+  routes?: RouteSeed[];
   /** Locale served when the requested one has no translation. */
   defaultLocale?: Locale;
   /** Timestamp stamped on every item, so output is deterministic. */
@@ -58,7 +66,7 @@ export interface MemoryContentAdapterOptions {
   failWith?: ContentAdapterError;
 }
 
-export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
+export class MemoryContentAdapter implements ContentAdapter, ContentWriter, RouteCompositionWriter {
   readonly #seed: Required<Pick<MemoryContentSeed, "content" | "defaultLocale" | "updatedAt">> &
     MemoryContentSeed;
   readonly #failWith?: ContentAdapterError;
@@ -157,6 +165,58 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
     // An unknown locale yields an empty map, never null: the app falls back to
     // its bootstrap bundle, and a null would force a guard at every call site.
     return this.#seed.messages?.[locale] ?? {};
+  }
+
+  // RouteCompositionWriter — the write counterpart to `getRouteManifest`, on
+  // this same class for the same reason `ContentWriter` is: both sides share
+  // the one mutable `#seed`, so a save is visible to the next read in local
+  // dev with no backend.
+
+  async saveComposition(
+    bundleId: string | null,
+    input: RouteCompositionInput,
+    expectedVersion: number | null,
+    actor: string,
+  ): Promise<RouteBundle> {
+    this.#guard();
+    void actor; // the seam accepts it for parity; a real backend uses the session.
+
+    this.#seed.routes ??= [];
+    const routes = this.#seed.routes;
+    const now = new Date().toISOString();
+    const items = flattenTree(input.tree).map((ref) => ref.key);
+
+    if (bundleId === null) {
+      const created: RouteSeed = {
+        id: randomUUID(),
+        path: input.path,
+        tree: input.tree,
+        version: 1,
+        updatedAt: now,
+      };
+      routes.push(created);
+      return { ...created, items };
+    }
+
+    const index = routes.findIndex((route) => route.id === bundleId);
+    if (index === -1) {
+      throw new RouteCompositionError("not_found", `No route bundle ${bundleId}.`);
+    }
+
+    const current = routes[index]!;
+    if (expectedVersion !== null && current.version !== expectedVersion) {
+      throw new RouteCompositionConflictError(expectedVersion, current.version);
+    }
+
+    const updated: RouteSeed = {
+      ...current,
+      path: input.path,
+      tree: input.tree,
+      version: current.version + 1,
+      updatedAt: now,
+    };
+    routes[index] = updated;
+    return { ...updated, items };
   }
 
   // ContentWriter — see that interface's own doc for why this is not part of

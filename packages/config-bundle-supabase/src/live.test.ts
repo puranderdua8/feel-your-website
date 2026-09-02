@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { MemoryCookieAdapter, type CookieRecord } from "./CookieAdapter.js";
 import { SupabaseConfigBundleStore } from "./SupabaseConfigBundleStore.js";
+import { SupabaseRouteCompositionWriter } from "./SupabaseRouteCompositionWriter.js";
 
 /**
  * Runs against a real local Supabase — see `content-adapter-supabase` and
@@ -321,6 +322,175 @@ if (hasLocalSupabase) {
         ).rejects.toBeInstanceOf(InvalidItemsError);
       });
     });
+  });
+
+  describe("SupabaseRouteCompositionWriter (live)", () => {
+    let admin: SupabaseClient;
+    let userId: string;
+    let grantBundleId: string;
+    let sessionCookies: CookieRecord[];
+
+    const email = `route-composition-writer-${randomUUID()}@example.com`;
+    const password = "correct horse battery staple";
+
+    beforeAll(async () => {
+      admin = createClient(url!, serviceRoleKey!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      const { data: userData, error: userError } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+      if (userError || !userData.user) throw userError ?? new Error("createUser returned no user");
+      userId = userData.user.id;
+
+      const { data: bundle, error: bundleError } = await admin
+        .from("config_bundles")
+        .insert({
+          vocabulary: "permission",
+          name: `live-test-rcw-grant-${userId}`,
+          updated_by: userId,
+        })
+        .select()
+        .single();
+      if (bundleError || !bundle) throw bundleError ?? new Error("bundle insert returned no row");
+      grantBundleId = bundle.id as string;
+
+      const { error: grantError } = await admin
+        .from("role_permissions")
+        .insert({ bundle_id: grantBundleId, permission: "manage:routes" });
+      if (grantError) throw grantError;
+
+      const { error: assignError } = await admin
+        .from("user_roles")
+        .insert({ user_id: userId, bundle_id: grantBundleId });
+      if (assignError) throw assignError;
+
+      const cookies = new MemoryCookieAdapter();
+      const authClient = createServerClient(url!, anonKey!, {
+        cookies: { getAll: () => cookies.getAll(), setAll: (c) => cookies.setAll(c) },
+      });
+      const { error: signInError } = await authClient.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+      sessionCookies = cookies.getAll();
+    });
+
+    afterAll(async () => {
+      await admin.from("config_bundles").delete().like("name", "live-test-rcw-%");
+      await admin.from("user_roles").delete().eq("bundle_id", grantBundleId);
+      await admin.from("config_bundles").delete().eq("id", grantBundleId);
+      await admin.auth.admin.deleteUser(userId);
+    });
+
+    function writer(): SupabaseRouteCompositionWriter {
+      const cookies = new MemoryCookieAdapter();
+      cookies.setAll(sessionCookies.map((cookie) => ({ ...cookie, options: {} })));
+      return new SupabaseRouteCompositionWriter({ url: url!, anonKey: anonKey!, cookies });
+    }
+
+    it("creates a route from a nested tree, then updates it in place", async () => {
+      const w = writer();
+      const cardId = randomUUID();
+      const iconId = randomUUID();
+      const path = `/live-test-rcw-${randomUUID()}`;
+
+      const created = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path,
+          published: true,
+          tree: [
+            {
+              instanceId: cardId,
+              ref: { key: "card", variant: "" },
+              slots: {
+                icon: [{ instanceId: iconId, ref: { key: "icon", variant: "star" }, slots: {} }],
+              },
+            },
+          ],
+        },
+        null,
+        "ignored — the RPC uses the session",
+      );
+
+      expect(created.version).toBe(1);
+      expect([...created.items]).toEqual(["card", "icon"]);
+
+      // The recursive insert actually wrote a parent and a slot child.
+      const { data: rows, error } = await admin
+        .from("route_section_instances")
+        .select("id, parent_instance_id, parent_slot, section_key, section_variant, ordinal")
+        .eq("bundle_id", created.id);
+      if (error) throw error;
+
+      expect(rows).toHaveLength(2);
+      const root = rows!.find((r) => r.parent_instance_id === null)!;
+      const child = rows!.find((r) => r.parent_instance_id !== null)!;
+      expect(root).toMatchObject({ id: cardId, section_key: "card", parent_slot: null });
+      expect(child).toMatchObject({
+        id: iconId,
+        parent_instance_id: cardId,
+        parent_slot: "icon",
+        section_key: "icon",
+        section_variant: "star",
+      });
+
+      const updated = await w.saveComposition(
+        created.id,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path,
+          published: true,
+          tree: [{ instanceId: randomUUID(), ref: { key: "hero", variant: "" }, slots: {} }],
+        },
+        created.version,
+        "x",
+      );
+
+      expect(updated.version).toBe(2);
+      expect([...updated.items]).toEqual(["hero"]);
+
+      const { count } = await admin
+        .from("route_section_instances")
+        .select("*", { count: "exact", head: true })
+        .eq("bundle_id", created.id);
+      expect(count).toBe(1);
+    });
+
+    it("rejects a write against a stale version", async () => {
+      const w = writer();
+      const path = `/live-test-rcw-${randomUUID()}`;
+      const name = () => `live-test-rcw-${randomUUID()}`;
+
+      const created = await w.saveComposition(
+        null,
+        { name: name(), path, published: false, tree: root("hero") },
+        null,
+        "x",
+      );
+      await w.saveComposition(
+        created.id,
+        { name: name(), path, published: false, tree: root("footer") },
+        created.version,
+        "x",
+      );
+
+      await expect(
+        w.saveComposition(
+          created.id,
+          { name: name(), path, published: false, tree: root("hero") },
+          created.version,
+          "x",
+        ),
+      ).rejects.toMatchObject({ code: "conflict" });
+    });
+
+    function root(key: string) {
+      return [{ instanceId: randomUUID(), ref: { key, variant: "" }, slots: {} }];
+    }
   });
 } else {
   describe.skip("SupabaseConfigBundleStore (live)", () => {

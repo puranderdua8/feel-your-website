@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@feel-your-website/config": "workspace:*",
+    "@types/node": "^22.10.5",
     "eslint": "catalog:",
     "jsdom": "catalog:",
     "tsup": "catalog:",
