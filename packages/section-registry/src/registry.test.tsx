@@ -50,7 +50,7 @@ describe("renderTemplate", () => {
       }),
     );
 
-    expect(screen.getByText(/No template registered/)).toBeTruthy();
+    expect(screen.getByText(/No section registered/)).toBeTruthy();
   });
 
   it("renders visibly, not silently, when content is missing", () => {

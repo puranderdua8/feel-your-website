@@ -1,5 +1,6 @@
 import {
   ContentAdapterError,
+  flattenTree,
   type Content,
   type ContentAdapter,
   type ContentWriter,
@@ -20,6 +21,9 @@ import {
  * that implementation, and the seam it is meant to protect never gets tested.
  */
 
+/** A seed route: the `tree` is required, the deprecated `items` optional. */
+export type RouteSeed = Omit<RouteBundle, "items"> & { items?: readonly string[] };
+
 export interface MemoryContentSeed {
   /** Default-variant content: `templateKey -> locale -> fields` */
   content: Record<string, Record<Locale, Record<string, JsonValue>>>;
@@ -31,7 +35,12 @@ export interface MemoryContentSeed {
   variants?: Record<string, Record<string, Record<Locale, Record<string, JsonValue>>>>;
   /** `locale -> messages` */
   messages?: Record<Locale, Record<string, string>>;
-  routes?: readonly RouteBundle[];
+  /**
+   * Published route bundles, tree-first. `items` is optional here — when
+   * omitted `getRouteManifest` derives it from `tree` via `flattenTree`, so a
+   * seed never has to keep the deprecated flat list in sync by hand.
+   */
+  routes?: readonly RouteSeed[];
   /** Locale served when the requested one has no translation. */
   defaultLocale?: Locale;
   /** Timestamp stamped on every item, so output is deterministic. */
@@ -137,7 +146,10 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter {
   async getRouteManifest(locale: Locale): Promise<readonly RouteBundle[]> {
     this.#guard();
     void locale;
-    return this.#seed.routes ?? [];
+    return (this.#seed.routes ?? []).map((route) => ({
+      ...route,
+      items: route.items ?? flattenTree(route.tree).map((ref) => ref.key),
+    }));
   }
 
   async getMessages(locale: Locale): Promise<Readonly<Record<string, string>>> {

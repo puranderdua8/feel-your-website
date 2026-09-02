@@ -161,13 +161,26 @@ export class SupabaseContentAdapter implements ContentAdapter {
       .select("bundle_id, path, version, updated_at, items");
     if (error) throw mapContentError(error);
 
-    return (data ?? []).map((row) => ({
-      id: row.bundle_id as string,
-      path: row.path as string,
-      items: row.items as readonly string[],
-      version: row.version as number,
-      updatedAt: row.updated_at as string,
-    }));
+    return (data ?? []).map((row) => {
+      const items = row.items as readonly string[];
+      return {
+        id: row.bundle_id as string,
+        path: row.path as string,
+        // Until the route-composition tables land, the published manifest is
+        // still a flat ordered list of section keys — lifted here into a
+        // roots-only tree (no slot fills) so every consumer already speaks
+        // `RouteBundle.tree`. `instanceId` is derived from the bundle id +
+        // position so it is stable across reads.
+        tree: items.map((key, index) => ({
+          instanceId: `${row.bundle_id as string}:${index}`,
+          ref: { key, variant: "" },
+          slots: {},
+        })),
+        items,
+        version: row.version as number,
+        updatedAt: row.updated_at as string,
+      };
+    });
   }
 
   async getMessages(locale: Locale): Promise<Readonly<Record<string, string>>> {
