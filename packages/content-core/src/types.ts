@@ -40,6 +40,20 @@ export interface TemplateKeyCatalog<TKey extends string> {
 }
 
 /**
+ * "A section" as something chosen into a route — which section, and which of
+ * its named content variants. `variant: ""` is the section's default/global
+ * content; a name selects an alternative (see {@link Content.variant}).
+ *
+ * The unit the CMS composes a route from, and the unit a route's section
+ * slot can be overridden to point at. Route composition itself (a tree of
+ * these) arrives with the route-composition work; this is the leaf.
+ */
+export interface SectionRef {
+  readonly key: string;
+  readonly variant: string;
+}
+
+/**
  * A resolved piece of content for one template key in one locale.
  */
 export interface Content<TKey extends string = string> {

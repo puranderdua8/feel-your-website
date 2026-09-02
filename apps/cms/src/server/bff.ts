@@ -148,6 +148,27 @@ export const deleteContentItem = createServerFn({ method: "POST" })
     await getContentWriter().deleteContentItem(data.templateKey, data.locale, data.variant);
   });
 
+/**
+ * One section's content for one exact `(key, variant, locale)` — for the
+ * Sections editor to load whatever the author selected.
+ *
+ * A locale-fallback result (`translated: false`) is treated as "nothing
+ * here": the editor edits one specific row, so surfacing the default
+ * locale's copy under an untranslated locale would make an unfilled
+ * language look filled. `null` in that case; the editor shows an empty form.
+ */
+export const getSectionContent = createServerFn({ method: "GET" })
+  .validator((input: unknown): { key: string; variant: string; locale: string } => {
+    const { key, variant, locale } = (input ?? {}) as Record<string, unknown>;
+    if (typeof key !== "string" || key.trim() === "") throw new Error("key is required.");
+    if (typeof locale !== "string" || locale.trim() === "") throw new Error("locale is required.");
+    return { key, variant: typeof variant === "string" ? variant : "", locale };
+  })
+  .handler(async ({ data }): Promise<Content | null> => {
+    const content = await getContentAdapter().getContent(data.key, data.locale, data.variant);
+    return content && content.translated ? content : null;
+  });
+
 export const listMessages = createServerFn({ method: "GET" })
   .validator((input: unknown): { locale: string } => {
     const locale = (input as { locale?: unknown })?.locale;
