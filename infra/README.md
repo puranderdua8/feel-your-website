@@ -60,6 +60,13 @@ already its own reviewable, ordered, re-playable history, and folding SQL
 execution into `terraform apply` would just be a second, worse mechanism for
 the same job.
 
+This manual `db push` is only the one-time bootstrap of a fresh project.
+From then on `.github/workflows/db-migrate.yml` applies new migrations to the
+hosted project automatically, on every merge to `main` that changes
+`supabase/migrations/`. It reads three repo secrets — `SUPABASE_ACCESS_TOKEN`
+(same token as above), `SUPABASE_DB_PASSWORD` (`TF_VAR_supabase_database_password`),
+and `SUPABASE_PROJECT_ID` (`terraform output -raw supabase_project_ref`).
+
 ## State
 
 No remote backend is configured — state defaults to local
