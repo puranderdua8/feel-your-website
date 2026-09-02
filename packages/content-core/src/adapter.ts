@@ -1,4 +1,4 @@
-import type { Content, ListContentQuery, Locale, Page, RouteBundle } from "./types.js";
+import type { Locale, RouteBundle } from "./types.js";
 
 /**
  * The only interface the apps depend on for content.
@@ -12,27 +12,12 @@ import type { Content, ListContentQuery, Locale, Page, RouteBundle } from "./typ
  * `contract-tests.ts`, not merely these signatures — see the note there on
  * why signature-matching alone does not give substitutability.
  */
-export interface ContentAdapter<TKey extends string = string> {
-  /**
-   * Resolves one template's content in one locale, optionally for a named
-   * variant (`variant` defaults to `""`, the default/global content).
-   *
-   * Returns `null` when the template — or the requested variant of it — has
-   * no content at all: a missing resource is an expected outcome, not an
-   * error, so it is not thrown. Falling back to another locale sets
-   * `translated: false` rather than returning null; there is no fallback
-   * between variants (an unknown variant of a known key returns `null`).
-   */
-  getContent(templateKey: TKey, locale: Locale, variant?: string): Promise<Content<TKey> | null>;
-
-  /** Lists content, cursor-paginated. */
-  listContent(query: ListContentQuery): Promise<Page<Content<TKey>>>;
-
+export interface ContentAdapter {
   /**
    * The published route manifest: the section-instance tree that renders at
    * each path, every node carrying its own per-locale content
-   * ({@link RouteSectionNode.content}). Only published bundles are returned;
-   * drafts never reach the shell.
+   * ({@link RouteSectionNode.content}) and every bundle its per-locale SEO.
+   * Only published bundles are returned; drafts never reach the shell.
    *
    * `locale` is accepted for signature stability but not used — the tree is
    * locale-independent structure and each node ships content for every

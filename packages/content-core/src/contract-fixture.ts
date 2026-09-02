@@ -1,35 +1,18 @@
 /**
- * The content every adapter under test must be seeded with.
+ * The locale configuration every adapter under test is seeded with.
  *
- * Deliberately in its own module, free of any test-framework import.
+ * Deliberately in its own module, free of any test-framework import: it is
+ * *data*, needed by things that are not tests — the memory adapter's seed,
+ * which ships in the running app. Keeping it beside the suite meant importing
+ * `contract-tests` (and therefore vitest) from a runtime module, which broke
+ * the dev server with "Vitest failed to access its internal state".
  *
- * The fixture is *data*, and it is needed by things that are not tests — the
- * memory adapter's seed, for one, which ships in the running app. Keeping it
- * beside the suite meant importing `contract-tests` (and therefore vitest)
- * from a runtime module, which broke the dev server with "Vitest failed to
- * access its internal state". The suite needs vitest; the data does not.
- *
- * Kept small and explicit: the contract is about behaviour, not about a rich
- * dataset.
+ * Small on purpose: since route content moved onto the route
+ * (`route_section_content`) there is no section-content fixture to describe —
+ * only which locales the suite exercises.
  */
 export const CONTRACT_FIXTURE = {
-  /** Present in both `en` and `hi`. */
-  translatedKey: "guidance",
-  /** Present in `en` only — used to prove locale fallback. */
-  untranslatedKey: "legal",
-  /** Present in no locale — used to prove missing is not an error. */
-  missingKey: "does-not-exist",
-  /**
-   * A template key that also has a named content variant alongside its
-   * default (`""`) content. The variant exists in `defaultLocale` only, so
-   * it also exercises locale fallback *within* a variant. Deliberately the
-   * same key as `translatedKey` — one key, default content in both locales
-   * plus a named variant.
-   */
-  variantKey: "guidance",
-  variantName: "short",
   defaultLocale: "en",
+  /** A second configured locale — used where the suite needs more than one. */
   otherLocale: "hi",
-  /** Total number of default-variant content items in `en`. */
-  totalEnItems: 3,
 } as const;
