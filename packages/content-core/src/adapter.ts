@@ -30,8 +30,13 @@ export interface ContentAdapter<TKey extends string = string> {
 
   /**
    * The published route manifest: the section-instance tree that renders at
-   * each path. Only published bundles are returned; drafts never reach the
-   * shell.
+   * each path, every node carrying its own per-locale content
+   * ({@link RouteSectionNode.content}). Only published bundles are returned;
+   * drafts never reach the shell.
+   *
+   * `locale` is accepted for signature stability but not used — the tree is
+   * locale-independent structure and each node ships content for every
+   * locale, so the renderer, not this call, selects one.
    */
   getRouteManifest(locale: Locale): Promise<readonly RouteBundle[]>;
 

@@ -46,11 +46,6 @@ export interface SectionSlotSpec {
   readonly arity: "single" | "list";
   /** Must be filled for the route to be publish-complete. */
   readonly required?: boolean;
-  /**
-   * Materialised at render time when the slot is left empty — never stored.
-   * Route composition uses this; a bare catalog only records it.
-   */
-  readonly default?: SectionRef;
 }
 
 /**

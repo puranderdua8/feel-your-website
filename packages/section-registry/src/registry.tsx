@@ -1,4 +1,7 @@
-import type { Content, JsonValue } from "@feel-your-website/content-core";
+import type { JsonValue } from "@feel-your-website/content-core";
+
+/** A section's rendered content: a plain field bag, or `null` when unfilled. */
+export type SectionFields = Readonly<Record<string, JsonValue>> | null;
 
 /**
  * Maps a section key to the React component that renders it — the one
@@ -112,28 +115,21 @@ function Placeholder({ children }: { children: React.ReactNode }): React.JSX.Ele
 }
 
 /**
- * Renders one section: its component, fed the resolved content and its
- * already-rendered slot children.
+ * Renders one section: its component, fed a field bag and its already-rendered
+ * slot children.
  *
  * A missing component or missing content is rendered visibly rather than
- * skipped — a route published against a key this build doesn't know, or a
- * variant nobody has filled in yet, is a mistake worth seeing on the page.
+ * skipped — a route published against a key this build doesn't know, or an
+ * instance nobody has filled in yet for this locale, is a mistake worth
+ * seeing on the page.
  */
 export function renderSection(
   sectionKey: string,
-  content: Content | null,
+  fields: SectionFields,
   slots: Readonly<Record<string, React.ReactNode>> = {},
 ): React.JSX.Element {
   const Component = SECTION_REGISTRY[sectionKey];
   if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
-  if (!content) return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
-  return <Component fields={content.fields} slots={slots} />;
-}
-
-/**
- * @deprecated Use `renderComposition` / `renderSection`. Kept while the shell
- * and CMS finish moving to the section-tree model; dropped in the B5 cleanup.
- */
-export function renderTemplate(templateKey: string, content: Content | null): React.JSX.Element {
-  return renderSection(templateKey, content);
+  if (!fields) return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
+  return <Component fields={fields} slots={slots} />;
 }

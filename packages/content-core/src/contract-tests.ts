@@ -266,6 +266,12 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
           expect(node.instanceId.length).toBeGreaterThan(0);
           expect(typeof node.ref.key).toBe("string");
           expect(typeof node.ref.variant).toBe("string");
+          // Content is a plain `locale -> field bag` object, never null.
+          expect(node.content).toBeTypeOf("object");
+          expect(node.content).not.toBeNull();
+          for (const fields of Object.values(node.content)) {
+            expect(fields).toBeTypeOf("object");
+          }
           for (const children of Object.values(node.slots)) {
             for (const child of children) assertNode(child);
           }

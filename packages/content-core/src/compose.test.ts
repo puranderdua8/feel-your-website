@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  assembleSectionTree,
-  collectEffectiveRefs,
-  flattenTree,
-  type FlatSectionRow,
-} from "./compose.js";
-import { defineSections } from "./section-schema.js";
+import { assembleSectionTree, flattenNodes, flattenTree, type FlatSectionRow } from "./compose.js";
 import type { RouteSectionNode } from "./types.js";
 
 const row = (
@@ -20,6 +14,10 @@ const row = (
   ...over,
 });
 
+const node = (
+  over: Partial<RouteSectionNode> & Pick<RouteSectionNode, "instanceId" | "ref">,
+): RouteSectionNode => ({ content: {}, slots: {}, ...over });
+
 describe("assembleSectionTree", () => {
   it("returns an empty array for no rows", () => {
     expect(assembleSectionTree([])).toEqual([]);
@@ -31,8 +29,18 @@ describe("assembleSectionTree", () => {
       row({ instanceId: "a", ordinal: 0, sectionKey: "hero" }),
     ]);
 
-    expect(tree.map((node) => node.instanceId)).toEqual(["a", "b"]);
-    expect(tree.map((node) => node.ref.key)).toEqual(["hero", "footer"]);
+    expect(tree.map((n) => n.instanceId)).toEqual(["a", "b"]);
+    expect(tree.map((n) => n.ref.key)).toEqual(["hero", "footer"]);
+  });
+
+  it("folds each row's per-locale content onto its node, defaulting to {}", () => {
+    const tree = assembleSectionTree([
+      row({ instanceId: "a", content: { en: { title: "Hi" }, hi: { title: "नमस्ते" } } }),
+      row({ instanceId: "b", ordinal: 1 }),
+    ]);
+
+    expect(tree[0]!.content).toEqual({ en: { title: "Hi" }, hi: { title: "नमस्ते" } });
+    expect(tree[1]!.content).toEqual({});
   });
 
   it("nests children under the right slot, ordered within the slot", () => {
@@ -87,17 +95,17 @@ describe("assembleSectionTree", () => {
 });
 
 describe("flattenTree", () => {
-  it("is a pre-order walk of the refs present, defaults excluded", () => {
+  it("is a pre-order walk of the refs present", () => {
     const tree: RouteSectionNode[] = [
-      {
+      node({
         instanceId: "card",
         ref: { key: "card", variant: "" },
         slots: {
-          icon: [{ instanceId: "ic", ref: { key: "icon", variant: "star" }, slots: {} }],
-          body: [{ instanceId: "t", ref: { key: "text", variant: "" }, slots: {} }],
+          icon: [node({ instanceId: "ic", ref: { key: "icon", variant: "star" } })],
+          body: [node({ instanceId: "t", ref: { key: "text", variant: "" } })],
         },
-      },
-      { instanceId: "f", ref: { key: "footer", variant: "" }, slots: {} },
+      }),
+      node({ instanceId: "f", ref: { key: "footer", variant: "" } }),
     ];
 
     expect(flattenTree(tree)).toEqual([
@@ -118,63 +126,17 @@ describe("flattenTree", () => {
   });
 });
 
-describe("collectEffectiveRefs", () => {
-  const catalog = defineSections([
-    { key: "icon", description: "", fields: [], slots: [] },
-    { key: "text", description: "", fields: [], slots: [] },
-    {
-      key: "card",
-      description: "",
-      fields: [],
-      slots: [
-        {
-          name: "icon",
-          label: "Icon",
-          accepts: ["icon"],
-          arity: "single",
-          required: true,
-          default: { key: "icon", variant: "" },
-        },
-        { name: "body", label: "Body", accepts: ["text"], arity: "list" },
-      ],
-    },
-  ]);
-
-  it("includes a required empty slot's default ref", () => {
+describe("flattenNodes", () => {
+  it("is a pre-order walk of every node instance, slots included", () => {
     const tree: RouteSectionNode[] = [
-      { instanceId: "card", ref: { key: "card", variant: "" }, slots: {} },
-    ];
-
-    expect(collectEffectiveRefs(catalog, tree)).toEqual([
-      { key: "card", variant: "" },
-      { key: "icon", variant: "" },
-    ]);
-  });
-
-  it("uses the filling ref, not the default, when the slot is filled", () => {
-    const tree: RouteSectionNode[] = [
-      {
+      node({
         instanceId: "card",
         ref: { key: "card", variant: "" },
-        slots: { icon: [{ instanceId: "ic", ref: { key: "icon", variant: "star" }, slots: {} }] },
-      },
+        slots: { body: [node({ instanceId: "t", ref: { key: "text", variant: "" } })] },
+      }),
+      node({ instanceId: "f", ref: { key: "footer", variant: "" } }),
     ];
 
-    expect(collectEffectiveRefs(catalog, tree)).toEqual([
-      { key: "card", variant: "" },
-      { key: "icon", variant: "star" },
-    ]);
-  });
-
-  it("de-duplicates a ref reached twice", () => {
-    const tree: RouteSectionNode[] = [
-      { instanceId: "c1", ref: { key: "card", variant: "" }, slots: {} },
-      { instanceId: "c2", ref: { key: "card", variant: "" }, slots: {} },
-    ];
-
-    expect(collectEffectiveRefs(catalog, tree)).toEqual([
-      { key: "card", variant: "" },
-      { key: "icon", variant: "" },
-    ]);
+    expect(flattenNodes(tree).map((n) => n.instanceId)).toEqual(["card", "t", "f"]);
   });
 });
