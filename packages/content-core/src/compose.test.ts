@@ -10,12 +10,11 @@ const row = (
   parentSlot: null,
   ordinal: 0,
   sectionKey: "hero",
-  sectionVariant: "",
   ...over,
 });
 
 const node = (
-  over: Partial<RouteSectionNode> & Pick<RouteSectionNode, "instanceId" | "ref">,
+  over: Partial<RouteSectionNode> & Pick<RouteSectionNode, "instanceId" | "sectionKey">,
 ): RouteSectionNode => ({ content: {}, slots: {}, ...over });
 
 describe("assembleSectionTree", () => {
@@ -30,7 +29,7 @@ describe("assembleSectionTree", () => {
     ]);
 
     expect(tree.map((n) => n.instanceId)).toEqual(["a", "b"]);
-    expect(tree.map((n) => n.ref.key)).toEqual(["hero", "footer"]);
+    expect(tree.map((n) => n.sectionKey)).toEqual(["hero", "footer"]);
   });
 
   it("folds each row's per-locale content onto its node, defaulting to {}", () => {
@@ -51,7 +50,6 @@ describe("assembleSectionTree", () => {
         parentInstanceId: "card",
         parentSlot: "icon",
         sectionKey: "icon",
-        sectionVariant: "star",
       }),
       row({
         instanceId: "b1",
@@ -71,7 +69,7 @@ describe("assembleSectionTree", () => {
 
     expect(tree).toHaveLength(1);
     const card = tree[0]!;
-    expect(card.slots.icon?.map((n) => n.ref)).toEqual([{ key: "icon", variant: "star" }]);
+    expect(card.slots.icon?.map((n) => n.sectionKey)).toEqual(["icon"]);
     expect(card.slots.body?.map((n) => n.instanceId)).toEqual(["b0", "b1"]);
   });
 
@@ -95,25 +93,20 @@ describe("assembleSectionTree", () => {
 });
 
 describe("flattenTree", () => {
-  it("is a pre-order walk of the refs present", () => {
+  it("is a pre-order walk of the section keys present", () => {
     const tree: RouteSectionNode[] = [
       node({
         instanceId: "card",
-        ref: { key: "card", variant: "" },
+        sectionKey: "card",
         slots: {
-          icon: [node({ instanceId: "ic", ref: { key: "icon", variant: "star" } })],
-          body: [node({ instanceId: "t", ref: { key: "text", variant: "" } })],
+          icon: [node({ instanceId: "ic", sectionKey: "icon" })],
+          body: [node({ instanceId: "t", sectionKey: "text" })],
         },
       }),
-      node({ instanceId: "f", ref: { key: "footer", variant: "" } }),
+      node({ instanceId: "f", sectionKey: "footer" }),
     ];
 
-    expect(flattenTree(tree)).toEqual([
-      { key: "card", variant: "" },
-      { key: "icon", variant: "star" },
-      { key: "text", variant: "" },
-      { key: "footer", variant: "" },
-    ]);
+    expect(flattenTree(tree)).toEqual(["card", "icon", "text", "footer"]);
   });
 
   it("round-trips through assembleSectionTree", () => {
@@ -122,7 +115,7 @@ describe("flattenTree", () => {
       row({ instanceId: "ic", parentInstanceId: "card", parentSlot: "icon", sectionKey: "icon" }),
     ];
 
-    expect(flattenTree(assembleSectionTree(rows)).map((r) => r.key)).toEqual(["card", "icon"]);
+    expect(flattenTree(assembleSectionTree(rows))).toEqual(["card", "icon"]);
   });
 });
 
@@ -131,10 +124,10 @@ describe("flattenNodes", () => {
     const tree: RouteSectionNode[] = [
       node({
         instanceId: "card",
-        ref: { key: "card", variant: "" },
-        slots: { body: [node({ instanceId: "t", ref: { key: "text", variant: "" } })] },
+        sectionKey: "card",
+        slots: { body: [node({ instanceId: "t", sectionKey: "text" })] },
       }),
-      node({ instanceId: "f", ref: { key: "footer", variant: "" } }),
+      node({ instanceId: "f", sectionKey: "footer" }),
     ];
 
     expect(flattenNodes(tree).map((n) => n.instanceId)).toEqual(["card", "t", "f"]);

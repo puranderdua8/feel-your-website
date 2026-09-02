@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   defineSections,
-  findUnknownSectionRefs,
+  findUnknownSectionKeys,
   validateSectionFields,
   type SectionDefinition,
 } from "./section-schema.js";
@@ -60,13 +60,10 @@ describe("validateSectionFields", () => {
   });
 });
 
-describe("findUnknownSectionRefs", () => {
-  it("returns only the refs whose key is not in the catalog", () => {
+describe("findUnknownSectionKeys", () => {
+  it("returns only the keys not in the catalog, de-duplicated and sorted", () => {
     const catalog = defineSections([card]);
-    const unknown = findUnknownSectionRefs(catalog, [
-      { key: "card", variant: "" },
-      { key: "ghost", variant: "x" },
-    ]);
-    expect(unknown).toEqual([{ key: "ghost", variant: "x" }]);
+    const unknown = findUnknownSectionKeys(catalog, ["card", "ghost", "phantom", "ghost"]);
+    expect(unknown).toEqual(["ghost", "phantom"]);
   });
 });

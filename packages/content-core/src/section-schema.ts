@@ -1,4 +1,4 @@
-import type { JsonValue, SectionRef } from "./types.js";
+import type { JsonValue } from "./types.js";
 
 /**
  * The schema half of a section: what fields an author fills in, and what
@@ -178,13 +178,13 @@ export function validateSectionFields(
 }
 
 /**
- * The refs among `refs` whose `key` is not in the catalog. Empty means every
- * ref names a real section. Route-composition validation will call this with
- * a flattened tree; a bare catalog check calls it with any ref list.
+ * The keys among `keys` not in the catalog, de-duplicated and sorted. Empty
+ * means every key names a real section. The CMS calls this at publish time
+ * with a route's flattened section-key list.
  */
-export function findUnknownSectionRefs(
+export function findUnknownSectionKeys(
   catalog: SectionCatalog,
-  refs: readonly SectionRef[],
-): readonly SectionRef[] {
-  return refs.filter((ref) => !catalog.includes(ref.key));
+  keys: readonly string[],
+): readonly string[] {
+  return [...new Set(keys.filter((key) => !catalog.includes(key)))].sort();
 }

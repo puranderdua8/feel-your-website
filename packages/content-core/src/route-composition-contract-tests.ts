@@ -51,7 +51,7 @@ export function runRouteCompositionWriterContract(
   const heroTree = (): RouteSectionNode[] => [
     {
       instanceId: f.rootHero,
-      ref: { key: "hero", variant: "" },
+      sectionKey: "hero",
       content: { en: { title: "Hero" }, hi: { title: "हीरो" } },
       slots: {},
     },
@@ -59,13 +59,13 @@ export function runRouteCompositionWriterContract(
   const cardTree = (): RouteSectionNode[] => [
     {
       instanceId: f.rootCard,
-      ref: { key: "card", variant: "" },
+      sectionKey: "card",
       content: { en: { heading: "Card" } },
       slots: {
         icon: [
           {
             instanceId: f.slotIcon,
-            ref: { key: "icon", variant: "star" },
+            sectionKey: "icon",
             content: { en: { name: "star" } },
             slots: {},
           },
@@ -87,7 +87,7 @@ export function runRouteCompositionWriterContract(
 
       expect(bundle.version).toBe(1);
       expect(bundle.path).toBe(f.path);
-      expect(bundle.tree.map((node) => node.ref.key)).toEqual(["hero"]);
+      expect(bundle.tree.map((node) => node.sectionKey)).toEqual(["hero"]);
     });
 
     it("round-trips a nested slot tree", async () => {
@@ -106,8 +106,8 @@ export function runRouteCompositionWriterContract(
         "user-1",
       );
 
-      expect(flattenTree(bundle.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
-      expect(bundle.tree[0]?.slots.icon?.[0]?.ref).toEqual({ key: "icon", variant: "star" });
+      expect(flattenTree(bundle.tree)).toEqual(["card", "icon"]);
+      expect(bundle.tree[0]?.slots.icon?.[0]?.sectionKey).toBe("icon");
       // The saved bundle echoes what it was given — per-instance content at the
       // root and inside a slot, and the per-locale SEO. (A full storage
       // round-trip through `getComposition` is exercised by each backend's own
@@ -134,7 +134,7 @@ export function runRouteCompositionWriterContract(
       );
 
       expect(updated.version).toBe(created.version + 1);
-      expect(flattenTree(updated.tree).map((ref) => ref.key)).toEqual(["card", "icon"]);
+      expect(flattenTree(updated.tree)).toEqual(["card", "icon"]);
     });
 
     it("rejects a write against a stale version", async () => {

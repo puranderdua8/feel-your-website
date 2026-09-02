@@ -29,7 +29,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
         tree: [
           {
             instanceId: crypto.randomUUID(),
-            ref: { key: "hero", variant: "" },
+            sectionKey: "hero",
             content: { en: { title: "Pricing" } },
             slots: {},
           },
@@ -48,7 +48,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
       published: false,
       version: 1,
     });
-    expect(composition?.tree.map((n) => n.ref.key)).toEqual(["hero"]);
+    expect(composition?.tree.map((n) => n.sectionKey)).toEqual(["hero"]);
     expect(composition?.seo).toEqual({ en: { title: "Pricing", robots: "noindex" } });
 
     // Draft — not in the published manifest, but visible in the editor's list.

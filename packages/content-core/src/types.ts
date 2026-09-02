@@ -40,27 +40,12 @@ export interface TemplateKeyCatalog<TKey extends string> {
 }
 
 /**
- * "A section" as something chosen into a route — just which section. The
- * `variant` field is vestigial: content is no longer keyed by section +
- * variant, it lives on the route instance ({@link RouteSectionNode.content}),
- * so every ref the CMS mints now carries `variant: ""`. Kept on the type
- * only until the B6 cleanup drops it along with the `content_items` read path.
- *
- * The unit the CMS composes a route from.
- */
-export interface SectionRef {
-  readonly key: string;
-  /** @deprecated Always `""`. Removed in B6 with the section-content read path. */
-  readonly variant: string;
-}
-
-/**
  * One instance in a route's composition tree.
  *
  * A tree of *values*, not a graph of shared references: a node owns its own
  * `slots` and its own `content`, so there is no back-edge and no structural
- * cycle risk. Two nodes may carry the same {@link SectionRef} — that is the
- * same *component* used twice, each with its own content, not a cycle.
+ * cycle risk. Two nodes may carry the same `sectionKey` — that is the same
+ * *component* used twice, each with its own content, not a cycle.
  */
 export interface RouteSectionNode {
   /**
@@ -69,7 +54,8 @@ export interface RouteSectionNode {
    * pre-order pass without round-tripping generated ids.
    */
   readonly instanceId: string;
-  readonly ref: SectionRef;
+  /** Which catalog section this instance renders. */
+  readonly sectionKey: string;
   /**
    * This instance's content, per site locale: `locale -> field bag`.
    *

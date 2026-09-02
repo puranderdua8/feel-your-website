@@ -87,8 +87,8 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
         const assertNode = (node: RouteSectionNode): void => {
           expect(typeof node.instanceId).toBe("string");
           expect(node.instanceId.length).toBeGreaterThan(0);
-          expect(typeof node.ref.key).toBe("string");
-          expect(typeof node.ref.variant).toBe("string");
+          expect(typeof node.sectionKey).toBe("string");
+          expect(node.sectionKey.length).toBeGreaterThan(0);
           // Content is a plain `locale -> field bag` object, never null.
           expect(node.content).toBeTypeOf("object");
           expect(node.content).not.toBeNull();

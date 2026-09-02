@@ -42,7 +42,6 @@ interface InstanceRow {
   parent_slot: string | null;
   ordinal: number;
   section_key: string;
-  section_variant: string | null;
   /** Embedded from route_section_content — one entry per authored locale. */
   route_section_content: { locale: string; fields: Record<string, JsonValue> }[] | null;
 }
@@ -112,7 +111,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
         this.#client
           .from("route_section_instances")
           .select(
-            "id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, route_section_content(locale, fields)",
+            "id, parent_instance_id, parent_slot, ordinal, section_key, route_section_content(locale, fields)",
           )
           .eq("bundle_id", bundleId),
         this.#client
@@ -129,7 +128,6 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       parentSlot: row.parent_slot,
       ordinal: row.ordinal,
       sectionKey: row.section_key,
-      sectionVariant: row.section_variant ?? "",
       content: Object.fromEntries(
         (row.route_section_content ?? []).map((entry) => [entry.locale, entry.fields]),
       ),
