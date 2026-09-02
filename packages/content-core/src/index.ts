@@ -6,6 +6,7 @@ export * from "./template-keys.js";
 export * from "./section-schema.js";
 export * from "./compose.js";
 export * from "./route-composition-writer.js";
+export * from "./site-settings.js";
 export * from "./contract-fixture.js";
 
 // `./contract-tests` is deliberately NOT re-exported here: it imports vitest,

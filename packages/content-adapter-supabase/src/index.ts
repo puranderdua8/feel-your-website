@@ -10,3 +10,7 @@ export {
   SupabaseContentWriter,
   type SupabaseContentWriterOptions,
 } from "./SupabaseContentWriter.js";
+export {
+  SupabaseSiteSettingsStore,
+  type SupabaseSiteSettingsStoreOptions,
+} from "./SupabaseSiteSettingsStore.js";

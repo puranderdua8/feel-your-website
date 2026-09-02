@@ -1,3 +1,4 @@
+import type { SiteLocale } from "@feel-your-website/content-core";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -5,19 +6,14 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
  * see `src/router.tsx`). What *is* switchable is the **content** locale: the
  * language whose copy every authoring surface reads and writes.
  *
- * The set of site locales is a code stub here; the real, editable set lands
- * with the site-settings store in the route-editor work. Selection is
- * client-only for now — no cookie, no round trip.
+ * The locale set comes from the `SiteSettingsStore` via the route loader
+ * (`listSiteLocales`); {@link DEFAULT_SITE_LOCALES} is only the fallback when
+ * that fetch yields nothing. Selection is client-only for now — no cookie, no
+ * round trip.
  */
-export interface SiteLocale {
-  readonly locale: string;
-  readonly label: string;
-}
+export type { SiteLocale };
 
-export const DEFAULT_SITE_LOCALES: readonly SiteLocale[] = [
-  { locale: "en", label: "English" },
-  { locale: "hi", label: "हिन्दी" },
-];
+export const DEFAULT_SITE_LOCALES: readonly SiteLocale[] = [{ locale: "en", label: "English" }];
 
 interface ContentLocaleValue {
   readonly locales: readonly SiteLocale[];

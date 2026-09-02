@@ -1,3 +1,4 @@
+import type { SiteLocale } from "@feel-your-website/content-core";
 import { PermissionsProvider } from "@feel-your-website/rbac/react";
 import {
   Button,
@@ -18,11 +19,28 @@ import { RolesPanel } from "@/components/roles-panel";
 import { RouteBundlesPanel } from "@/components/route-bundles-panel";
 import { SectionsPanel } from "@/components/sections-panel";
 import { SignInForm } from "@/components/sign-in-form";
-import { ContentLocaleProvider, useContentLocale } from "@/i18n/content-locale";
-import { loadSession, signOut, type SessionPayload } from "@/server/bff";
+import {
+  ContentLocaleProvider,
+  DEFAULT_SITE_LOCALES,
+  useContentLocale,
+} from "@/i18n/content-locale";
+import { listSiteLocales, loadSession, signOut, type SessionPayload } from "@/server/bff";
+
+export interface CmsHomeData {
+  session: SessionPayload;
+  siteLocales: readonly SiteLocale[];
+}
 
 export const Route = createFileRoute("/")({
-  loader: async (): Promise<SessionPayload> => loadSession(),
+  loader: async (): Promise<CmsHomeData> => {
+    const session = await loadSession();
+    // The locale set only matters once signed in; skipping it for a signed-out
+    // visitor keeps the sign-in screen a single round trip.
+    const siteLocales = session.userId
+      ? await listSiteLocales().catch(() => DEFAULT_SITE_LOCALES)
+      : DEFAULT_SITE_LOCALES;
+    return { session, siteLocales };
+  },
   component: CmsHome,
 });
 
@@ -33,7 +51,7 @@ export const Route = createFileRoute("/")({
  * the session that gates them all.
  */
 function CmsHome() {
-  const session = Route.useLoaderData();
+  const { session, siteLocales } = Route.useLoaderData();
   const router = useRouter();
 
   if (!session.userId) {
@@ -42,7 +60,7 @@ function CmsHome() {
 
   return (
     <PermissionsProvider permissions={new Set(session.permissions)}>
-      <ContentLocaleProvider>
+      <ContentLocaleProvider locales={siteLocales}>
         <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
           <header className="flex items-center justify-between">
             <div>
