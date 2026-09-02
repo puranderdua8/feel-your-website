@@ -47,6 +47,14 @@ export interface RouteCompositionWriter {
     expectedVersion: number | null,
     actor: string,
   ): Promise<RouteBundle>;
+
+  /**
+   * Deletes a route bundle and its whole section tree. `expectedVersion` is
+   * the optimistic-concurrency token, same as `saveComposition`; a mismatch
+   * throws {@link RouteCompositionConflictError}, an unknown `bundleId` throws
+   * {@link RouteCompositionError} with code `not_found`.
+   */
+  deleteComposition(bundleId: string, expectedVersion: number, actor: string): Promise<void>;
 }
 
 /** A route bundle's header — enough for the editor's route list. */

@@ -113,18 +113,6 @@ function asFields(input: unknown): Record<string, JsonValue> {
   return input as Record<string, JsonValue>;
 }
 
-export const listContentItems = createServerFn({ method: "GET" })
-  .validator((input: unknown): { locale: string } => {
-    const locale = (input as { locale?: unknown } | undefined)?.locale;
-    return { locale: typeof locale === "string" && locale.trim() !== "" ? locale : "en" };
-  })
-  .handler(async ({ data }): Promise<readonly Content[]> => {
-    // Default-variant rows for the chosen locale — the Sections surface (a
-    // later phase) lists named variants separately.
-    const page = await getContentAdapter().listContent({ locale: data.locale, limit: 100 });
-    return page.items;
-  });
-
 export const saveContentItem = createServerFn({ method: "POST" })
   .validator(
     (
@@ -188,13 +176,32 @@ export const getSectionContent = createServerFn({ method: "GET" })
   });
 
 /**
- * The configured content locales — what the header language switcher and,
- * later, the publish-completeness gate iterate. Read-only here; editing the
- * set is the Languages surface's job (a later phase).
+ * The configured content locales — what the header language switcher, the
+ * Languages tab and the publish-completeness gate all iterate.
  */
 export const listSiteLocales = createServerFn({ method: "GET" }).handler(
   async (): Promise<readonly SiteLocale[]> => getSiteSettingsStore().getLocales(),
 );
+
+/** Replaces the configured content-locale set. `manage:content` gated in the store. */
+export const saveSiteLocales = createServerFn({ method: "POST" })
+  .validator((input: unknown): { locales: SiteLocale[] } => {
+    const raw = (input as { locales?: unknown } | undefined)?.locales;
+    if (!Array.isArray(raw)) throw new Error("locales must be an array.");
+    const locales = raw.map((entry): SiteLocale => {
+      const { locale, label } = (entry ?? {}) as Record<string, unknown>;
+      if (typeof locale !== "string" || locale.trim() === "") {
+        throw new Error("every locale needs a non-empty BCP-47 tag.");
+      }
+      return { locale: locale.trim(), label: typeof label === "string" ? label : locale.trim() };
+    });
+    if (locales.length === 0) throw new Error("at least one locale is required.");
+    return { locales };
+  })
+  .handler(async ({ data }): Promise<readonly SiteLocale[]> => {
+    await getSiteSettingsStore().setLocales(data.locales);
+    return getSiteSettingsStore().getLocales();
+  });
 
 export const listMessages = createServerFn({ method: "GET" })
   .validator((input: unknown): { locale: string } => {
@@ -292,73 +299,6 @@ export const roleBundleHistory = createServerFn({ method: "GET" })
     getConfigBundleStore("permission").history(data.id),
   );
 
-// --- Route bundles ---------------------------------------------------------
-
-export const listRouteBundles = createServerFn({ method: "GET" }).handler(
-  async (): Promise<readonly ConfigBundle[]> => getConfigBundleStore("template_key").list(),
-);
-
-export const saveRouteBundle = createServerFn({ method: "POST" })
-  .validator(
-    (
-      input: unknown,
-    ): {
-      id?: string;
-      name: string;
-      path: string;
-      items: string[];
-      published: boolean;
-      expectedVersion?: number;
-      actor: string;
-    } => {
-      const { id, name, path, items, published, expectedVersion, actor } = (input ?? {}) as Record<
-        string,
-        unknown
-      >;
-      if (typeof name !== "string" || name.trim() === "") throw new Error("name is required.");
-      if (typeof path !== "string" || !path.startsWith("/")) {
-        throw new Error("path is required and must start with /.");
-      }
-      if (!Array.isArray(items) || !items.every((item) => typeof item === "string")) {
-        throw new Error("items must be a list of strings.");
-      }
-      return {
-        id: typeof id === "string" ? id : undefined,
-        name,
-        path,
-        items: items as string[],
-        published: Boolean(published),
-        expectedVersion: typeof expectedVersion === "number" ? expectedVersion : undefined,
-        actor: typeof actor === "string" ? actor : "unknown",
-      };
-    },
-  )
-  .handler(async ({ data }): Promise<ConfigBundle> => {
-    const store = getConfigBundleStore("template_key");
-    const input = {
-      name: data.name,
-      items: data.items,
-      path: data.path,
-      published: data.published,
-    };
-
-    return data.id
-      ? store.update(data.id, input, data.expectedVersion ?? 0, data.actor)
-      : store.create(input, data.actor);
-  });
-
-export const deleteRouteBundle = createServerFn({ method: "POST" })
-  .validator((input: unknown): { id: string; expectedVersion: number; actor: string } => {
-    const { id, expectedVersion, actor } = (input ?? {}) as Record<string, unknown>;
-    if (typeof id !== "string" || typeof expectedVersion !== "number") {
-      throw new Error("id and expectedVersion are required.");
-    }
-    return { id, expectedVersion, actor: typeof actor === "string" ? actor : "unknown" };
-  })
-  .handler(async ({ data }): Promise<void> => {
-    await getConfigBundleStore("template_key").delete(data.id, data.expectedVersion, data.actor);
-  });
-
 // --- Route composition (section tree) ------------------------------------
 
 /** Parses an untrusted value into a `RouteSectionNode[]`, rejecting anything malformed. */
@@ -454,6 +394,23 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     return getRouteCompositionWriter().saveComposition(
       data.bundleId,
       { name: data.name, path: data.path, published: data.published, tree: data.tree },
+      data.expectedVersion,
+      data.actor,
+    );
+  });
+
+/** Deletes a route bundle and its whole section tree. */
+export const deleteRouteComposition = createServerFn({ method: "POST" })
+  .validator((input: unknown): { bundleId: string; expectedVersion: number; actor: string } => {
+    const { bundleId, expectedVersion, actor } = (input ?? {}) as Record<string, unknown>;
+    if (typeof bundleId !== "string" || typeof expectedVersion !== "number") {
+      throw new Error("bundleId and expectedVersion are required.");
+    }
+    return { bundleId, expectedVersion, actor: typeof actor === "string" ? actor : "unknown" };
+  })
+  .handler(async ({ data }): Promise<void> => {
+    await getRouteCompositionWriter().deleteComposition(
+      data.bundleId,
       data.expectedVersion,
       data.actor,
     );

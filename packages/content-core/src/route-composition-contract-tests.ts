@@ -157,5 +157,44 @@ export function runRouteCompositionWriterContract(
         expect(isRouteCompositionError(error) && error.code === "not_found").toBe(true);
       }
     });
+
+    it("deletes a composition, version-checked", async () => {
+      const writer = await createWriter();
+      const created = await writer.saveComposition(
+        null,
+        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        null,
+        "user-1",
+      );
+
+      // Stale version is refused.
+      try {
+        await writer.deleteComposition(created.id, created.version + 99, "user-1");
+        expect.unreachable("a stale delete should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(RouteCompositionConflictError);
+      }
+
+      await writer.deleteComposition(created.id, created.version, "user-1");
+
+      // Gone: recreating at the same path now succeeds at version 1.
+      const recreated = await writer.saveComposition(
+        null,
+        { name: f.name, path: f.path, published: false, tree: heroTree() },
+        null,
+        "user-1",
+      );
+      expect(recreated.version).toBe(1);
+    });
+
+    it("reports not_found when deleting an unknown bundle id", async () => {
+      const writer = await createWriter();
+      try {
+        await writer.deleteComposition(f.unknownId, 1, "user-1");
+        expect.unreachable("an unknown id should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "not_found").toBe(true);
+      }
+    });
   });
 }

@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useContentLocale } from "@/i18n/content-locale";
 import {
-  deleteRouteBundle,
+  deleteRouteComposition,
   getSectionContent,
   listRouteCompositions,
   loadRouteComposition,
@@ -188,8 +188,8 @@ function RouteEditorInner({ actor }: { actor: string }) {
 
   async function removeRoute() {
     if (!open?.bundleId || open.version === null) return;
-    await deleteRouteBundle({
-      data: { id: open.bundleId, expectedVersion: open.version, actor },
+    await deleteRouteComposition({
+      data: { bundleId: open.bundleId, expectedVersion: open.version, actor },
     });
     setOpen(null);
     await refresh();

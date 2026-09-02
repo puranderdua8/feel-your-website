@@ -114,15 +114,8 @@ if (hasLocalSupabase) {
         .insert({ bundle_id: routeBundleId, path: "/contract-test", published: true });
       if (routeBundleError) throw routeBundleError;
 
-      const { error: routeTemplateError } = await admin
-        .from("route_templates")
-        .insert({ bundle_id: routeBundleId, ordinal: 0, template_key: thirdKey });
-      if (routeTemplateError) throw routeTemplateError;
-
-      // `getRouteManifest` reads `published_route_sections` (the section-tree
-      // read model), not `published_route_manifest`, so seed a root instance
-      // too — `save_route_bundle` would mirror both, but this fixture writes
-      // the tables directly.
+      // `getRouteManifest` reads `published_route_sections` — seed one root
+      // section instance for the published bundle.
       const { error: routeSectionError } = await admin.from("route_section_instances").insert({
         bundle_id: routeBundleId,
         parent_instance_id: null,
@@ -135,7 +128,7 @@ if (hasLocalSupabase) {
     });
 
     afterAll(async () => {
-      // cascades route_bundles + route_templates
+      // cascades route_bundles + route_section_instances
       await admin.from("config_bundles").delete().eq("id", routeBundleId);
       await admin
         .from("content_items")

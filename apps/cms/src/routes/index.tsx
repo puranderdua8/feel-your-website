@@ -14,7 +14,7 @@ import {
 } from "@feel-your-website/ui";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 
-import { ContentPanel } from "@/components/content-panel";
+import { LanguagesPanel } from "@/components/languages-panel";
 import { RolesPanel } from "@/components/roles-panel";
 import { RouteEditor } from "@/components/route-editor";
 import { SectionsPanel } from "@/components/sections-panel";
@@ -82,7 +82,7 @@ function CmsHome() {
             <TabsList>
               <TabsTrigger value="sections">Sections</TabsTrigger>
               <TabsTrigger value="routes">Routes</TabsTrigger>
-              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="languages">Languages</TabsTrigger>
               <TabsTrigger value="roles">Roles</TabsTrigger>
             </TabsList>
             <TabsContent value="sections">
@@ -91,8 +91,8 @@ function CmsHome() {
             <TabsContent value="routes">
               <RouteEditor actor={session.userId} />
             </TabsContent>
-            <TabsContent value="content">
-              <ContentPanel />
+            <TabsContent value="languages">
+              <LanguagesPanel />
             </TabsContent>
             <TabsContent value="roles">
               <RolesPanel actor={session.userId} />

@@ -277,6 +277,22 @@ export class MemoryContentAdapter
     };
   }
 
+  async deleteComposition(bundleId: string, expectedVersion: number, actor: string): Promise<void> {
+    this.#guard();
+    void actor;
+
+    const routes = this.#seed.routes ?? [];
+    const index = routes.findIndex((route) => route.id === bundleId);
+    if (index === -1) {
+      throw new RouteCompositionError("not_found", `No route bundle ${bundleId}.`);
+    }
+    const current = routes[index]!;
+    if (current.version !== expectedVersion) {
+      throw new RouteCompositionConflictError(expectedVersion, current.version);
+    }
+    routes.splice(index, 1);
+  }
+
   // ContentWriter — see that interface's own doc for why this is not part of
   // ContentAdapter. Implemented on the same class rather than a separate
   // `MemoryContentWriter` purely because there is nothing to separate here:

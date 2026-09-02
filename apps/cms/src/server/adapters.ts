@@ -21,11 +21,9 @@ import type {
   SiteLocale,
   SiteSettingsStore,
 } from "@feel-your-website/content-core";
-import { findUnknownTemplateKeys, MemorySiteSettingsStore } from "@feel-your-website/content-core";
+import { MemorySiteSettingsStore } from "@feel-your-website/content-core";
 import { platformCatalog, SEED_ONLY_PERMISSIONS } from "@feel-your-website/rbac";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
-
-import { templateCatalog } from "../content/template-keys.js";
 
 /**
  * The dependency-injection point — same role as `apps/shell/src/server/adapters.ts`,
@@ -219,8 +217,8 @@ export function getAuthProvider(): AuthProvider {
 }
 
 /**
- * One store per vocabulary — `"permission"` for the role editor, `"template_key"`
- * for the route bundle editor.
+ * The role-bundle store (the one remaining config-bundle vocabulary — routes
+ * moved to the `RouteComposition*` seams).
  *
  * Deliberately keyed off `AUTH_PROVIDER`, not a config-bundle-specific env
  * var: a config bundle write is only ever meaningful against a *real* signed-in
@@ -233,6 +231,12 @@ export function getConfigBundleStore(vocabulary: ConfigBundleVocabulary): Config
   const cached = configBundleStores.get(vocabulary);
   if (cached) return cached;
 
+  const validation = {
+    findUnknownItems: (items: readonly string[]) =>
+      items.filter((item) => !platformCatalog.includes(item)),
+    forbiddenItems: SEED_ONLY_PERMISSIONS,
+  };
+
   const kind = resolveAuthProviderKind();
   const store =
     kind === "supabase"
@@ -241,24 +245,12 @@ export function getConfigBundleStore(vocabulary: ConfigBundleVocabulary): Config
           anonKey: requireEnv("SUPABASE_ANON_KEY"),
           cookies: tanstackCookieAdapter(),
           vocabulary,
-          ...vocabularyValidation(vocabulary),
+          ...validation,
         })
-      : new MemoryConfigBundleStore(vocabularyValidation(vocabulary));
+      : new MemoryConfigBundleStore(validation);
 
   configBundleStores.set(vocabulary, store);
   return store;
-}
-
-function vocabularyValidation(vocabulary: ConfigBundleVocabulary): {
-  findUnknownItems: (items: readonly string[]) => readonly string[];
-  forbiddenItems?: readonly string[];
-} {
-  return vocabulary === "permission"
-    ? {
-        findUnknownItems: (items) => items.filter((item) => !platformCatalog.includes(item)),
-        forbiddenItems: SEED_ONLY_PERMISSIONS,
-      }
-    : { findUnknownItems: (items) => findUnknownTemplateKeys(templateCatalog, items) };
 }
 
 /** Test seam: forces the next call to rebuild from current env. */
