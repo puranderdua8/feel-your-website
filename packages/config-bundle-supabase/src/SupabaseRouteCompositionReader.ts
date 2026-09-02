@@ -5,12 +5,14 @@ import {
   type RouteComposition,
   type RouteCompositionReader,
   type RouteCompositionSummary,
+  type RouteSeo,
 } from "@feel-your-website/content-core";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { CookieAdapter } from "./CookieAdapter.js";
 import { mapRouteCompositionError } from "./mapRouteCompositionError.js";
+import { type RouteSeoRow, rowToRouteSeo } from "./routeSeo.js";
 
 export interface SupabaseRouteCompositionReaderOptions {
   /** The project URL — `SUPABASE_URL`. Safe to log; not secret. */
@@ -105,13 +107,21 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       : header.route_bundles;
     if (!routeMeta) return null;
 
-    const { data: rows, error: rowsError } = await this.#client
-      .from("route_section_instances")
-      .select(
-        "id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, route_section_content(locale, fields)",
-      )
-      .eq("bundle_id", bundleId);
+    const [{ data: rows, error: rowsError }, { data: seoRows, error: seoError }] =
+      await Promise.all([
+        this.#client
+          .from("route_section_instances")
+          .select(
+            "id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, route_section_content(locale, fields)",
+          )
+          .eq("bundle_id", bundleId),
+        this.#client
+          .from("route_seo")
+          .select("locale, title, description, canonical, og_image, keywords, robots")
+          .eq("bundle_id", bundleId),
+      ]);
     if (rowsError) throw mapRouteCompositionError(rowsError);
+    if (seoError) throw mapRouteCompositionError(seoError);
 
     const flat: FlatSectionRow[] = ((rows ?? []) as InstanceRow[]).map((row) => ({
       instanceId: row.id,
@@ -125,6 +135,11 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       ),
     }));
 
+    const seo: Record<string, RouteSeo> = {};
+    for (const row of (seoRows ?? []) as RouteSeoRow[]) {
+      seo[row.locale] = rowToRouteSeo(row);
+    }
+
     return {
       id: header.id,
       name: header.name,
@@ -133,6 +148,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       version: header.version,
       updatedAt: header.updated_at,
       tree: assembleSectionTree(flat),
+      seo,
     };
   }
 }

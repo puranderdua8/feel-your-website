@@ -361,6 +361,10 @@ if (hasLocalSupabase) {
               },
             },
           ],
+          seo: {
+            en: { title: "Card page", description: "A card.", keywords: ["a", "b"] },
+            hi: { title: "कार्ड" },
+          },
         },
         null,
         "ignored — the RPC uses the session",
@@ -403,6 +407,25 @@ if (hasLocalSupabase) {
       );
       expect(content).toHaveLength(2);
 
+      // SEO rows landed too — one per locale, `keywords` as a text[], missing
+      // fields as NULL.
+      const { data: seo, error: seoError } = await admin
+        .from("route_seo")
+        .select("locale, title, description, keywords, robots")
+        .eq("bundle_id", created.id)
+        .order("locale");
+      if (seoError) throw seoError;
+      expect(seo).toEqual([
+        {
+          locale: "en",
+          title: "Card page",
+          description: "A card.",
+          keywords: ["a", "b"],
+          robots: null,
+        },
+        { locale: "hi", title: "कार्ड", description: null, keywords: null, robots: null },
+      ]);
+
       const updated = await w.saveComposition(
         created.id,
         {
@@ -417,6 +440,7 @@ if (hasLocalSupabase) {
               slots: {},
             },
           ],
+          seo: { en: { robots: "noindex" } },
         },
         created.version,
         "x",
@@ -430,6 +454,14 @@ if (hasLocalSupabase) {
         .select("*", { count: "exact", head: true })
         .eq("bundle_id", created.id);
       expect(count).toBe(1);
+
+      // The whole SEO set was replaced: the two old locales are gone, only
+      // the new single row remains.
+      const { data: seoAfter } = await admin
+        .from("route_seo")
+        .select("locale, robots")
+        .eq("bundle_id", created.id);
+      expect(seoAfter).toEqual([{ locale: "en", robots: "noindex" }]);
 
       // Replacing the tree cascaded the old content away and wrote the new
       // node's — nothing from the card/icon pair survives.
@@ -447,13 +479,13 @@ if (hasLocalSupabase) {
 
       const created = await w.saveComposition(
         null,
-        { name: name(), path, published: false, tree: root("hero") },
+        { name: name(), path, published: false, tree: root("hero"), seo: {} },
         null,
         "x",
       );
       await w.saveComposition(
         created.id,
-        { name: name(), path, published: false, tree: root("footer") },
+        { name: name(), path, published: false, tree: root("footer"), seo: {} },
         created.version,
         "x",
       );
@@ -461,7 +493,7 @@ if (hasLocalSupabase) {
       await expect(
         w.saveComposition(
           created.id,
-          { name: name(), path, published: false, tree: root("hero") },
+          { name: name(), path, published: false, tree: root("hero"), seo: {} },
           created.version,
           "x",
         ),
@@ -485,6 +517,7 @@ if (hasLocalSupabase) {
               slots: {},
             },
           ],
+          seo: { en: { title: "Hero" } },
         },
         null,
         "x",
@@ -498,18 +531,24 @@ if (hasLocalSupabase) {
 
       await w.deleteComposition(created.id, created.version, "x");
 
-      const [{ count: instanceCount }, { count: contentCount }] = await Promise.all([
-        admin
-          .from("route_section_instances")
-          .select("*", { count: "exact", head: true })
-          .eq("bundle_id", created.id),
-        admin
-          .from("route_section_content")
-          .select("*", { count: "exact", head: true })
-          .eq("bundle_id", created.id),
-      ]);
+      const [{ count: instanceCount }, { count: contentCount }, { count: seoCount }] =
+        await Promise.all([
+          admin
+            .from("route_section_instances")
+            .select("*", { count: "exact", head: true })
+            .eq("bundle_id", created.id),
+          admin
+            .from("route_section_content")
+            .select("*", { count: "exact", head: true })
+            .eq("bundle_id", created.id),
+          admin
+            .from("route_seo")
+            .select("*", { count: "exact", head: true })
+            .eq("bundle_id", created.id),
+        ]);
       expect(instanceCount).toBe(0);
       expect(contentCount).toBe(0);
+      expect(seoCount).toBe(0);
 
       await expect(w.deleteComposition(created.id, 1, "x")).rejects.toMatchObject({
         code: "not_found",

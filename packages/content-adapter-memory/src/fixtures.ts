@@ -76,6 +76,13 @@ export const contractSeed: MemoryContentSeed = {
           slots: {},
         },
       ],
+      seo: {
+        en: { title: "Help — feel-your-website", description: "Get help and contact support." },
+        hi: {
+          title: "सहायता — feel-your-website",
+          description: "सहायता पाएँ और समर्थन से संपर्क करें।",
+        },
+      },
       version: 1,
       updatedAt: "2026-01-01T00:00:00.000Z",
     },

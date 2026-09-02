@@ -65,6 +65,7 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       p_tree: input.tree,
       // The audit trail still records a flat key list alongside the tree.
       p_items: flattenTree(input.tree).map((ref) => ref.key),
+      p_seo: input.seo,
     });
     if (error) throw mapRouteCompositionError(error, expectedVersion);
 
@@ -73,8 +74,9 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       id: row.id,
       path: input.path,
       // Echoed: the RPC returns only the bundle header, and this is exactly
-      // what was just written.
+      // what was just written — tree (with per-instance content) and SEO.
       tree: input.tree,
+      seo: input.seo,
       version: row.version,
       updatedAt: row.updated_at,
     };

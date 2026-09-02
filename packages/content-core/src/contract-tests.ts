@@ -247,6 +247,9 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
         for (const bundle of manifest) {
           expect(bundle.path.startsWith("/")).toBe(true);
           expect(bundle.version).toBeGreaterThan(0);
+          // SEO is a plain `locale -> RouteSeo` object, never null.
+          expect(bundle.seo).toBeTypeOf("object");
+          expect(bundle.seo).not.toBeNull();
         }
       });
 

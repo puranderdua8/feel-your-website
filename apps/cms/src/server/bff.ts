@@ -10,6 +10,7 @@ import type {
   RouteComposition,
   RouteCompositionSummary,
   RouteSectionNode,
+  RouteSeo,
   SiteLocale,
 } from "@feel-your-website/content-core";
 import {
@@ -280,6 +281,35 @@ function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
   });
 }
 
+/** Optional string field off an untrusted object, or `undefined`. */
+function optString(row: Record<string, unknown>, key: string): string | undefined {
+  const value = row[key];
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+/** Parses an untrusted value into `Record<Locale, RouteSeo>`, dropping empty fields. */
+function parseSeo(value: unknown): Record<string, RouteSeo> {
+  const out: Record<string, RouteSeo> = {};
+  for (const [locale, raw] of Object.entries(asObject(value ?? {}, "SEO"))) {
+    const row = asObject(raw, `SEO for ${locale}`);
+    const keywordsRaw = Array.isArray(row.keywords) ? row.keywords : [];
+    const keywords = keywordsRaw.filter(
+      (k): k is string => typeof k === "string" && k.trim() !== "",
+    );
+    const seo: RouteSeo = {
+      ...(optString(row, "title") ? { title: optString(row, "title") } : {}),
+      ...(optString(row, "description") ? { description: optString(row, "description") } : {}),
+      ...(optString(row, "canonical") ? { canonical: optString(row, "canonical") } : {}),
+      ...(optString(row, "ogImage") ? { ogImage: optString(row, "ogImage") } : {}),
+      ...(keywords.length > 0 ? { keywords } : {}),
+      ...(optString(row, "robots") ? { robots: optString(row, "robots") } : {}),
+    };
+    // Only keep a locale that actually carries something.
+    if (Object.keys(seo).length > 0) out[locale] = seo;
+  }
+  return out;
+}
+
 /** Every route bundle's header, drafts included — the editor's route list. */
 export const listRouteCompositions = createServerFn({ method: "GET" }).handler(
   async (): Promise<readonly RouteCompositionSummary[]> =>
@@ -315,10 +345,11 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
       path: string;
       published: boolean;
       tree: RouteSectionNode[];
+      seo: Record<string, RouteSeo>;
       expectedVersion: number | null;
       actor: string;
     } => {
-      const { bundleId, name, path, published, tree, expectedVersion, actor } = (input ??
+      const { bundleId, name, path, published, tree, seo, expectedVersion, actor } = (input ??
         {}) as Record<string, unknown>;
       if (typeof name !== "string" || name.trim() === "") throw new Error("name is required.");
       if (typeof path !== "string" || !path.startsWith("/")) {
@@ -330,6 +361,7 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
         path,
         published: Boolean(published),
         tree: parseTree(tree),
+        seo: parseSeo(seo),
         expectedVersion: typeof expectedVersion === "number" ? expectedVersion : null,
         actor: typeof actor === "string" ? actor : "unknown",
       };
@@ -343,7 +375,13 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
 
     return getRouteCompositionWriter().saveComposition(
       data.bundleId,
-      { name: data.name, path: data.path, published: data.published, tree: data.tree },
+      {
+        name: data.name,
+        path: data.path,
+        published: data.published,
+        tree: data.tree,
+        seo: data.seo,
+      },
       data.expectedVersion,
       data.actor,
     );

@@ -2,6 +2,7 @@ import {
   isContentAdapterError,
   type Content,
   type RouteSectionNode,
+  type RouteSeo,
 } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
@@ -136,6 +137,8 @@ export interface RoutePage {
    * `@feel-your-website/section-registry`'s `renderComposition`.
    */
   tree: readonly RouteSectionNode[];
+  /** This route's SEO metadata for `locale` — `{}` when it has none. */
+  seo: RouteSeo;
 }
 
 /**
@@ -166,7 +169,7 @@ export const loadRoutePage = createServerFn({ method: "GET" })
     const bundle = manifest.find((candidate) => candidate.path === data.path);
     if (!bundle) return null;
 
-    return { path: bundle.path, locale, tree: bundle.tree };
+    return { path: bundle.path, locale, tree: bundle.tree, seo: bundle.seo[locale] ?? {} };
   });
 
 /** Resolves one template's content, honouring locale fallback. */

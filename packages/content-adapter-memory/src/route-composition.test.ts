@@ -34,6 +34,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
             slots: {},
           },
         ],
+        seo: { en: { title: "Pricing", robots: "noindex" } },
       },
       null,
       "user-1",
@@ -48,6 +49,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
       version: 1,
     });
     expect(composition?.tree.map((n) => n.ref.key)).toEqual(["hero"]);
+    expect(composition?.seo).toEqual({ en: { title: "Pricing", robots: "noindex" } });
 
     // Draft — not in the published manifest, but visible in the editor's list.
     expect(await adapter.getRouteManifest("en")).toEqual([]);
@@ -55,7 +57,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
 
     const published = await adapter.saveComposition(
       saved.id,
-      { name: "Pricing", path: "/pricing", published: true, tree: composition!.tree },
+      { name: "Pricing", path: "/pricing", published: true, tree: composition!.tree, seo: {} },
       saved.version,
       "user-1",
     );

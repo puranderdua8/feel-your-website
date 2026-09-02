@@ -33,9 +33,11 @@ import { randomUUID } from "node:crypto";
  * CMS editor needs. A seed that omits them gets `name = path` and
  * `published = true` (a fixture route is live by default).
  */
-export type RouteSeed = RouteBundle & {
+export type RouteSeed = Omit<RouteBundle, "seo"> & {
   name?: string;
   published?: boolean;
+  /** Optional in a seed — a fixture route with no SEO simply omits it. */
+  seo?: RouteBundle["seo"];
 };
 
 export interface MemoryContentSeed {
@@ -171,6 +173,7 @@ export class MemoryContentAdapter
         id: route.id,
         path: route.path,
         tree: route.tree,
+        seo: route.seo ?? {},
         version: route.version,
         updatedAt: route.updatedAt,
       }));
@@ -199,6 +202,7 @@ export class MemoryContentAdapter
       published: route.published ?? true,
       version: route.version,
       tree: route.tree,
+      seo: route.seo ?? {},
       updatedAt: route.updatedAt,
     };
   }
@@ -235,6 +239,7 @@ export class MemoryContentAdapter
         path: input.path,
         published: input.published,
         tree: input.tree,
+        seo: input.seo,
         version: 1,
         updatedAt: now,
       };
@@ -243,6 +248,7 @@ export class MemoryContentAdapter
         id: created.id,
         path: created.path,
         tree: created.tree,
+        seo: input.seo,
         version: 1,
         updatedAt: now,
       };
@@ -264,6 +270,7 @@ export class MemoryContentAdapter
       path: input.path,
       published: input.published,
       tree: input.tree,
+      seo: input.seo,
       version: current.version + 1,
       updatedAt: now,
     };
@@ -272,6 +279,7 @@ export class MemoryContentAdapter
       id: updated.id,
       path: updated.path,
       tree: updated.tree,
+      seo: input.seo,
       version: updated.version,
       updatedAt: now,
     };
