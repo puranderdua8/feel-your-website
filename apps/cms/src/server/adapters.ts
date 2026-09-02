@@ -9,9 +9,15 @@ import { contractSeed, MemoryContentAdapter } from "@feel-your-website/content-a
 import {
   SupabaseContentAdapter,
   SupabaseContentWriter,
+  SupabaseSiteSettingsStore,
 } from "@feel-your-website/content-adapter-supabase";
-import type { ContentAdapter, ContentWriter } from "@feel-your-website/content-core";
-import { findUnknownTemplateKeys } from "@feel-your-website/content-core";
+import type {
+  ContentAdapter,
+  ContentWriter,
+  SiteLocale,
+  SiteSettingsStore,
+} from "@feel-your-website/content-core";
+import { findUnknownTemplateKeys, MemorySiteSettingsStore } from "@feel-your-website/content-core";
 import { platformCatalog, SEED_ONLY_PERMISSIONS } from "@feel-your-website/rbac";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
 
@@ -71,9 +77,16 @@ function tanstackCookieAdapter(): CookieAdapter {
   };
 }
 
+/** Local-dev content locales — kept in step with `supabase/seed`'s intent. */
+const DEV_SITE_LOCALES: readonly SiteLocale[] = [
+  { locale: "en", label: "English" },
+  { locale: "hi", label: "हिन्दी" },
+];
+
 let contentAdapter: ContentAdapter | null = null;
 let contentWriter: ContentWriter | null = null;
 let authProvider: AuthProvider | null = null;
+let siteSettingsStore: SiteSettingsStore | null = null;
 const configBundleStores = new Map<ConfigBundleVocabulary, ConfigBundleStore>();
 
 export function getContentAdapter(): ContentAdapter {
@@ -120,6 +133,22 @@ function memoryContent(): MemoryContentAdapter {
       : new MemoryContentAdapter(contractSeed);
   contentAdapter = shared;
   return shared;
+}
+
+export function getSiteSettingsStore(): SiteSettingsStore {
+  if (siteSettingsStore) return siteSettingsStore;
+
+  const kind = resolveContentAdapterKind();
+  siteSettingsStore =
+    kind === "supabase"
+      ? new SupabaseSiteSettingsStore({
+          url: requireEnv("SUPABASE_URL"),
+          anonKey: requireEnv("SUPABASE_ANON_KEY"),
+          cookies: tanstackCookieAdapter(),
+        })
+      : new MemorySiteSettingsStore(DEV_SITE_LOCALES);
+
+  return siteSettingsStore;
 }
 
 export function getAuthProvider(): AuthProvider {
@@ -195,5 +224,6 @@ export function resetAdapters(): void {
   contentAdapter = null;
   contentWriter = null;
   authProvider = null;
+  siteSettingsStore = null;
   configBundleStores.clear();
 }

@@ -4,7 +4,7 @@ import type {
   CreateBundleInput,
   UpdateBundleInput,
 } from "@feel-your-website/config-schema";
-import type { Content, JsonValue } from "@feel-your-website/content-core";
+import type { Content, JsonValue, SiteLocale } from "@feel-your-website/content-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import { createServerFn } from "@tanstack/react-start";
 
@@ -13,6 +13,7 @@ import {
   getConfigBundleStore,
   getContentAdapter,
   getContentWriter,
+  getSiteSettingsStore,
 } from "./adapters.js";
 
 /**
@@ -168,6 +169,15 @@ export const getSectionContent = createServerFn({ method: "GET" })
     const content = await getContentAdapter().getContent(data.key, data.locale, data.variant);
     return content && content.translated ? content : null;
   });
+
+/**
+ * The configured content locales — what the header language switcher and,
+ * later, the publish-completeness gate iterate. Read-only here; editing the
+ * set is the Languages surface's job (a later phase).
+ */
+export const listSiteLocales = createServerFn({ method: "GET" }).handler(
+  async (): Promise<readonly SiteLocale[]> => getSiteSettingsStore().getLocales(),
+);
 
 export const listMessages = createServerFn({ method: "GET" })
   .validator((input: unknown): { locale: string } => {
