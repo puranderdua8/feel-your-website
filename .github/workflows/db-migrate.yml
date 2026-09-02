@@ -1,0 +1,88 @@
+name: DB migrate
+
+# Applies pending Supabase migrations to the hosted project on merge to main.
+#
+# Why this exists: nothing else does it. `ci.yml`'s `supabase` job only ever
+# replays migrations against an ephemeral local database; Terraform (`infra/`)
+# manages project *settings*, never schema; Netlify builds and ships the app.
+# Before this workflow, `supabase db push` was a manual step in
+# `infra/README.md` that was easy to forget — the failure mode being a
+# deployed app whose code calls RPCs/tables the hosted database does not have
+# yet ("The content backend is unreachable" in the CMS).
+#
+# "Only when a migration is required" is the `paths:` filter below: GitHub
+# skips this workflow entirely unless the push changed something under
+# supabase/migrations/, so an ordinary merge never links the CLI to the
+# project or spends any time here.
+#
+# "Cannot be missed" is that it runs unconditionally on every qualifying merge
+# and shows up as its own commit status — red if the push fails.
+#
+# It deliberately runs in parallel with the Netlify build the same merge
+# triggers. Every migration in supabase/migrations/ is written to apply while
+# the previous app revision is still live (additive columns/tables, new RPC
+# overloads rather than signature changes, a drop only one release after its
+# last caller) — the same backward-compatibility rule the migration history
+# already follows, so the brief window where one revision meets the other
+# schema is safe. If a future migration cannot be made safe that way,
+# serialise it instead: turn off Netlify auto-publish for the affected site
+# and trigger its build hook as the final step of this job.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/config.toml"
+  # Manual trigger, for the one-time catch-up when the hosted project is
+  # behind and for re-running after a transient failure — no local CLI needed.
+  workflow_dispatch:
+
+# Never let two merges push migrations at once, and — unlike ci.yml's
+# top-level `ci-` group — never cancel one that is mid-push. A separate
+# workflow rather than a job in ci.yml precisely so ci.yml's
+# `cancel-in-progress: true` cannot kill an in-flight `supabase db push`.
+concurrency:
+  group: supabase-migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Prove the whole set replays onto an empty database before touching
+      # production — the same guarantee ci.yml's `supabase` job gives on a
+      # PR, repeated here so this workflow is self-contained and a migration
+      # that somehow reached `main` past a red check is still caught before
+      # it is pushed. Cheap in practice: the `paths:` filter means this only
+      # runs on the rare merge that actually changes a migration.
+      - name: Replay every migration from scratch
+        run: |
+          supabase db start
+          supabase db reset
+
+      - name: Link the hosted project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      # Idempotent by construction: `db push` reads
+      # `supabase_migrations.schema_migrations` on the remote and applies only
+      # the files missing there, in filename order. Running it when nothing is
+      # pending is a no-op — the `paths:` filter is an optimisation, not the
+      # correctness boundary.
+      - name: Push pending migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
