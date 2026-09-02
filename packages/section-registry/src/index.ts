@@ -4,3 +4,4 @@
 // `@feel-your-website/content-core`'s content model, never on an adapter.
 
 export * from "./registry.js";
+export * from "./sections.js";
