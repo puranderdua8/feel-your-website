@@ -177,3 +177,6 @@ supabase/.branches
 # Local Claude Code config (e.g. dev-server launch config for the Browser
 # preview tool). Machine-local, never committed.
 .claude/
+
+# macOS Finder metadata.
+.DS_Store
