@@ -266,17 +266,15 @@ A few things worth knowing before extending it:
   conflict on. See `ContentWriter` in `content-core` for the write-side
   interface this backs — deliberately separate from the read-only
   `ContentAdapter` (see that interface's own doc for why).
-- **Migrations reach the hosted project through CI, never by hand.**
-  `.github/workflows/db-migrate.yml` runs `supabase db push` against the
-  hosted project on every merge to `main` that changes `supabase/migrations/`
-  — and only then; a `paths:` filter skips the workflow otherwise — after
-  replaying the whole set onto an empty database first. It needs three repo
-  secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`,
-  `SUPABASE_PROJECT_ID`. Migrations are written to apply against the
-  still-running previous revision (additive first, drops a release later), so
-  this racing the Netlify build the same merge triggers is safe. The manual
-  `supabase db push` in [`infra/README.md`](infra/README.md) is now only the
-  first-apply bootstrap for a brand-new project.
+- **Migrations are applied to the hosted project by hand, and a PR check
+  enforces that you did.** `supabase/migrations/applied.txt` records which
+  migrations are live on the hosted project; the `migrations` job in
+  `ci.yml` (`scripts/check-migrations-applied.sh`) fails any PR that carries
+  a migration file with no line there. So the sequence is: land the
+  migration, run `pnpm exec supabase db push` yourself, append its version
+  to `applied.txt` — every PR in between stays red. It is a pure file
+  comparison, no credentials in CI. See [`infra/README.md`](infra/README.md)
+  for the `db push` mechanics.
 
 Everything above was exercised against a real local Postgres (`supabase db
 reset`, and `psql` sessions simulating both an unauthorized caller and an

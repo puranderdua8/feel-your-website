@@ -10,6 +10,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Blocks merge while the hosted Supabase project is behind the migrations on
+  # this branch. Migrations are applied to that project by hand, on purpose
+  # (see scripts/check-migrations-applied.sh and infra/README.md); this check
+  # is what makes "forgot to run `supabase db push`" a red PR instead of a
+  # broken deploy. Pure file comparison — no credentials, no network.
+  migrations:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Every migration is recorded as applied
+        run: bash scripts/check-migrations-applied.sh
+
   verify:
     runs-on: ubuntu-latest
     permissions:

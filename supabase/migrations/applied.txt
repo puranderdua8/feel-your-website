@@ -1,0 +1,24 @@
+# Migrations applied to the hosted Supabase project (cpqrmxaaijchjwwqlamg).
+#
+# One version — the timestamp prefix of a file in this directory — per line,
+# in filename order. This is the source of truth the PR check
+# (scripts/check-migrations-applied.sh) compares against: a migration file
+# with no line here fails the check and blocks merge until it is applied to
+# the hosted project and recorded.
+#
+# Update this only after actually running `pnpm exec supabase db push`.
+# `pnpm exec supabase migration list --linked` shows the project's real state.
+20260831000100
+20260831000200
+20260831000300
+20260831000400
+20260831000500
+20260831000600
+20260831000700
+20260831000800
+20260901000100
+20260902000100
+20260903000100
+20260904000100
+20260905000100
+20260906000100
