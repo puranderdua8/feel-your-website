@@ -1,4 +1,5 @@
 import { runRouteCompositionWriterContract } from "@feel-your-website/content-core/route-composition-contract-tests";
+import { describe, expect, it } from "vitest";
 
 import { MemoryContentAdapter } from "./MemoryContentAdapter.js";
 
@@ -13,4 +14,49 @@ import { MemoryContentAdapter } from "./MemoryContentAdapter.js";
 runRouteCompositionWriterContract({
   name: "MemoryContentAdapter",
   createWriter: () => new MemoryContentAdapter({ content: {}, routes: [] }),
+});
+
+describe("MemoryContentAdapter route composition read/write", () => {
+  it("reads back a saved draft through getComposition, and keeps it out of the manifest", async () => {
+    const adapter = new MemoryContentAdapter({ content: {}, routes: [] });
+
+    const saved = await adapter.saveComposition(
+      null,
+      {
+        name: "Pricing",
+        path: "/pricing",
+        published: false,
+        tree: [{ instanceId: crypto.randomUUID(), ref: { key: "hero", variant: "" }, slots: {} }],
+      },
+      null,
+      "user-1",
+    );
+
+    const composition = await adapter.getComposition(saved.id);
+    expect(composition).toMatchObject({
+      id: saved.id,
+      name: "Pricing",
+      path: "/pricing",
+      published: false,
+      version: 1,
+    });
+    expect(composition?.tree.map((n) => n.ref.key)).toEqual(["hero"]);
+
+    // Draft — not in the published manifest.
+    expect(await adapter.getRouteManifest("en")).toEqual([]);
+
+    const published = await adapter.saveComposition(
+      saved.id,
+      { name: "Pricing", path: "/pricing", published: true, tree: composition!.tree },
+      saved.version,
+      "user-1",
+    );
+    const manifest = await adapter.getRouteManifest("en");
+    expect(manifest.map((b) => b.id)).toEqual([published.id]);
+  });
+
+  it("returns null for an unknown bundle id", async () => {
+    const adapter = new MemoryContentAdapter({ content: {}, routes: [] });
+    expect(await adapter.getComposition(crypto.randomUUID())).toBeNull();
+  });
 });

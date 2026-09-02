@@ -2,6 +2,8 @@ import { MockAuthProvider, type AuthProvider } from "@feel-your-website/auth";
 import { SupabaseAuthProvider, type CookieAdapter } from "@feel-your-website/auth-supabase";
 import {
   SupabaseConfigBundleStore,
+  SupabaseRouteCompositionReader,
+  SupabaseRouteCompositionWriter,
   type ConfigBundleVocabulary,
 } from "@feel-your-website/config-bundle-supabase";
 import { MemoryConfigBundleStore, type ConfigBundleStore } from "@feel-your-website/config-schema";
@@ -14,6 +16,8 @@ import {
 import type {
   ContentAdapter,
   ContentWriter,
+  RouteCompositionReader,
+  RouteCompositionWriter,
   SiteLocale,
   SiteSettingsStore,
 } from "@feel-your-website/content-core";
@@ -87,6 +91,8 @@ let contentAdapter: ContentAdapter | null = null;
 let contentWriter: ContentWriter | null = null;
 let authProvider: AuthProvider | null = null;
 let siteSettingsStore: SiteSettingsStore | null = null;
+let routeCompositionWriter: RouteCompositionWriter | null = null;
+let routeCompositionReader: RouteCompositionReader | null = null;
 const configBundleStores = new Map<ConfigBundleVocabulary, ConfigBundleStore>();
 
 export function getContentAdapter(): ContentAdapter {
@@ -133,6 +139,42 @@ function memoryContent(): MemoryContentAdapter {
       : new MemoryContentAdapter(contractSeed);
   contentAdapter = shared;
   return shared;
+}
+
+/**
+ * Route-composition read + write. On memory both are the one shared
+ * `MemoryContentAdapter` (a save is visible to the next load); on Supabase
+ * they are two session-carrying classes in `config-bundle-supabase`, next to
+ * `SupabaseConfigBundleStore` — a route composition *is* a config bundle.
+ */
+export function getRouteCompositionWriter(): RouteCompositionWriter {
+  if (routeCompositionWriter) return routeCompositionWriter;
+
+  routeCompositionWriter =
+    resolveContentAdapterKind() === "supabase"
+      ? new SupabaseRouteCompositionWriter({
+          url: requireEnv("SUPABASE_URL"),
+          anonKey: requireEnv("SUPABASE_ANON_KEY"),
+          cookies: tanstackCookieAdapter(),
+        })
+      : memoryContent();
+
+  return routeCompositionWriter;
+}
+
+export function getRouteCompositionReader(): RouteCompositionReader {
+  if (routeCompositionReader) return routeCompositionReader;
+
+  routeCompositionReader =
+    resolveContentAdapterKind() === "supabase"
+      ? new SupabaseRouteCompositionReader({
+          url: requireEnv("SUPABASE_URL"),
+          anonKey: requireEnv("SUPABASE_ANON_KEY"),
+          cookies: tanstackCookieAdapter(),
+        })
+      : memoryContent();
+
+  return routeCompositionReader;
 }
 
 export function getSiteSettingsStore(): SiteSettingsStore {
@@ -225,5 +267,7 @@ export function resetAdapters(): void {
   contentWriter = null;
   authProvider = null;
   siteSettingsStore = null;
+  routeCompositionWriter = null;
+  routeCompositionReader = null;
   configBundleStores.clear();
 }

@@ -8,6 +8,10 @@ export {
   type SupabaseConfigBundleStoreOptions,
 } from "./SupabaseConfigBundleStore.js";
 export {
+  SupabaseRouteCompositionReader,
+  type SupabaseRouteCompositionReaderOptions,
+} from "./SupabaseRouteCompositionReader.js";
+export {
   SupabaseRouteCompositionWriter,
   type SupabaseRouteCompositionWriterOptions,
 } from "./SupabaseRouteCompositionWriter.js";

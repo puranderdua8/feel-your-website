@@ -11,7 +11,9 @@ import {
   type JsonValue,
   type Page,
   type RouteBundle,
+  type RouteComposition,
   type RouteCompositionInput,
+  type RouteCompositionReader,
   type RouteCompositionWriter,
 } from "@feel-your-website/content-core";
 import { randomUUID } from "node:crypto";
@@ -26,8 +28,17 @@ import { randomUUID } from "node:crypto";
  * that implementation, and the seam it is meant to protect never gets tested.
  */
 
-/** A seed route: the `tree` is required, the deprecated `items` optional. */
-export type RouteSeed = Omit<RouteBundle, "items"> & { items?: readonly string[] };
+/**
+ * A seed route: `tree` is required, the deprecated `items` optional. `name`
+ * and `published` mirror the config-bundle header — a seed that omits them
+ * gets `name = path` and `published = true` (a fixture route is live by
+ * default).
+ */
+export type RouteSeed = Omit<RouteBundle, "items"> & {
+  items?: readonly string[];
+  name?: string;
+  published?: boolean;
+};
 
 export interface MemoryContentSeed {
   /** Default-variant content: `templateKey -> locale -> fields` */
@@ -66,7 +77,9 @@ export interface MemoryContentAdapterOptions {
   failWith?: ContentAdapterError;
 }
 
-export class MemoryContentAdapter implements ContentAdapter, ContentWriter, RouteCompositionWriter {
+export class MemoryContentAdapter
+  implements ContentAdapter, ContentWriter, RouteCompositionWriter, RouteCompositionReader
+{
   readonly #seed: Required<Pick<MemoryContentSeed, "content" | "defaultLocale" | "updatedAt">> &
     MemoryContentSeed;
   readonly #failWith?: ContentAdapterError;
@@ -154,10 +167,33 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter, Rout
   async getRouteManifest(locale: Locale): Promise<readonly RouteBundle[]> {
     this.#guard();
     void locale;
-    return (this.#seed.routes ?? []).map((route) => ({
-      ...route,
-      items: route.items ?? flattenTree(route.tree).map((ref) => ref.key),
-    }));
+    // Only published routes — a seed route with no `published` flag is a
+    // fixture and counts as live; `saveComposition` can now create drafts.
+    return (this.#seed.routes ?? [])
+      .filter((route) => route.published !== false)
+      .map((route) => ({
+        id: route.id,
+        path: route.path,
+        tree: route.tree,
+        items: route.items ?? flattenTree(route.tree).map((ref) => ref.key),
+        version: route.version,
+        updatedAt: route.updatedAt,
+      }));
+  }
+
+  async getComposition(bundleId: string): Promise<RouteComposition | null> {
+    this.#guard();
+    const route = (this.#seed.routes ?? []).find((candidate) => candidate.id === bundleId);
+    if (!route) return null;
+    return {
+      id: route.id,
+      name: route.name ?? route.path,
+      path: route.path,
+      published: route.published ?? true,
+      version: route.version,
+      tree: route.tree,
+      updatedAt: route.updatedAt,
+    };
   }
 
   async getMessages(locale: Locale): Promise<Readonly<Record<string, string>>> {
@@ -189,13 +225,22 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter, Rout
     if (bundleId === null) {
       const created: RouteSeed = {
         id: randomUUID(),
+        name: input.name,
         path: input.path,
+        published: input.published,
         tree: input.tree,
         version: 1,
         updatedAt: now,
       };
       routes.push(created);
-      return { ...created, items };
+      return {
+        id: created.id,
+        path: created.path,
+        tree: created.tree,
+        items,
+        version: 1,
+        updatedAt: now,
+      };
     }
 
     const index = routes.findIndex((route) => route.id === bundleId);
@@ -210,13 +255,22 @@ export class MemoryContentAdapter implements ContentAdapter, ContentWriter, Rout
 
     const updated: RouteSeed = {
       ...current,
+      name: input.name,
       path: input.path,
+      published: input.published,
       tree: input.tree,
       version: current.version + 1,
       updatedAt: now,
     };
     routes[index] = updated;
-    return { ...updated, items };
+    return {
+      id: updated.id,
+      path: updated.path,
+      tree: updated.tree,
+      items,
+      version: updated.version,
+      updatedAt: now,
+    };
   }
 
   // ContentWriter — see that interface's own doc for why this is not part of

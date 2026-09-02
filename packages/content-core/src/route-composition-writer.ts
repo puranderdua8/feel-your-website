@@ -48,3 +48,30 @@ export interface RouteCompositionWriter {
     actor: string,
   ): Promise<RouteBundle>;
 }
+
+/**
+ * One route's full composition, drafts included — what the CMS route editor
+ * loads to edit. Richer than {@link RouteBundle}: it carries the bundle
+ * `name` and `published` flag (which live on the config-bundle header, not on
+ * the shell-facing `RouteBundle`), and no derived `items`.
+ */
+export interface RouteComposition {
+  readonly id: string;
+  readonly name: string;
+  readonly path: string;
+  readonly published: boolean;
+  readonly version: number;
+  readonly tree: readonly RouteSectionNode[];
+  readonly updatedAt: string;
+}
+
+/**
+ * The read counterpart to {@link RouteCompositionWriter}, for the one caller
+ * that needs a route's tree *before* it is published: the CMS editor.
+ * `ContentAdapter.getRouteManifest` deliberately only ever returns published
+ * bundles, so it cannot serve this.
+ */
+export interface RouteCompositionReader {
+  /** One route's composition by bundle id, or `null` if there is no such route bundle. */
+  getComposition(bundleId: string): Promise<RouteComposition | null>;
+}
