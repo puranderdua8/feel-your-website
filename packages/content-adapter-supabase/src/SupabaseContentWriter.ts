@@ -78,6 +78,7 @@ export class SupabaseContentWriter implements ContentWriter {
     templateKey: string,
     locale: Locale,
     fields: Readonly<Record<string, JsonValue>>,
+    variant = "",
   ): Promise<Content> {
     this.#guard();
 
@@ -85,11 +86,13 @@ export class SupabaseContentWriter implements ContentWriter {
       p_template_key: templateKey,
       p_locale: locale,
       p_fields: fields,
+      p_variant: variant,
     });
     if (error) throw mapContentWriteError(error);
 
     return {
       templateKey: data.template_key as string,
+      variant: data.variant as string,
       locale: data.locale as string,
       translated: true,
       fields: data.fields as Record<string, JsonValue>,
@@ -97,12 +100,13 @@ export class SupabaseContentWriter implements ContentWriter {
     };
   }
 
-  async deleteContentItem(templateKey: string, locale: Locale): Promise<void> {
+  async deleteContentItem(templateKey: string, locale: Locale, variant = ""): Promise<void> {
     this.#guard();
 
     const { error } = await this.#client.rpc("delete_content_item", {
       p_template_key: templateKey,
       p_locale: locale,
+      p_variant: variant,
     });
     if (error) throw mapContentWriteError(error);
   }

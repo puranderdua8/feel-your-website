@@ -56,6 +56,15 @@ if (hasLocalSupabase) {
         { template_key: f.translatedKey, locale: f.otherLocale, fields: { title: "मार्गदर्शन" } },
         { template_key: f.untranslatedKey, locale: f.defaultLocale, fields: { title: "Legal" } },
         { template_key: thirdKey, locale: f.defaultLocale, fields: { title: "Help" } },
+        // A named variant of `variantKey` (== `translatedKey`), default
+        // locale only — exercises variant selection + locale fallback within
+        // a variant. `variant` defaults to '' for the rows above.
+        {
+          template_key: f.variantKey,
+          variant: f.variantName,
+          locale: f.defaultLocale,
+          fields: { title: "Guidance (short)" },
+        },
       ]);
       if (contentError) throw contentError;
 

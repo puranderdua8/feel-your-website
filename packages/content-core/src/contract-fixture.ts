@@ -19,8 +19,17 @@ export const CONTRACT_FIXTURE = {
   untranslatedKey: "legal",
   /** Present in no locale — used to prove missing is not an error. */
   missingKey: "does-not-exist",
+  /**
+   * A template key that also has a named content variant alongside its
+   * default (`""`) content. The variant exists in `defaultLocale` only, so
+   * it also exercises locale fallback *within* a variant. Deliberately the
+   * same key as `translatedKey` — one key, default content in both locales
+   * plus a named variant.
+   */
+  variantKey: "guidance",
+  variantName: "short",
   defaultLocale: "en",
   otherLocale: "hi",
-  /** Total number of content items across all template keys in `en`. */
+  /** Total number of default-variant content items in `en`. */
   totalEnItems: 3,
 } as const;

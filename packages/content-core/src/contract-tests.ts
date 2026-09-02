@@ -100,6 +100,61 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
           /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/,
         );
       });
+
+      it("defaults to the '' variant when none is asked for", async () => {
+        const adapter = await createAdapter();
+        const content = await adapter.getContent(f.translatedKey, f.defaultLocale);
+
+        expect(content?.variant).toBe("");
+      });
+    });
+
+    describe("content variants", () => {
+      it("returns a named variant's content when asked for it by name", async () => {
+        const adapter = await createAdapter();
+        const content = await adapter.getContent(f.variantKey, f.defaultLocale, f.variantName);
+
+        expect(content).not.toBeNull();
+        expect(content?.templateKey).toBe(f.variantKey);
+        expect(content?.variant).toBe(f.variantName);
+      });
+
+      it("does not fall back to the default variant for an unknown variant", async () => {
+        // Unlike locale, a variant is an explicit selection: a missing one is
+        // a clear "no such thing", not a cue to serve different content.
+        const adapter = await createAdapter();
+        await expect(
+          adapter.getContent(f.variantKey, f.defaultLocale, "no-such-variant"),
+        ).resolves.toBeNull();
+      });
+
+      it("still applies locale fallback within a variant", async () => {
+        const adapter = await createAdapter();
+        const content = await adapter.getContent(f.variantKey, f.otherLocale, f.variantName);
+
+        expect(content?.variant).toBe(f.variantName);
+        expect(content?.locale).toBe(f.defaultLocale);
+        expect(content?.translated).toBe(false);
+      });
+
+      it("lists only '' variant rows by default", async () => {
+        const adapter = await createAdapter();
+        const page = await adapter.listContent({ locale: f.defaultLocale });
+
+        expect(page.items.length).toBe(f.totalEnItems);
+        expect(page.items.every((item) => item.variant === "")).toBe(true);
+      });
+
+      it("lists a named variant's rows when the query names it", async () => {
+        const adapter = await createAdapter();
+        const page = await adapter.listContent({
+          locale: f.defaultLocale,
+          variant: f.variantName,
+        });
+
+        expect(page.items.map((item) => item.templateKey)).toContain(f.variantKey);
+        expect(page.items.every((item) => item.variant === f.variantName)).toBe(true);
+      });
     });
 
     describe("listContent pagination", () => {

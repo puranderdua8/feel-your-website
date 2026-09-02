@@ -8,6 +8,7 @@ describe("renderTemplate", () => {
     render(
       renderTemplate("hero", {
         templateKey: "hero",
+        variant: "",
         locale: "en",
         translated: true,
         fields: { title: "Welcome", subtitle: "Glad you're here" },
@@ -22,6 +23,7 @@ describe("renderTemplate", () => {
   it("renders guidance and help through the same title/body template", () => {
     const content = {
       templateKey: "guidance",
+      variant: "",
       locale: "en",
       translated: true,
       fields: { title: "Guidance", body: "Hold the device close." },
@@ -40,6 +42,7 @@ describe("renderTemplate", () => {
     render(
       renderTemplate("not-a-real-template", {
         templateKey: "not-a-real-template",
+        variant: "",
         locale: "en",
         translated: true,
         fields: {},
