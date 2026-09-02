@@ -53,6 +53,31 @@ export interface SectionSlotSpec {
   readonly default?: SectionRef;
 }
 
+/**
+ * A stand-in child for previewing a composite section's slot — just a section
+ * key and the fields to render it with. Recursive so a `card` sample can put
+ * a `text` inside a `body` slot that itself nests, but in practice one level
+ * is enough.
+ */
+export interface SectionSampleChild {
+  readonly sectionKey: string;
+  readonly fields: Readonly<Record<string, JsonValue>>;
+  readonly slots?: Readonly<Record<string, readonly SectionSampleChild[]>>;
+}
+
+/**
+ * Dummy content for showing a section on its own — the CMS "Sections" gallery
+ * renders each catalog entry with this. Never persisted, never a publish
+ * default: it exists only so an author can see what a component looks like
+ * before placing it on a route, where the route then supplies the real
+ * content.
+ */
+export interface SectionSample {
+  readonly fields: Readonly<Record<string, JsonValue>>;
+  /** Stand-in children per slot, so a composite renders filled, not empty. */
+  readonly slots?: Readonly<Record<string, readonly SectionSampleChild[]>>;
+}
+
 export interface SectionDefinition {
   /** e.g. `"hero"`, `"card"`, `"icon"`. */
   readonly key: string;
@@ -60,6 +85,11 @@ export interface SectionDefinition {
   readonly fields: readonly SectionFieldSpec[];
   /** `[]` for a leaf/atom section. */
   readonly slots: readonly SectionSlotSpec[];
+  /**
+   * Dummy content for the Sections gallery. Optional so bare test catalogs
+   * need not supply it; every real catalog section should.
+   */
+  readonly sample?: SectionSample;
 }
 
 export interface SectionCatalog {
