@@ -164,7 +164,7 @@ export class SupabaseContentAdapter implements ContentAdapter {
     const { data, error } = await this.#client
       .from("published_route_sections")
       .select(
-        "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, section_variant",
+        "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, content",
       );
     if (error) throw mapContentError(error);
 
@@ -192,6 +192,10 @@ export class SupabaseContentAdapter implements ContentAdapter {
         ordinal: row.ordinal as number,
         sectionKey: row.section_key as string,
         sectionVariant: (row.section_variant as string | null) ?? "",
+        // The view aggregates route_section_content into a `locale -> fields`
+        // object; `{}` when the instance has no content rows yet.
+        content:
+          (row.content as Record<string, Record<string, JsonValue>> | null | undefined) ?? {},
       });
     }
 

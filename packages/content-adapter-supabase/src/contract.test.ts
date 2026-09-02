@@ -124,16 +124,39 @@ if (hasLocalSupabase) {
       if (routeBundleError) throw routeBundleError;
 
       // `getRouteManifest` reads `published_route_sections` — seed one root
-      // section instance for the published bundle.
-      const { error: routeSectionError } = await admin.from("route_section_instances").insert({
-        bundle_id: routeBundleId,
-        parent_instance_id: null,
-        parent_slot: null,
-        ordinal: 0,
-        section_key: thirdKey,
-        section_variant: "",
-      });
-      if (routeSectionError) throw routeSectionError;
+      // section instance for the published bundle, with per-locale content so
+      // the view's `content` aggregation is exercised, not just the `{}` path.
+      const { data: instance, error: routeSectionError } = await admin
+        .from("route_section_instances")
+        .insert({
+          bundle_id: routeBundleId,
+          parent_instance_id: null,
+          parent_slot: null,
+          ordinal: 0,
+          section_key: thirdKey,
+          section_variant: "",
+        })
+        .select()
+        .single();
+      if (routeSectionError || !instance) {
+        throw routeSectionError ?? new Error("route_section_instances insert returned no row");
+      }
+
+      const { error: routeContentError } = await admin.from("route_section_content").insert([
+        {
+          bundle_id: routeBundleId,
+          instance_id: instance.id,
+          locale: f.defaultLocale,
+          fields: { title: "Help" },
+        },
+        {
+          bundle_id: routeBundleId,
+          instance_id: instance.id,
+          locale: f.otherLocale,
+          fields: { title: "मदद" },
+        },
+      ]);
+      if (routeContentError) throw routeContentError;
     });
 
     afterAll(async () => {

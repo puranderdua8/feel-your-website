@@ -388,6 +388,21 @@ if (hasLocalSupabase) {
         section_variant: "star",
       });
 
+      // Each node's per-locale content was persisted alongside its instance,
+      // at the root and inside the slot.
+      const { data: content, error: contentError } = await admin
+        .from("route_section_content")
+        .select("instance_id, locale, fields")
+        .eq("bundle_id", created.id);
+      if (contentError) throw contentError;
+      expect(content).toEqual(
+        expect.arrayContaining([
+          { instance_id: cardId, locale: "en", fields: { heading: "Card" } },
+          { instance_id: iconId, locale: "en", fields: { name: "star" } },
+        ]),
+      );
+      expect(content).toHaveLength(2);
+
       const updated = await w.saveComposition(
         created.id,
         {
@@ -415,6 +430,14 @@ if (hasLocalSupabase) {
         .select("*", { count: "exact", head: true })
         .eq("bundle_id", created.id);
       expect(count).toBe(1);
+
+      // Replacing the tree cascaded the old content away and wrote the new
+      // node's — nothing from the card/icon pair survives.
+      const { data: afterUpdate } = await admin
+        .from("route_section_content")
+        .select("locale, fields")
+        .eq("bundle_id", created.id);
+      expect(afterUpdate).toEqual([{ locale: "en", fields: { title: "Hero" } }]);
     });
 
     it("rejects a write against a stale version", async () => {
@@ -450,7 +473,19 @@ if (hasLocalSupabase) {
       const path = `/live-test-rcw-${randomUUID()}`;
       const created = await w.saveComposition(
         null,
-        { name: `live-test-rcw-${randomUUID()}`, path, published: true, tree: root("hero") },
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path,
+          published: true,
+          tree: [
+            {
+              instanceId: randomUUID(),
+              ref: { key: "hero", variant: "" },
+              content: { en: { title: "Hero" } },
+              slots: {},
+            },
+          ],
+        },
         null,
         "x",
       );
@@ -463,11 +498,18 @@ if (hasLocalSupabase) {
 
       await w.deleteComposition(created.id, created.version, "x");
 
-      const { count } = await admin
-        .from("route_section_instances")
-        .select("*", { count: "exact", head: true })
-        .eq("bundle_id", created.id);
-      expect(count).toBe(0);
+      const [{ count: instanceCount }, { count: contentCount }] = await Promise.all([
+        admin
+          .from("route_section_instances")
+          .select("*", { count: "exact", head: true })
+          .eq("bundle_id", created.id),
+        admin
+          .from("route_section_content")
+          .select("*", { count: "exact", head: true })
+          .eq("bundle_id", created.id),
+      ]);
+      expect(instanceCount).toBe(0);
+      expect(contentCount).toBe(0);
 
       await expect(w.deleteComposition(created.id, 1, "x")).rejects.toMatchObject({
         code: "not_found",

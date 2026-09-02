@@ -1,6 +1,7 @@
 import {
   assembleSectionTree,
   type FlatSectionRow,
+  type JsonValue,
   type RouteComposition,
   type RouteCompositionReader,
   type RouteCompositionSummary,
@@ -40,6 +41,8 @@ interface InstanceRow {
   ordinal: number;
   section_key: string;
   section_variant: string | null;
+  /** Embedded from route_section_content — one entry per authored locale. */
+  route_section_content: { locale: string; fields: Record<string, JsonValue> }[] | null;
 }
 
 /**
@@ -104,7 +107,9 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
 
     const { data: rows, error: rowsError } = await this.#client
       .from("route_section_instances")
-      .select("id, parent_instance_id, parent_slot, ordinal, section_key, section_variant")
+      .select(
+        "id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, route_section_content(locale, fields)",
+      )
       .eq("bundle_id", bundleId);
     if (rowsError) throw mapRouteCompositionError(rowsError);
 
@@ -115,6 +120,9 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       ordinal: row.ordinal,
       sectionKey: row.section_key,
       sectionVariant: row.section_variant ?? "",
+      content: Object.fromEntries(
+        (row.route_section_content ?? []).map((entry) => [entry.locale, entry.fields]),
+      ),
     }));
 
     return {
