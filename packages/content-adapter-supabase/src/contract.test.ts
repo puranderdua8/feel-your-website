@@ -51,14 +51,33 @@ if (hasLocalSupabase) {
     beforeAll(async () => {
       admin = createClient(url!, serviceRoleKey!);
 
+      // Every row states `variant` explicitly: PostgREST's bulk insert uses
+      // the union of keys across the array as the column list, so once one
+      // row names `variant` the rest get NULL (not the column default) and
+      // trip the NOT NULL constraint.
       const { error: contentError } = await admin.from("content_items").insert([
-        { template_key: f.translatedKey, locale: f.defaultLocale, fields: { title: "Guidance" } },
-        { template_key: f.translatedKey, locale: f.otherLocale, fields: { title: "मार्गदर्शन" } },
-        { template_key: f.untranslatedKey, locale: f.defaultLocale, fields: { title: "Legal" } },
-        { template_key: thirdKey, locale: f.defaultLocale, fields: { title: "Help" } },
+        {
+          template_key: f.translatedKey,
+          variant: "",
+          locale: f.defaultLocale,
+          fields: { title: "Guidance" },
+        },
+        {
+          template_key: f.translatedKey,
+          variant: "",
+          locale: f.otherLocale,
+          fields: { title: "मार्गदर्शन" },
+        },
+        {
+          template_key: f.untranslatedKey,
+          variant: "",
+          locale: f.defaultLocale,
+          fields: { title: "Legal" },
+        },
+        { template_key: thirdKey, variant: "", locale: f.defaultLocale, fields: { title: "Help" } },
         // A named variant of `variantKey` (== `translatedKey`), default
         // locale only — exercises variant selection + locale fallback within
-        // a variant. `variant` defaults to '' for the rows above.
+        // a variant.
         {
           template_key: f.variantKey,
           variant: f.variantName,
