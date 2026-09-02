@@ -9,6 +9,7 @@ import type {
   JsonValue,
   RouteBundle,
   RouteComposition,
+  RouteCompositionSummary,
   RouteSectionNode,
   SiteLocale,
 } from "@feel-your-website/content-core";
@@ -388,6 +389,12 @@ function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
     };
   });
 }
+
+/** Every route bundle's header, drafts included — the editor's route list. */
+export const listRouteCompositions = createServerFn({ method: "GET" }).handler(
+  async (): Promise<readonly RouteCompositionSummary[]> =>
+    getRouteCompositionReader().listCompositions(),
+);
 
 /** One route's whole section tree, drafts included — for the route editor. */
 export const loadRouteComposition = createServerFn({ method: "GET" })

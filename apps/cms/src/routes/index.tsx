@@ -16,7 +16,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 
 import { ContentPanel } from "@/components/content-panel";
 import { RolesPanel } from "@/components/roles-panel";
-import { RouteBundlesPanel } from "@/components/route-bundles-panel";
+import { RouteEditor } from "@/components/route-editor";
 import { SectionsPanel } from "@/components/sections-panel";
 import { SignInForm } from "@/components/sign-in-form";
 import {
@@ -89,7 +89,7 @@ function CmsHome() {
               <SectionsPanel />
             </TabsContent>
             <TabsContent value="routes">
-              <RouteBundlesPanel actor={session.userId} />
+              <RouteEditor actor={session.userId} />
             </TabsContent>
             <TabsContent value="content">
               <ContentPanel />

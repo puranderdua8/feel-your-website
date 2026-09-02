@@ -1,0 +1,90 @@
+import type { RouteSectionNode } from "@feel-your-website/content-core";
+import { Button } from "@feel-your-website/ui";
+import { useCallback, useEffect, useState } from "react";
+
+import { checkRoutePublishReadiness, type PublishReadiness } from "@/server/bff";
+
+/**
+ * Save draft / publish, with a per-locale completeness gate. `Publish` is
+ * disabled while any configured locale is missing content for a section the
+ * route depends on — unless the author explicitly forces it.
+ */
+export function PublishBar({
+  tree,
+  pending,
+  onSaveDraft,
+  onPublish,
+}: {
+  tree: readonly RouteSectionNode[];
+  pending: boolean;
+  onSaveDraft: () => void;
+  onPublish: () => void;
+}) {
+  const [readiness, setReadiness] = useState<PublishReadiness | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [force, setForce] = useState(false);
+
+  const check = useCallback(async () => {
+    setChecking(true);
+    try {
+      setReadiness(await checkRoutePublishReadiness({ data: { tree } }));
+    } finally {
+      setChecking(false);
+    }
+  }, [tree]);
+
+  useEffect(() => {
+    setReadiness(null);
+    setForce(false);
+  }, [tree]);
+
+  const blocked = readiness !== null && !readiness.ready && !force;
+
+  return (
+    <div className="border-border flex flex-col gap-3 rounded-[var(--radius)] border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" disabled={pending} onClick={onSaveDraft}>
+          Save draft
+        </Button>
+        <Button type="button" variant="outline" disabled={checking} onClick={() => void check()}>
+          {checking ? "Checking…" : "Check readiness"}
+        </Button>
+        <Button type="button" disabled={pending || blocked} onClick={onPublish}>
+          Publish
+        </Button>
+        {readiness !== null && (
+          <span
+            className={readiness.ready ? "text-sm text-emerald-600" : "text-destructive text-sm"}
+          >
+            {readiness.ready
+              ? "Ready — every locale is complete."
+              : `${readiness.gaps.length} translation gap(s).`}
+          </span>
+        )}
+      </div>
+
+      {readiness !== null && readiness.gaps.length > 0 && (
+        <>
+          <ul className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+            {readiness.gaps.map((gap, index) => (
+              <li key={index}>
+                <code>{gap.locale}</code> · <code>{gap.sectionKey}</code>
+                {gap.variant && (
+                  <>
+                    {" "}
+                    (<code>{gap.variant}</code>)
+                  </>
+                )}{" "}
+                — {gap.missing.includes("*") ? "no content" : `missing: ${gap.missing.join(", ")}`}
+              </li>
+            ))}
+          </ul>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
+            Publish anyway
+          </label>
+        </>
+      )}
+    </div>
+  );
+}

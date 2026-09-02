@@ -42,8 +42,9 @@ describe("MemoryContentAdapter route composition read/write", () => {
     });
     expect(composition?.tree.map((n) => n.ref.key)).toEqual(["hero"]);
 
-    // Draft — not in the published manifest.
+    // Draft — not in the published manifest, but visible in the editor's list.
     expect(await adapter.getRouteManifest("en")).toEqual([]);
+    expect((await adapter.listCompositions()).map((r) => r.id)).toEqual([saved.id]);
 
     const published = await adapter.saveComposition(
       saved.id,
