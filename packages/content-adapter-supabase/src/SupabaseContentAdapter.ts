@@ -9,12 +9,14 @@ import {
   type Locale,
   type Page,
   type RouteBundle,
+  type RouteSeo,
 } from "@feel-your-website/content-core";
 import { randomUUID } from "node:crypto";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { mapContentError } from "./mapContentError.js";
+import { type RouteSeoRow, rowToRouteSeo } from "./routeSeo.js";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
@@ -158,15 +160,29 @@ export class SupabaseContentAdapter implements ContentAdapter {
     // structure is shared across locales; only content within it translates.
     void locale;
 
-    // Flat instance rows, one per section of every published route. The tree
-    // is assembled here in TypeScript via the shared helper — no recursive
-    // CTE, so this adapter and the memory one build it identically.
-    const { data, error } = await this.#client
-      .from("published_route_sections")
-      .select(
-        "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, content",
-      );
+    // Flat instance rows, one per section of every published route, plus the
+    // per-locale SEO rows (a separate view — SEO is per-bundle, not
+    // per-instance). Two reads in parallel; the tree is assembled here in
+    // TypeScript via the shared helper, same as the memory adapter.
+    const [{ data, error }, { data: seoData, error: seoError }] = await Promise.all([
+      this.#client
+        .from("published_route_sections")
+        .select(
+          "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, section_variant, content",
+        ),
+      this.#client
+        .from("published_route_seo")
+        .select("bundle_id, locale, title, description, canonical, og_image, keywords, robots"),
+    ]);
     if (error) throw mapContentError(error);
+    if (seoError) throw mapContentError(seoError);
+
+    const seoByBundle = new Map<string, Record<string, RouteSeo>>();
+    for (const row of (seoData ?? []) as (RouteSeoRow & { bundle_id: string })[]) {
+      const forBundle = seoByBundle.get(row.bundle_id) ?? {};
+      forBundle[row.locale] = rowToRouteSeo(row);
+      seoByBundle.set(row.bundle_id, forBundle);
+    }
 
     const byBundle = new Map<
       string,
@@ -203,6 +219,7 @@ export class SupabaseContentAdapter implements ContentAdapter {
       id,
       path: entry.path,
       tree: assembleSectionTree(entry.rows),
+      seo: seoByBundle.get(id) ?? {},
       version: entry.version,
       updatedAt: entry.updatedAt,
     }));

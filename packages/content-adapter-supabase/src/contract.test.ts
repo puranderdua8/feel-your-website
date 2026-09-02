@@ -157,6 +157,14 @@ if (hasLocalSupabase) {
         },
       ]);
       if (routeContentError) throw routeContentError;
+
+      const { error: routeSeoError } = await admin.from("route_seo").insert({
+        bundle_id: routeBundleId,
+        locale: f.defaultLocale,
+        title: "Help — contract test",
+        keywords: ["help", "support"],
+      });
+      if (routeSeoError) throw routeSeoError;
     });
 
     afterAll(async () => {
