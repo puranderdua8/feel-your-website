@@ -60,12 +60,14 @@ already its own reviewable, ordered, re-playable history, and folding SQL
 execution into `terraform apply` would just be a second, worse mechanism for
 the same job.
 
-This manual `db push` is only the one-time bootstrap of a fresh project.
-From then on `.github/workflows/db-migrate.yml` applies new migrations to the
-hosted project automatically, on every merge to `main` that changes
-`supabase/migrations/`. It reads three repo secrets — `SUPABASE_ACCESS_TOKEN`
-(same token as above), `SUPABASE_DB_PASSWORD` (`TF_VAR_supabase_database_password`),
-and `SUPABASE_PROJECT_ID` (`terraform output -raw supabase_project_ref`).
+The same `supabase link` + `supabase db push` is also how you apply
+migrations to an existing project as they land — there is no automation that
+does it for you, by choice. What keeps it from being forgotten is a required
+PR check: `supabase/migrations/applied.txt` lists the versions live on the
+hosted project, and `scripts/check-migrations-applied.sh` (the `migrations`
+job in `.github/workflows/ci.yml`) fails while any migration file is missing
+from it. After a `db push`, append the applied versions to that file and
+commit. Reconcile against reality with `supabase migration list --linked`.
 
 ## State
 
