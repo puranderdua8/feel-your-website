@@ -1,228 +1,115 @@
-import type { JsonValue, SectionDefinition } from "@feel-your-website/content-core";
-import { validateSectionFields } from "@feel-your-website/content-core";
+import type { SectionDefinition } from "@feel-your-website/content-core";
 import { Can } from "@feel-your-website/rbac/react";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-} from "@feel-your-website/ui";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { renderSectionSample } from "@feel-your-website/section-registry";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@feel-your-website/ui";
+import { ThemeProvider } from "@feel-your-website/theme/client";
 
 import { sectionCatalog } from "@/content/sections";
-import { useContentLocale } from "@/i18n/content-locale";
-import { deleteContentItem, getSectionContent, saveContentItem } from "@/server/bff";
 
-import { FieldControl } from "./field-control.js";
 import { LockedNotice } from "./locked-notice.js";
 
 /**
- * The Sections surface: pick a section from the code-defined catalog, then
- * edit one of its content variants with a form built from the section's
- * field schema — no JSON textarea. The variant and the active content locale
- * together identify which `content_items` row is being edited.
+ * The Sections surface: a read-only gallery of every section in the
+ * code-defined catalog, each rendered with the placeholder content from its
+ * `SectionDefinition.sample`, beside its field and slot schema.
+ *
+ * There is nothing to edit here. A section is a reusable component — a
+ * container for whatever a route hands it — not a place content lives. The
+ * content for a section on a page is authored in the Routes tab, against that
+ * route. This tab exists so an author can see what each component looks like
+ * before placing it.
  */
 export function SectionsPanel() {
   return (
     <Can permission="manage:content" fallback={<LockedNotice permission="manage:content" />}>
-      <SectionsEditor />
+      <SectionsGallery />
     </Can>
   );
 }
 
-function SectionsEditor() {
-  const { contentLocale } = useContentLocale();
-  const [selectedKey, setSelectedKey] = useState(sectionCatalog.definitions[0]?.key ?? "");
-  const [variant, setVariant] = useState("");
-
-  const def = sectionCatalog.byKey.get(selectedKey);
-
+function SectionsGallery() {
   return (
-    <div className="flex flex-col gap-6 sm:flex-row">
-      <Card className="sm:w-64 sm:shrink-0">
-        <CardHeader>
-          <CardTitle>Sections</CardTitle>
-          <CardDescription>The vocabulary a route may compose from.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-1">
-          {sectionCatalog.definitions.map((section) => (
-            <button
-              key={section.key}
-              type="button"
-              onClick={() => {
-                setSelectedKey(section.key);
-                setVariant("");
-              }}
-              className={`rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-                section.key === selectedKey
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-accent/50"
-              }`}
-            >
-              <span className="font-medium">{section.key}</span>
-              <span className="text-muted-foreground block text-xs">{section.description}</span>
-            </button>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="flex flex-col gap-6">
+      <p className="text-muted-foreground text-sm">
+        Sections are reusable components. They render whatever content a route feeds them — the
+        previews below use placeholder data. Author real content in the Routes tab.
+      </p>
 
-      {def && (
-        <SectionForm
-          key={`${def.key}:${variant}:${contentLocale}`}
-          def={def}
-          variant={variant}
-          onVariantChange={setVariant}
-          locale={contentLocale}
-        />
-      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {sectionCatalog.definitions.map((def) => (
+          <SectionCard key={def.key} def={def} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function SectionForm({
-  def,
-  variant,
-  onVariantChange,
-  locale,
-}: {
-  def: SectionDefinition;
-  variant: string;
-  onVariantChange: (v: string) => void;
-  locale: string;
-}) {
-  const [fields, setFields] = useState<Record<string, JsonValue>>({});
-  const [variantDraft, setVariantDraft] = useState(variant);
-  const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const content = await getSectionContent({ data: { key: def.key, variant, locale } });
-      setFields(content ? { ...content.fields } : {});
-    } finally {
-      setLoading(false);
-    }
-  }, [def.key, variant, locale]);
-
-  useEffect(() => {
-    setVariantDraft(variant);
-    void load();
-  }, [load, variant]);
-
-  const issues = useMemo(() => validateSectionFields(def, fields), [def, fields]);
-
-  function setField(name: string, value: JsonValue) {
-    setFields((current) => ({ ...current, [name]: value }));
-  }
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setPending(true);
-    setError(null);
-    try {
-      await saveContentItem({ data: { templateKey: def.key, locale, fields, variant } });
-      await load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Save failed.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  async function handleDelete() {
-    setPending(true);
-    try {
-      await deleteContentItem({ data: { templateKey: def.key, locale, variant } });
-      setFields({});
-    } finally {
-      setPending(false);
-    }
-  }
-
+function SectionCard({ def }: { def: SectionDefinition }) {
   return (
-    <Card className="flex-1">
+    <Card>
       <CardHeader>
-        <CardTitle>
-          {def.key}
-          {variant && <span className="text-muted-foreground"> · {variant}</span>}
-        </CardTitle>
-        <CardDescription>
-          Editing <code>{locale}</code> content.{" "}
-          {def.slots.length > 0 &&
-            `Slots (${def.slots.map((s) => s.name).join(", ")}) are filled per route.`}
-        </CardDescription>
+        <CardTitle className="font-mono text-base">{def.key}</CardTitle>
+        <CardDescription>{def.description}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onVariantChange(variantDraft.trim());
-          }}
-        >
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Label htmlFor="section-variant">Variant</Label>
-            <Input
-              id="section-variant"
-              placeholder="(default)"
-              value={variantDraft}
-              onChange={(event) => setVariantDraft(event.target.value)}
-            />
-          </div>
-          <Button type="submit" variant="outline">
-            Load
-          </Button>
-        </form>
+        <div className="border-border overflow-hidden rounded-[var(--radius)] border">
+          <p className="bg-muted text-muted-foreground border-border border-b px-3 py-1.5 text-xs">
+            Preview · placeholder content
+          </p>
+          <ThemeProvider theme="base">
+            <div className="bg-background flex flex-col gap-4 p-4">{renderSectionSample(def)}</div>
+          </ThemeProvider>
+        </div>
 
-        {loading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
-        ) : (
-          <form className="flex flex-col gap-4" onSubmit={(event) => void handleSubmit(event)}>
-            {def.fields.map((spec) => (
-              <FieldControl
-                key={spec.name}
-                spec={spec}
-                value={fields[spec.name]}
-                onChange={(value) => setField(spec.name, value)}
-              />
-            ))}
-
-            {issues.length > 0 && (
-              <ul className="text-destructive text-sm">
-                {issues.map((issue) => (
-                  <li key={issue.field}>{issue.message}</li>
-                ))}
-              </ul>
-            )}
-            {error && (
-              <p role="alert" className="text-destructive text-sm">
-                {error}
-              </p>
-            )}
-
-            <div className="flex gap-2">
-              <Button type="submit" disabled={pending}>
-                Save
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={() => void handleDelete()}
-              >
-                Delete
-              </Button>
-            </div>
-          </form>
-        )}
+        <SchemaTable def={def} />
       </CardContent>
     </Card>
+  );
+}
+
+function SchemaTable({ def }: { def: SectionDefinition }) {
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <div>
+        <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+          Fields
+        </p>
+        {def.fields.length === 0 ? (
+          <p className="text-muted-foreground">No fields.</p>
+        ) : (
+          <ul className="flex flex-col gap-0.5">
+            {def.fields.map((field) => (
+              <li key={field.name} className="flex flex-wrap items-baseline gap-x-2">
+                <code>{field.name}</code>
+                <span className="text-muted-foreground">
+                  {field.label} · {field.type}
+                  {field.required && <span className="text-destructive"> · required</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {def.slots.length > 0 && (
+        <div>
+          <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+            Slots
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {def.slots.map((slot) => (
+              <li key={slot.name} className="flex flex-wrap items-baseline gap-x-2">
+                <code>{slot.name}</code>
+                <span className="text-muted-foreground">
+                  {slot.label} · {slot.arity}
+                  {slot.accepts.length > 0 && ` · accepts ${slot.accepts.join(" / ")}`}
+                  {slot.required && <span className="text-destructive"> · required</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

@@ -15,6 +15,13 @@ import { defineSections } from "@feel-your-website/content-core";
  * `renderComposition` in `compose.tsx` renders a route's tree of these and
  * materialises any unfilled slot defaults.
  */
+/**
+ * A self-contained placeholder image, so the `image` section's sample renders
+ * offline and under a strict CSP — no external host.
+ */
+const SAMPLE_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='240'%3E%3Crect width='480' height='240' fill='%23d1d5db'/%3E%3C/svg%3E";
+
 export const sectionCatalog = defineSections([
   {
     key: "hero",
@@ -24,6 +31,12 @@ export const sectionCatalog = defineSections([
       { name: "subtitle", label: "Subtitle", type: "text" },
     ],
     slots: [],
+    sample: {
+      fields: {
+        title: "Feel your website",
+        subtitle: "The headline sits here, with a supporting line beneath it.",
+      },
+    },
   },
   {
     key: "guidance",
@@ -33,24 +46,35 @@ export const sectionCatalog = defineSections([
       { name: "body", label: "Body", type: "richtext", required: true },
     ],
     slots: [],
+    sample: {
+      fields: {
+        title: "How it works",
+        body: "A paragraph of guidance copy. On a real route this text comes from the route, not from the section.",
+      },
+    },
   },
   {
     key: "footer",
     description: "Page footer.",
     fields: [{ name: "text", label: "Text", type: "text" }],
     slots: [],
+    sample: { fields: { text: "© 2026 feel-your-website — sample footer text." } },
   },
   {
     key: "icon",
     description: "A single icon.",
     fields: [{ name: "name", label: "Icon name", type: "icon", required: true }],
     slots: [],
+    sample: { fields: { name: "sparkles" } },
   },
   {
     key: "text",
     description: "A block of rich text.",
     fields: [{ name: "value", label: "Text", type: "richtext", required: true }],
     slots: [],
+    sample: {
+      fields: { value: "A block of body copy that a route replaces with its own words." },
+    },
   },
   {
     key: "image",
@@ -60,6 +84,7 @@ export const sectionCatalog = defineSections([
       { name: "alt", label: "Alt text", type: "text" },
     ],
     slots: [],
+    sample: { fields: { src: SAMPLE_IMAGE, alt: "Sample image" } },
   },
   {
     key: "button",
@@ -69,6 +94,7 @@ export const sectionCatalog = defineSections([
       { name: "href", label: "Link URL", type: "url", required: true },
     ],
     slots: [],
+    sample: { fields: { label: "Get started", href: "#" } },
   },
   {
     key: "card",
@@ -78,5 +104,15 @@ export const sectionCatalog = defineSections([
       { name: "icon", label: "Icon", accepts: ["icon"], arity: "single" },
       { name: "body", label: "Body", accepts: ["text", "button"], arity: "list" },
     ],
+    sample: {
+      fields: { heading: "Card heading" },
+      slots: {
+        icon: [{ sectionKey: "icon", fields: { name: "sparkles" } }],
+        body: [
+          { sectionKey: "text", fields: { value: "Body text inside the card." } },
+          { sectionKey: "button", fields: { label: "Learn more", href: "#" } },
+        ],
+      },
+    },
   },
 ]);

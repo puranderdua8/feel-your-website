@@ -29,4 +29,33 @@ describe("sectionCatalog", () => {
     ]);
     expect(validateSectionFields(hero, { title: "Welcome" })).toEqual([]);
   });
+
+  it("every section ships sample content that satisfies its own required fields", () => {
+    for (const def of sectionCatalog.definitions) {
+      expect(def.sample, `${def.key} has no sample`).toBeDefined();
+      expect(validateSectionFields(def, def.sample!.fields), `${def.key} sample fields`).toEqual(
+        [],
+      );
+    }
+  });
+
+  it("sample slot children name sections the slot accepts and fill their required fields", () => {
+    for (const def of sectionCatalog.definitions) {
+      for (const [slotName, children] of Object.entries(def.sample?.slots ?? {})) {
+        const slot = def.slots.find((s) => s.name === slotName);
+        expect(slot, `${def.key} sample fills unknown slot ${slotName}`).toBeDefined();
+        for (const child of children) {
+          const childDef = sectionCatalog.byKey.get(child.sectionKey);
+          expect(childDef, `${def.key}.${slotName} sample child ${child.sectionKey}`).toBeDefined();
+          if (slot!.accepts.length > 0) {
+            expect(slot!.accepts).toContain(child.sectionKey);
+          }
+          expect(
+            validateSectionFields(childDef!, child.fields),
+            `${def.key}.${slotName} sample child ${child.sectionKey} fields`,
+          ).toEqual([]);
+        }
+      }
+    }
+  });
 });
