@@ -142,8 +142,8 @@ regenerated: `pnpm --filter @feel-your-website/rbac generate:seed`.
 
 ```
 apps/
-  shell/     end-user PWA — BFF, RBAC enforcement, CMS-driven slots
-  cms/       authoring — content, roles, route bundles (wizard configs: Phase 7)
+  shell/     end-user PWA — BFF, RBAC enforcement, CMS-authored routes
+  cms/       authoring — sections, routes, languages, roles
   demo/      proving app: exercises all three mechanisms end to end
 packages/
   tokens/                   design tokens (primitive → semantic → extended)
@@ -152,11 +152,12 @@ packages/
   rbac/                     permission catalog + resolution + guards
   auth/                     AuthProvider interface, mock, contract suite
   auth-supabase/            AuthProvider backed by Supabase Auth
-  content-core/             ContentAdapter + ContentWriter + TemplateKey + contract suite
+  content-core/             ContentAdapter / ContentWriter / RouteComposition* / SiteSettingsStore + contract suites
   content-adapter-memory/   fixtures — dev, tests, Storybook
-  content-adapter-supabase/ ContentAdapter + ContentWriter backed by Supabase Postgres
+  content-adapter-supabase/ ContentAdapter + ContentWriter + SiteSettingsStore backed by Supabase Postgres
+  section-registry/         section key → React component, shared by shell (render) and CMS (preview)
   config-schema/            ConfigBundle substrate: versioning, audit, contract suite
-  config-bundle-supabase/   ConfigBundleStore backed by Supabase Postgres
+  config-bundle-supabase/   role-bundle store + RouteComposition{Reader,Writer} backed by Supabase Postgres
   i18n-core/                locale negotiation, routing, message provider
   wizard/                   config-driven wizard + validator registry (Phase 7)
   config/                   shared eslint/prettier/tsconfig/vitest
@@ -212,15 +213,18 @@ the way `MemoryConfigBundleStore` does, and what it runs instead.
 ## Database
 
 `supabase/migrations` is the Postgres half of `config-schema` and `rbac`:
-the `config_bundles` substrate (roles and route bundles), the permission
-mirror, the Custom Access Token auth hook, and public-read `content_items` /
-`content_messages` / `published_route_manifest` for the content side.
+the `config_bundles` substrate (now roles only), the permission mirror, the
+Custom Access Token auth hook, public-read `content_items` /
+`content_messages` / `site_settings` for the content side, and
+`route_section_instances` + the `published_route_sections` view for route
+composition.
 
 A few things worth knowing before extending it:
 
 - **Writes go through `SECURITY DEFINER` RPCs
-  (`save_role_bundle`/`save_route_bundle`/`delete_config_bundle`), never
-  direct table access.** Every table `INSERT`/`UPDATE`/`DELETE` grant is
+  (`save_role_bundle` / `save_route_composition` / `delete_config_bundle` /
+  `save_content_item` / `save_site_setting`), never direct table access.**
+  Every table `INSERT`/`UPDATE`/`DELETE` grant is
   revoked from `anon`/`authenticated` — Postgres's default grants hand a new
   table to both, so this is revoked explicitly rather than left to RLS alone.
   A write is four things that must succeed or fail together (check the
@@ -235,16 +239,17 @@ A few things worth knowing before extending it:
   mismatch raises with `errcode = 'PT409'`, which PostgREST turns into an
   HTTP 409 for `ConfigConflictError` to map.
 - **RLS is split by audience, and it is easy to get this wrong in the
-  direction that fails silently.** `published_route_manifest` is declared
+  direction that fails silently.** `published_route_sections` is declared
   `security_invoker = true` (avoiding the RLS-bypass footgun a definer view
   would be), which means it only returns rows the _querying role_ — not the
   view's owner — can see on the underlying tables. That requires
-  `config_bundles`/`route_bundles`/`route_templates` to carry their own read
-  policies for anonymous visitors, or the view silently returns nothing to a
-  real site visitor while looking correct in every test run as the owning
-  role. See `..._bundle_read_policies.sql` for the actual split: published
-  route data is public, role/permission data never is, and audit history
-  needs `view:audit` specifically rather than reusing `manage:roles`.
+  `config_bundles` / `route_bundles` / `route_section_instances` to carry
+  their own read policies for anonymous visitors, or the view silently
+  returns nothing to a real site visitor while looking correct in every test
+  run as the owning role. See `..._bundle_read_policies.sql` and
+  `..._route_composition.sql` for the actual split: published route data is
+  public, role/permission data never is, and audit history needs `view:audit`
+  specifically rather than reusing `manage:roles`.
 - **The delete path re-stamps staleness explicitly, ahead of the cascade.**
   Deleting a role bundle cascades into `role_permissions` and `user_roles`,
   and nothing orders that cascade relative to the trigger that marks holders'
@@ -319,11 +324,13 @@ happened while building this).
 
 ## The config-bundle and content-write adapters
 
-`config-bundle-supabase` (`SupabaseConfigBundleStore`) and the write half of
-`content-adapter-supabase` (`SupabaseContentWriter`) are `apps/cms`'s
-backends: one store per vocabulary — `"permission"` for the role editor,
-`"template_key"` for the route bundle editor — and one writer for content
-items and messages. Unlike the read-only adapters above, every method here
+`config-bundle-supabase` and the write half of `content-adapter-supabase`
+(`SupabaseContentWriter`) are `apps/cms`'s backends:
+`SupabaseConfigBundleStore` for the role editor (the one remaining
+`config_bundles` vocabulary), `SupabaseRouteCompositionReader` /
+`SupabaseRouteCompositionWriter` for the route editor's section trees, and
+one content writer for content items, messages and `site_settings`. Unlike
+the read-only adapters above, every method here
 runs as the _signed-in caller_, not the anon key: the RPCs check
 `has_permission()` against that session's own JWT claims, so these classes
 build their client with `@supabase/ssr`'s `createServerClient` and a
@@ -338,7 +345,7 @@ times than to introduce a cross-adapter dependency for).
   verbatim into `updatedBy` — true for `MemoryConfigBundleStore`, which
   trusts whatever it is given, and false for any backend where `updated_by`
   is `auth.uid()` of the authenticated session (`save_role_bundle` /
-  `save_route_bundle` never even accept an actor parameter — see
+  `save_route_composition` never even accept an actor parameter — see
   `..._config_bundle_writes.sql`). A client claiming to be someone else is
   exactly what session-derived authorship exists to prevent, so this is not a
   bug to fix — it is two genuinely different notions of "actor" that the
@@ -385,7 +392,8 @@ must be an instance of Event. Received an instance of MessageEvent`, from
 module allowed to name a concrete backend; `seam.test.ts` checks it the same
 way) but is deliberately smaller in a few specific ways:
 
-- **One route, three tabs, not three routes.** Nobody bookmarks "the roles
+- **One route, four tabs (Sections / Routes / Languages / Roles), not four
+  routes.** Nobody bookmarks "the roles
   tab" — the only thing gating access is the signed-in session's permissions,
   loaded once by `/`'s own loader. `Can` (from `@feel-your-website/rbac/react`)
   gates each tab's content exactly as `apps/shell`'s `admin.tsx` does: hiding
@@ -396,7 +404,7 @@ way) but is deliberately smaller in a few specific ways:
   permission — not a localized end-user surface, and its own UI cannot
   sensibly be driven by the CMS it is itself the authoring tool for without a
   chicken-and-egg dependency on content that might not exist yet.
-- **The role and route-bundle stores follow `AUTH_PROVIDER`, not a config-bundle-specific
+- **The role-bundle store follows `AUTH_PROVIDER`, not a config-bundle-specific
   env var.** A config-bundle write is only ever meaningful against a _real_
   signed-in session — `has_permission()` reads that session's own JWT claims
   — so `AUTH_PROVIDER=mock` gets `MemoryConfigBundleStore` (which cannot check
@@ -404,14 +412,19 @@ way) but is deliberately smaller in a few specific ways:
   `SupabaseConfigBundleStore` sharing that same session's cookies. A separate
   `CONFIG_BUNDLE_STORE` variable would only ever need to agree with
   `AUTH_PROVIDER`, which is a variable that can disagree with itself, not a
-  useful axis of configuration.
-- **The route bundle editor's template catalog
-  (`src/content/template-keys.ts`) is a placeholder.** This boilerplate ships
-  no _real_ templates — `hero`, `guidance`, `footer` are examples, not a
-  design system's actual output — but `apps/shell` does render whatever this
-  catalog declares now (see "Rendering CMS-authored routes" below). A real
-  project replaces the catalog and the registry that renders it together;
-  nothing that imports either needs to change.
+  useful axis of configuration. Routes are no longer config bundles — they
+  went through the `RouteComposition{Reader,Writer}` seams once they gained a
+  section tree — but the same `AUTH_PROVIDER` reasoning picks memory vs
+  Supabase for those too.
+- **The Sections tab is driven by a code-defined `SectionCatalog`
+  (`src/content/sections.ts`, a thin re-export of
+  `@feel-your-website/section-registry`).** Each section declares its content
+  fields (so the editor renders a real form, not a JSON textarea) and its
+  slots (so sections nest). This boilerplate ships no _real_ sections —
+  `hero`, `guidance`, `card`, the atoms — they are examples, not a design
+  system's actual output. A real project replaces the catalog and the
+  `section-registry` components that render it together; nothing that imports
+  either needs to change.
 - **It is its own Netlify site, not the same one as `apps/shell`.** Both
   `apps/cms` and `apps/shell` have their own `netlify.toml` (`base = "/"` in
   each — still one pnpm workspace with one lockfile at the repo root) and
@@ -433,27 +446,33 @@ way) but is deliberately smaller in a few specific ways:
 
 ## Rendering CMS-authored routes
 
-Publishing a route bundle in the CMS makes it queryable — that much was true
-from Phase 4 (`published_route_manifest` is a real, public, correctly-RLS'd
-view) — but until now nothing in `apps/shell` ever called
-`getRouteManifest()`. Two small pieces close that loop:
+A route is a **tree of section instances**: each node names a section
+(`SectionRef` = a section key + a named content variant) and fills that
+section's slots with child nodes. The CMS route editor writes the tree
+through `RouteCompositionWriter`; the shell renders it. Two pieces:
 
 - **`src/routes/$.tsx`** — a catch-all route. TanStack Router always prefers
   a static file match (`index.tsx`, `admin.tsx`) over a splat one, so this
   only ever sees a path nothing else claimed. Its loader calls
   `loadRoutePage()` (`src/server/bff.ts`), which looks the path up in the
-  manifest and fetches each listed template key's content, in the bundle's
-  own order. No match → `throw notFound()`, handled by the root route's
-  `notFoundComponent`.
-- **`src/templates/registry.tsx`** — maps a `template_key` to the component
-  that renders it. The three keys registered (`hero`, `guidance`, `footer`,
-  plus `help` for the one fixture route `content-adapter-memory`'s seed
-  ships) match `apps/cms/src/content/template-keys.ts`'s own placeholder
-  catalog exactly, on purpose — local dev with no backend at all still has to
-  render something real at `/help`. An unregistered key or missing content
-  renders a visible placeholder rather than silently shortening the page —
-  a CMS author publishing ahead of a template existing is a real, expected
-  sequence, not a failure mode to hide.
+  published manifest, batch-fetches content for every ref the tree depends on
+  (`collectEffectiveRefs`, which also pulls in the declared default of a
+  required slot left empty), and renders via `renderComposition`. No match →
+  `throw notFound()`, handled by the root route's `notFoundComponent`.
+- **`@feel-your-website/section-registry`** — maps a section key to the React
+  component that renders it, shared by the shell (render) and the CMS
+  (in-process preview). The keys registered (`hero`, `guidance`, `footer`,
+  the atoms `icon` / `text` / `image` / `button`, the composite `card`, plus
+  `help` for the one fixture route `content-adapter-memory`'s seed ships)
+  match `apps/cms/src/content/sections.ts` exactly, on purpose — local dev
+  with no backend at all still has to render something real at `/help`. An
+  unregistered key or missing content renders a visible placeholder rather
+  than silently shortening the page.
+
+The Supabase read model is `published_route_sections` (a flat, one-row-per-
+instance `security_invoker` view); the tree is assembled in TypeScript by the
+shared `assembleSectionTree`, never a recursive SQL CTE, so the memory and
+Postgres adapters build it identically.
 
 **This only reflects what a given deployment's `shell` site is actually
 pointed at.** `getRouteManifest()` goes through the same `ContentAdapter`

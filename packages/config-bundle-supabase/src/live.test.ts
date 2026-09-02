@@ -135,7 +135,7 @@ if (hasLocalSupabase) {
      * another run's — rows in the same shared tables. See
      * `SupabaseConfigBundleStoreOptions.namespace`.
      */
-    function freshStore(vocabulary: "permission" | "template_key"): SupabaseConfigBundleStore {
+    function freshStore(): SupabaseConfigBundleStore {
       const cookies = new MemoryCookieAdapter();
       cookies.setAll(sessionCookies.map((cookie) => ({ ...cookie, options: {} })));
 
@@ -143,19 +143,16 @@ if (hasLocalSupabase) {
         url: url!,
         anonKey: anonKey!,
         cookies,
-        vocabulary,
+        vocabulary: "permission",
         namespace: `live-test-${randomUUID()}-`,
-        findUnknownItems:
-          vocabulary === "permission"
-            ? (items) => items.filter((item) => !platformCatalog.includes(item))
-            : (items) => items.filter((item) => !["hero", "footer"].includes(item)),
-        forbiddenItems: vocabulary === "permission" ? SEED_ONLY_PERMISSIONS : undefined,
+        findUnknownItems: (items) => items.filter((item) => !platformCatalog.includes(item)),
+        forbiddenItems: SEED_ONLY_PERMISSIONS,
       });
     }
 
     describe("role bundles", () => {
       it("creates a bundle at version 1, authored by the signed-in session", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
 
         const bundle = await store.create(
           { name: "Content Manager", items: ["manage:content"] },
@@ -169,7 +166,7 @@ if (hasLocalSupabase) {
       });
 
       it("rejects an item outside the platform catalog", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
 
         await expect(
           store.create({ name: "Bad", items: ["not:a:real:permission"] }, "x"),
@@ -177,7 +174,7 @@ if (hasLocalSupabase) {
       });
 
       it("refuses manage:roles even though it is valid vocabulary — the privilege-escalation guard", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
 
         try {
           await store.create({ name: "Escalated", items: ["manage:content", "manage:roles"] }, "x");
@@ -189,7 +186,7 @@ if (hasLocalSupabase) {
       });
 
       it("updates in place, incrementing the version and keeping the same authored-by", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
         const created = await store.create({ name: "One", items: ["manage:content"] }, "x");
 
         const updated = await store.update(
@@ -205,7 +202,7 @@ if (hasLocalSupabase) {
       });
 
       it("rejects a write based on a stale version", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
         const created = await store.create({ name: "One", items: ["manage:content"] }, "x");
         await store.update(created.id, { items: ["view:audit"] }, created.version, "x");
 
@@ -221,7 +218,7 @@ if (hasLocalSupabase) {
       });
 
       it("deletes, after which get() returns null", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
         const created = await store.create({ name: "One", items: ["manage:content"] }, "x");
 
         await store.delete(created.id, created.version, "x");
@@ -230,7 +227,7 @@ if (hasLocalSupabase) {
       });
 
       it("records history, newest first, including the deletion", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
         const created = await store.create({ name: "One", items: ["manage:content"] }, "x");
         const updated = await store.update(
           created.id,
@@ -247,8 +244,8 @@ if (hasLocalSupabase) {
       });
 
       it("lists only the bundles this store's own namespace created", async () => {
-        const storeA = freshStore("permission");
-        const storeB = freshStore("permission");
+        const storeA = freshStore();
+        const storeB = freshStore();
         await storeA.create({ name: "One", items: ["manage:content"] }, "x");
         await storeB.create({ name: "One", items: ["view:audit"] }, "x");
 
@@ -260,67 +257,11 @@ if (hasLocalSupabase) {
       });
 
       it("reports not_found for an unknown id", async () => {
-        const store = freshStore("permission");
+        const store = freshStore();
 
         await expect(store.update(randomUUID(), { name: "x" }, 1, "x")).rejects.toMatchObject({
           code: "not_found",
         });
-      });
-    });
-
-    describe("route bundles", () => {
-      it("creates with a path and a publish flag, absent from the role vocabulary", async () => {
-        const store = freshStore("template_key");
-
-        const bundle = await store.create(
-          { name: "Help page", items: ["hero", "footer"], path: "/help", published: true },
-          "x",
-        );
-
-        expect(bundle.path).toBe("/help");
-        expect(bundle.published).toBe(true);
-        expect([...bundle.items]).toEqual(["hero", "footer"]);
-      });
-
-      it("round-trips path and published through get()", async () => {
-        const store = freshStore("template_key");
-        const created = await store.create(
-          { name: "Draft", items: ["hero"], path: "/draft", published: false },
-          "x",
-        );
-
-        const fetched = await store.get(created.id);
-
-        expect(fetched?.path).toBe("/draft");
-        expect(fetched?.published).toBe(false);
-      });
-
-      it("publishes on update without needing the items or path repeated", async () => {
-        const store = freshStore("template_key");
-        // A path distinct from the previous test's "/draft": `route_bundles.path`
-        // carries a real, global `unique` constraint (see `..._config_bundles.sql`)
-        // that the store's own `namespace` scoping — a `name` prefix — does
-        // nothing to protect. Found by running this file against a live
-        // database: reusing "/draft" here failed the *other* test's row, not
-        // this one, with a bare "unavailable" error that named neither.
-        const created = await store.create(
-          { name: "Draft", items: ["hero"], path: "/draft-publish", published: false },
-          "x",
-        );
-
-        const published = await store.update(created.id, { published: true }, created.version, "x");
-
-        expect(published.published).toBe(true);
-        expect(published.path).toBe("/draft-publish");
-        expect([...published.items]).toEqual(["hero"]);
-      });
-
-      it("rejects a template key outside this project's catalog", async () => {
-        const store = freshStore("template_key");
-
-        await expect(
-          store.create({ name: "Bad", items: ["not-a-real-template"], path: "/bad" }, "x"),
-        ).rejects.toBeInstanceOf(InvalidItemsError);
       });
     });
   });
@@ -487,6 +428,35 @@ if (hasLocalSupabase) {
           "x",
         ),
       ).rejects.toMatchObject({ code: "conflict" });
+    });
+
+    it("deletes a route and its section rows, version-checked", async () => {
+      const w = writer();
+      const path = `/live-test-rcw-${randomUUID()}`;
+      const created = await w.saveComposition(
+        null,
+        { name: `live-test-rcw-${randomUUID()}`, path, published: true, tree: root("hero") },
+        null,
+        "x",
+      );
+
+      await expect(w.deleteComposition(created.id, created.version + 5, "x")).rejects.toMatchObject(
+        {
+          code: "conflict",
+        },
+      );
+
+      await w.deleteComposition(created.id, created.version, "x");
+
+      const { count } = await admin
+        .from("route_section_instances")
+        .select("*", { count: "exact", head: true })
+        .eq("bundle_id", created.id);
+      expect(count).toBe(0);
+
+      await expect(w.deleteComposition(created.id, 1, "x")).rejects.toMatchObject({
+        code: "not_found",
+      });
     });
 
     function root(key: string) {

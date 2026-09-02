@@ -13,8 +13,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CookieAdapter } from "./CookieAdapter.js";
 import { mapConfigError } from "./mapConfigError.js";
 
-/** A vocabulary is one instance of the substrate — see `config-schema`'s own doc. */
-export type ConfigBundleVocabulary = "permission" | "template_key";
+/**
+ * A vocabulary is one instance of the substrate — see `config-schema`'s own
+ * doc. Only `"permission"` remains: routes moved to `RouteCompositionWriter`
+ * / `RouteCompositionReader` when they gained a section tree (B3/B4).
+ */
+export type ConfigBundleVocabulary = "permission";
 
 export interface SupabaseConfigBundleStoreOptions {
   /** The project URL — `SUPABASE_URL`. Safe to log; not secret. */
@@ -24,12 +28,12 @@ export interface SupabaseConfigBundleStoreOptions {
   /**
    * Where the session lives across requests — the same contract
    * `SupabaseAuthProvider` takes, and for the same reason: `save_role_bundle`
-   * / `save_route_bundle` / `delete_config_bundle` check the *calling
-   * session's* permissions via `auth.uid()`, so this store has to carry that
-   * session, not merely an anon key.
+   * / `delete_config_bundle` check the *calling session's* permissions via
+   * `auth.uid()`, so this store has to carry that session, not merely an anon
+   * key.
    */
   cookies: CookieAdapter;
-  /** Which vocabulary this store instance manages. One store per vocabulary, matching one RPC pair per vocabulary. */
+  /** Which vocabulary this store instance manages. Only `"permission"` remains. */
   vocabulary: ConfigBundleVocabulary;
   /** Validates items against the fixed vocabulary. Returns the unknown ones. Same contract as `MemoryConfigBundleStore`. */
   findUnknownItems: (items: readonly string[]) => readonly string[];
@@ -59,16 +63,16 @@ interface ConfigBundleRow {
 
 /**
  * `ConfigBundleStore` backed by Supabase Postgres — the `save_role_bundle` /
- * `save_route_bundle` / `delete_config_bundle` RPCs `..._config_bundle_writes.sql`
- * defines, one instance per vocabulary.
+ * `delete_config_bundle` RPCs `..._config_bundle_writes.sql` defines. Scoped
+ * to the permission vocabulary; route composition is `RouteCompositionWriter`
+ * / `RouteCompositionReader`'s job.
  *
  * Every write and read runs as the signed-in caller, never the anon role:
  * `list`/`get`/`history` rely on the read policies in
- * `..._bundle_read_policies.sql` (a role author sees role bundles, a route
- * author sees route bundles, nobody sees both merely by holding one
- * permission), and every write relies on `has_permission()` inside the RPC.
- * There is deliberately no path around that check from here — this class has
- * no service-role mode.
+ * `..._bundle_read_policies.sql` (only a role author sees role bundles), and
+ * every write relies on `has_permission()` inside the RPC. There is
+ * deliberately no path around that check from here — this class has no
+ * service-role mode.
  *
  * `actor` is part of `ConfigBundleStore`'s interface but is never sent
  * anywhere: the RPCs derive the writer from `auth.uid()` of the *session*,
@@ -141,33 +145,12 @@ export class SupabaseConfigBundleStore<
     void actor; // see the class doc — the real actor is the signed-in session.
     this.#validate(input.items);
 
-    const name = `${this.#namespace}${input.name}`;
-
-    if (this.#vocabulary === "permission") {
-      const { data, error } = await this.#client.rpc("save_role_bundle", {
-        p_name: name,
-        p_items: [...input.items],
-      });
-      if (error) throw mapConfigError(error);
-      return this.#toBundle(data as ConfigBundleRow, input.items);
-    }
-
-    if (!input.path) {
-      throw new ConfigStoreError("invalid_items", "A route bundle needs a path.");
-    }
-    const { data, error } = await this.#client.rpc("save_route_bundle", {
-      p_name: name,
-      p_path: input.path,
+    const { data, error } = await this.#client.rpc("save_role_bundle", {
+      p_name: `${this.#namespace}${input.name}`,
       p_items: [...input.items],
-      p_published: input.published ?? false,
     });
     if (error) throw mapConfigError(error);
-    return this.#toBundle(
-      data as ConfigBundleRow,
-      input.items,
-      input.path,
-      input.published ?? false,
-    );
+    return this.#toBundle(data as ConfigBundleRow, input.items);
   }
 
   async update(
@@ -185,33 +168,14 @@ export class SupabaseConfigBundleStore<
     const items = input.items ?? existing.items;
     this.#validate(items);
 
-    const qualifiedName = `${this.#namespace}${name}`;
-
-    if (this.#vocabulary === "permission") {
-      const { data, error } = await this.#client.rpc("save_role_bundle", {
-        p_name: qualifiedName,
-        p_items: [...items],
-        p_id: id,
-        p_expected_version: expectedVersion,
-      });
-      if (error) throw mapConfigError(error, expectedVersion);
-      return this.#toBundle(data as ConfigBundleRow, items);
-    }
-
-    const path = input.path ?? existing.path;
-    const published = input.published ?? existing.published ?? false;
-    if (!path) throw new ConfigStoreError("invalid_items", "A route bundle needs a path.");
-
-    const { data, error } = await this.#client.rpc("save_route_bundle", {
-      p_name: qualifiedName,
-      p_path: path,
+    const { data, error } = await this.#client.rpc("save_role_bundle", {
+      p_name: `${this.#namespace}${name}`,
       p_items: [...items],
-      p_published: published,
       p_id: id,
       p_expected_version: expectedVersion,
     });
     if (error) throw mapConfigError(error, expectedVersion);
-    return this.#toBundle(data as ConfigBundleRow, items, path, published);
+    return this.#toBundle(data as ConfigBundleRow, items);
   }
 
   async delete(id: string, expectedVersion: number, actor: string): Promise<void> {
@@ -243,74 +207,30 @@ export class SupabaseConfigBundleStore<
     }));
   }
 
-  /** Joins each header row against its vocabulary's item (and, for routes, path/published) satellite table. */
+  /** Joins each header row against its `role_permissions` items. */
   async #attachItems(rows: ConfigBundleRow[]): Promise<ConfigBundle<TItem>[]> {
     const ids = rows.map((row) => row.id);
 
-    if (this.#vocabulary === "permission") {
-      const { data, error } = await this.#client
-        .from("role_permissions")
-        .select("bundle_id, permission")
-        .in("bundle_id", ids);
-      if (error) throw mapConfigError(error);
+    const { data, error } = await this.#client
+      .from("role_permissions")
+      .select("bundle_id, permission")
+      .in("bundle_id", ids);
+    if (error) throw mapConfigError(error);
 
-      const itemsByBundle = new Map<string, string[]>();
-      for (const row of data ?? []) {
-        const list = itemsByBundle.get(row.bundle_id as string) ?? [];
-        list.push(row.permission as string);
-        itemsByBundle.set(row.bundle_id as string, list);
-      }
-      // No ordinal on role_permissions — sorted for deterministic output,
-      // matching the substrate's audience (a role editor's checkbox list),
-      // where order carries no meaning the way route render order does.
-      return rows.map((row) =>
-        this.#toBundle(
-          row,
-          (itemsByBundle.get(row.id) ?? []).sort() as unknown as readonly TItem[],
-        ),
-      );
-    }
-
-    const [{ data: routeMeta, error: routeMetaError }, { data: templates, error: templatesError }] =
-      await Promise.all([
-        this.#client
-          .from("route_bundles")
-          .select("bundle_id, path, published")
-          .in("bundle_id", ids),
-        this.#client
-          .from("route_templates")
-          .select("bundle_id, ordinal, template_key")
-          .in("bundle_id", ids)
-          .order("ordinal"),
-      ]);
-    if (routeMetaError) throw mapConfigError(routeMetaError);
-    if (templatesError) throw mapConfigError(templatesError);
-
-    const metaByBundle = new Map((routeMeta ?? []).map((row) => [row.bundle_id as string, row]));
     const itemsByBundle = new Map<string, string[]>();
-    for (const row of templates ?? []) {
+    for (const row of data ?? []) {
       const list = itemsByBundle.get(row.bundle_id as string) ?? [];
-      list.push(row.template_key as string);
+      list.push(row.permission as string);
       itemsByBundle.set(row.bundle_id as string, list);
     }
-
-    return rows.map((row) => {
-      const meta = metaByBundle.get(row.id);
-      return this.#toBundle(
-        row,
-        (itemsByBundle.get(row.id) ?? []) as unknown as readonly TItem[],
-        meta?.path as string | undefined,
-        meta?.published as boolean | undefined,
-      );
-    });
+    // No ordinal on role_permissions — sorted for deterministic output,
+    // matching the substrate's audience (a role editor's checkbox list).
+    return rows.map((row) =>
+      this.#toBundle(row, (itemsByBundle.get(row.id) ?? []).sort() as unknown as readonly TItem[]),
+    );
   }
 
-  #toBundle(
-    row: ConfigBundleRow,
-    items: readonly TItem[],
-    path?: string,
-    published?: boolean,
-  ): ConfigBundle<TItem> {
+  #toBundle(row: ConfigBundleRow, items: readonly TItem[]): ConfigBundle<TItem> {
     return {
       id: row.id,
       name: row.name.slice(this.#namespace.length),
@@ -318,8 +238,6 @@ export class SupabaseConfigBundleStore<
       version: row.version,
       updatedAt: row.updated_at,
       updatedBy: row.updated_by,
-      path,
-      published,
     };
   }
 

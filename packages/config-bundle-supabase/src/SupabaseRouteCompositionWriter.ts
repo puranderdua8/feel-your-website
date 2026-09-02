@@ -79,4 +79,15 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       updatedAt: row.updated_at,
     };
   }
+
+  async deleteComposition(bundleId: string, expectedVersion: number, actor: string): Promise<void> {
+    void actor;
+    // `delete_config_bundle` is vocabulary-agnostic — its route branch checks
+    // `manage:routes` and cascades `route_bundles` + `route_section_instances`.
+    const { error } = await this.#client.rpc("delete_config_bundle", {
+      p_id: bundleId,
+      p_expected_version: expectedVersion,
+    });
+    if (error) throw mapRouteCompositionError(error, expectedVersion);
+  }
 }
