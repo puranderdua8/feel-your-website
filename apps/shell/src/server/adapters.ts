@@ -5,8 +5,6 @@ import { SupabaseContentAdapter } from "@feel-your-website/content-adapter-supab
 import type { ContentAdapter } from "@feel-your-website/content-core";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
 
-import { localeConfig } from "../i18n/config.js";
-
 /**
  * The dependency-injection point. There is exactly one.
  *
@@ -94,7 +92,6 @@ export function getContentAdapter(): ContentAdapter {
       ? new SupabaseContentAdapter({
           url: requireEnv("SUPABASE_URL"),
           anonKey: requireEnv("SUPABASE_ANON_KEY"),
-          defaultLocale: localeConfig.defaultLocale,
         })
       : new MemoryContentAdapter(contractSeed);
 

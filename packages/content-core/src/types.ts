@@ -89,33 +89,6 @@ export interface RouteSectionNode {
 }
 
 /**
- * A resolved piece of content for one template key in one locale.
- */
-export interface Content<TKey extends string = string> {
-  templateKey: TKey;
-  /**
-   * The named content variant. `""` is the section's default/global content;
-   * a named variant (`"star"`, `"short"`, …) is an independently-selectable
-   * alternative the CMS can point a route's slot at. Locale fallback applies
-   * within a variant; there is no fallback between variants.
-   */
-  variant: string;
-  /** The locale actually served, which may differ from the one requested. */
-  locale: Locale;
-  /**
-   * `false` when the requested locale had no translation and a fallback was
-   * served instead.
-   *
-   * Surfaced rather than hidden so the app can decide: fall back silently for
-   * body copy, but never silently for something read aloud to a customer.
-   */
-  translated: boolean;
-  /** Template-shaped payload. Validated by the app against the template. */
-  fields: Readonly<Record<string, JsonValue>>;
-  updatedAt: string;
-}
-
-/**
  * A route's search-engine and social metadata, for one locale. Every field is
  * optional — a route may set only a title, or nothing at all. The shell turns
  * this into `<head>` tags; the CMS authors it per locale alongside the tree.
@@ -152,31 +125,4 @@ export interface RouteBundle {
   seo: Readonly<Record<Locale, RouteSeo>>;
   version: number;
   updatedAt: string;
-}
-
-/** One page of results, with an opaque cursor. */
-export interface Page<TItem> {
-  items: readonly TItem[];
-  /**
-   * Cursor for the next page, or `null` at the end.
-   *
-   * Deliberately opaque and cursor-based rather than offset-based: offsets
-   * skip or repeat rows when content is published mid-listing, and every
-   * adapter must behave the same way here.
-   */
-  nextCursor: string | null;
-}
-
-export interface ListContentQuery {
-  locale: Locale;
-  /**
-   * Restrict to one content variant. Omitted lists only the default
-   * variant (`""`); pass a name to list that variant's rows instead.
-   */
-  variant?: string;
-  /** Restrict to these template keys. Omitted means all. */
-  templateKeys?: readonly string[];
-  /** Page size. Adapters must clamp to their own maximum rather than error. */
-  limit?: number;
-  cursor?: string | null;
 }

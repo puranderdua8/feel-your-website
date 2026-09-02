@@ -1,8 +1,6 @@
 import {
-  ContentAdapterError,
-  type Content,
+  type ContentAdapterError,
   type ContentWriter,
-  type JsonValue,
   type Locale,
 } from "@feel-your-website/content-core";
 import { createServerClient } from "@supabase/ssr";
@@ -27,18 +25,10 @@ export interface SupabaseContentWriterOptions {
    * Overrides GoTrue's storage key, stable (`sb-<project-ref>-auth-token`) by
    * default — matching `SupabaseAuthProvider`'s own default for the same
    * reason: this instance's job is finding a session an earlier instance
-   * wrote to cookies, which needs a *stable* key, not a random one.
-   *
-   * The one caller with a real reason to override it is a test holding two
-   * *different* real, signed-in sessions alive in the same process at once
-   * (see `writer.live.test.ts`) — ordinary request handling, one session per
-   * request, never needs this. Two GoTrueClient instances sharing a storage
-   * key also both open a same-named `BroadcastChannel` for cross-tab sync;
-   * under Node two of those posting to each other has been observed to throw
-   * (`TypeError: The "event" argument must be an instance of Event`, from
-   * Node's own `BroadcastChannel`/`MessageEvent` interop), not just log
-   * GoTrue's benign "multiple clients" warning — found by running exactly
-   * that scenario against a live database.
+   * wrote to cookies, which needs a *stable* key. A test holding two
+   * *different* signed-in sessions in one process needs distinct keys to
+   * avoid two GoTrueClients sharing one and both opening a same-named
+   * `BroadcastChannel` (which, under Node, has been observed to throw).
    */
   storageKey?: string;
   /** Test seam: makes every call reject. */
@@ -46,16 +36,14 @@ export interface SupabaseContentWriterOptions {
 }
 
 /**
- * `ContentWriter` backed by Supabase Postgres — the `save_content_item` /
- * `delete_content_item` / `save_content_message` / `delete_content_message`
- * RPCs `..._content_writes.sql` defines.
+ * `ContentWriter` backed by Supabase Postgres — the `save_content_message` /
+ * `delete_content_message` RPCs `..._content_writes.sql` defines.
  *
- * The counterpart to `SupabaseContentAdapter`, deliberately a separate class
- * rather than one class implementing both interfaces: `SupabaseContentAdapter`
- * reads with the anon key and no session at all (every table it queries is
- * public-read RLS), while every method here runs as the signed-in caller and
- * is refused by the database itself without `manage:content`. Two genuinely
- * different clients, not one client wearing two hats.
+ * The counterpart to `SupabaseContentAdapter`, deliberately a separate class:
+ * `SupabaseContentAdapter` reads with the anon key and no session at all,
+ * while every method here runs as the signed-in caller and is refused by the
+ * database without `manage:content`. Its whole surface is UI-chrome messages
+ * now — route content is written through `SupabaseRouteCompositionWriter`.
  */
 export class SupabaseContentWriter implements ContentWriter {
   readonly #client: SupabaseClient;
@@ -72,43 +60,6 @@ export class SupabaseContentWriter implements ContentWriter {
       },
       ...(options.storageKey ? { auth: { storageKey: options.storageKey } } : {}),
     });
-  }
-
-  async saveContentItem(
-    templateKey: string,
-    locale: Locale,
-    fields: Readonly<Record<string, JsonValue>>,
-    variant = "",
-  ): Promise<Content> {
-    this.#guard();
-
-    const { data, error } = await this.#client.rpc("save_content_item", {
-      p_template_key: templateKey,
-      p_locale: locale,
-      p_fields: fields,
-      p_variant: variant,
-    });
-    if (error) throw mapContentWriteError(error);
-
-    return {
-      templateKey: data.template_key as string,
-      variant: data.variant as string,
-      locale: data.locale as string,
-      translated: true,
-      fields: data.fields as Record<string, JsonValue>,
-      updatedAt: data.updated_at as string,
-    };
-  }
-
-  async deleteContentItem(templateKey: string, locale: Locale, variant = ""): Promise<void> {
-    this.#guard();
-
-    const { error } = await this.#client.rpc("delete_content_item", {
-      p_template_key: templateKey,
-      p_locale: locale,
-      p_variant: variant,
-    });
-    if (error) throw mapContentWriteError(error);
   }
 
   async saveMessage(locale: Locale, key: string, value: string): Promise<void> {

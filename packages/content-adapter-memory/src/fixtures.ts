@@ -6,40 +6,14 @@ import type { MemoryContentSeed } from "./MemoryContentAdapter.js";
  * The seed shaped to satisfy the shared contract suite.
  *
  * Exported rather than kept in the test file so the Supabase adapter's own
- * contract run can seed a real database from exactly the same data — the
- * suite is only meaningful if every adapter starts from identical content.
+ * contract run can seed a real database from equivalent data — the suite is
+ * only meaningful if every adapter starts from the same shape.
  */
 export const contractSeed: MemoryContentSeed = {
   defaultLocale: CONTRACT_FIXTURE.defaultLocale,
-  content: {
-    // Translated into both locales.
-    [CONTRACT_FIXTURE.translatedKey]: {
-      en: { title: "Guidance", body: "Hold the device close." },
-      hi: { title: "मार्गदर्शन", body: "डिवाइस को पास रखें।" },
-    },
-    // English only — proves locale fallback and the `translated: false` flag.
-    [CONTRACT_FIXTURE.untranslatedKey]: {
-      en: { title: "Legal", body: "Terms apply." },
-    },
-    // A third key so pagination has more than two items to walk.
-    help: {
-      en: { title: "Help", body: "Contact support." },
-    },
-  },
-  // A named content variant of `guidance`, in the default locale only —
-  // proves variant selection, and that locale fallback still applies within
-  // a variant.
-  variants: {
-    [CONTRACT_FIXTURE.variantKey]: {
-      [CONTRACT_FIXTURE.variantName]: {
-        en: { title: "Guidance (short)", body: "Hold it close." },
-      },
-    },
-  },
   // Keys deliberately match the i18n bootstrap set, so this fixture
   // demonstrates the real behaviour: CMS copy overriding the built-in
-  // strings, in each locale. Keys that are absent here keep their bootstrap
-  // text rather than disappearing.
+  // strings, in each locale. Keys absent here keep their bootstrap text.
   messages: {
     en: {
       "bootstrap.loading": "Loading…",
@@ -63,8 +37,7 @@ export const contractSeed: MemoryContentSeed = {
       id: "route-help",
       path: "/help",
       // One root section, no slots — the flat case. The route owns its
-      // content now: the copy lives on the node, per locale, not in a
-      // `content_items`-style store keyed by section.
+      // content: the copy lives on the node, per locale.
       tree: [
         {
           instanceId: "help-root",
