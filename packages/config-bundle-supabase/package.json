@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@feel-your-website/config-schema": "workspace:*",
+    "@feel-your-website/content-core": "workspace:*",
     "@supabase/ssr": "catalog:",
     "@supabase/supabase-js": "catalog:"
   },

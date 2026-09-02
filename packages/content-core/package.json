@@ -19,6 +19,11 @@
       "import": "./dist/contract-tests.js",
       "require": "./dist/contract-tests.cjs"
     },
+    "./route-composition-contract-tests": {
+      "types": "./dist/route-composition-contract-tests.d.ts",
+      "import": "./dist/route-composition-contract-tests.js",
+      "require": "./dist/route-composition-contract-tests.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [

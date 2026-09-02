@@ -389,6 +389,9 @@ importers:
       '@feel-your-website/config-schema':
         specifier: workspace:*
         version: link:../config-schema
+      '@feel-your-website/content-core':
+        specifier: workspace:*
+        version: link:../content-core
       '@supabase/ssr':
         specifier: 'catalog:'
         version: 0.12.5(@supabase/supabase-js@2.112.4(@opentelemetry/api@1.9.1))
@@ -451,6 +454,9 @@ importers:
       '@feel-your-website/config':
         specifier: workspace:*
         version: link:../config
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
       eslint:
         specifier: 'catalog:'
         version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
