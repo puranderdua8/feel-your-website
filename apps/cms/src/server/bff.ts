@@ -4,8 +4,22 @@ import type {
   CreateBundleInput,
   UpdateBundleInput,
 } from "@feel-your-website/config-schema";
-import type { Content, JsonValue, SiteLocale } from "@feel-your-website/content-core";
+import type {
+  Content,
+  JsonValue,
+  RouteBundle,
+  RouteComposition,
+  RouteSectionNode,
+  SiteLocale,
+} from "@feel-your-website/content-core";
+import {
+  collectEffectiveRefs,
+  findUnknownSectionRefs,
+  flattenTree,
+  validateSectionFields,
+} from "@feel-your-website/content-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
+import { sectionCatalog } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 
 import {
@@ -13,6 +27,8 @@ import {
   getConfigBundleStore,
   getContentAdapter,
   getContentWriter,
+  getRouteCompositionReader,
+  getRouteCompositionWriter,
   getSiteSettingsStore,
 } from "./adapters.js";
 
@@ -340,4 +356,152 @@ export const deleteRouteBundle = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<void> => {
     await getConfigBundleStore("template_key").delete(data.id, data.expectedVersion, data.actor);
+  });
+
+// --- Route composition (section tree) ------------------------------------
+
+/** Parses an untrusted value into a `RouteSectionNode[]`, rejecting anything malformed. */
+function parseTree(value: unknown, depth = 0): RouteSectionNode[] {
+  if (depth > 20) throw new Error("Section tree is nested too deeply.");
+  if (!Array.isArray(value)) throw new Error("A section tree must be an array of nodes.");
+
+  return value.map((raw): RouteSectionNode => {
+    const node = (raw ?? {}) as Record<string, unknown>;
+    const ref = (node.ref ?? {}) as Record<string, unknown>;
+    if (typeof node.instanceId !== "string" || node.instanceId === "") {
+      throw new Error("Every node needs a non-empty instanceId.");
+    }
+    if (typeof ref.key !== "string" || ref.key === "") {
+      throw new Error("Every node needs a ref.key.");
+    }
+
+    const slotsIn = (node.slots ?? {}) as Record<string, unknown>;
+    const slots: Record<string, readonly RouteSectionNode[]> = {};
+    for (const [name, children] of Object.entries(slotsIn)) {
+      slots[name] = parseTree(children, depth + 1);
+    }
+
+    return {
+      instanceId: node.instanceId,
+      ref: { key: ref.key, variant: typeof ref.variant === "string" ? ref.variant : "" },
+      slots,
+    };
+  });
+}
+
+/** One route's whole section tree, drafts included — for the route editor. */
+export const loadRouteComposition = createServerFn({ method: "GET" })
+  .validator((input: unknown): { bundleId: string } => {
+    const bundleId = (input as { bundleId?: unknown } | undefined)?.bundleId;
+    if (typeof bundleId !== "string" || bundleId.trim() === "") {
+      throw new Error("bundleId is required.");
+    }
+    return { bundleId };
+  })
+  .handler(async ({ data }): Promise<RouteComposition | null> =>
+    getRouteCompositionReader().getComposition(data.bundleId),
+  );
+
+/**
+ * Creates (`bundleId` absent) or replaces a route's section tree. The tree is
+ * validated against the section catalog here — an unknown section key is
+ * rejected before the write, matching how `route_templates.template_key` is
+ * validated at author time rather than by the database.
+ */
+export const saveRouteComposition = createServerFn({ method: "POST" })
+  .validator(
+    (
+      input: unknown,
+    ): {
+      bundleId: string | null;
+      name: string;
+      path: string;
+      published: boolean;
+      tree: RouteSectionNode[];
+      expectedVersion: number | null;
+      actor: string;
+    } => {
+      const { bundleId, name, path, published, tree, expectedVersion, actor } = (input ??
+        {}) as Record<string, unknown>;
+      if (typeof name !== "string" || name.trim() === "") throw new Error("name is required.");
+      if (typeof path !== "string" || !path.startsWith("/")) {
+        throw new Error("path is required and must start with /.");
+      }
+      return {
+        bundleId: typeof bundleId === "string" && bundleId !== "" ? bundleId : null,
+        name,
+        path,
+        published: Boolean(published),
+        tree: parseTree(tree),
+        expectedVersion: typeof expectedVersion === "number" ? expectedVersion : null,
+        actor: typeof actor === "string" ? actor : "unknown",
+      };
+    },
+  )
+  .handler(async ({ data }): Promise<RouteBundle> => {
+    const unknown = findUnknownSectionRefs(sectionCatalog, flattenTree(data.tree));
+    if (unknown.length > 0) {
+      throw new Error(`Unknown section(s): ${unknown.map((ref) => ref.key).join(", ")}`);
+    }
+
+    return getRouteCompositionWriter().saveComposition(
+      data.bundleId,
+      { name: data.name, path: data.path, published: data.published, tree: data.tree },
+      data.expectedVersion,
+      data.actor,
+    );
+  });
+
+export interface PublishGap {
+  locale: string;
+  sectionKey: string;
+  variant: string;
+  /** Field names still missing, or `["*"]` when the section has no content in this locale at all. */
+  missing: string[];
+}
+
+export interface PublishReadiness {
+  ready: boolean;
+  gaps: PublishGap[];
+}
+
+/**
+ * Whether a tree can be published: every section it effectively depends on
+ * (including the default of a required slot left empty) must have complete,
+ * translated content in every configured site locale. A locale-fallback
+ * result counts as missing — an untranslated language is not "done".
+ */
+export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
+  .validator((input: unknown): { tree: RouteSectionNode[] } => ({
+    tree: parseTree((input as { tree?: unknown } | undefined)?.tree),
+  }))
+  .handler(async ({ data }): Promise<PublishReadiness> => {
+    const [locales, refs] = [
+      await getSiteSettingsStore().getLocales(),
+      collectEffectiveRefs(sectionCatalog, data.tree),
+    ];
+    const adapter = getContentAdapter();
+    const gaps: PublishGap[] = [];
+
+    for (const ref of refs) {
+      const def = sectionCatalog.byKey.get(ref.key);
+      for (const { locale } of locales) {
+        const content = await adapter.getContent(ref.key, locale, ref.variant);
+        if (!content || !content.translated) {
+          gaps.push({ locale, sectionKey: ref.key, variant: ref.variant, missing: ["*"] });
+          continue;
+        }
+        const issues = def ? validateSectionFields(def, content.fields) : [];
+        if (issues.length > 0) {
+          gaps.push({
+            locale,
+            sectionKey: ref.key,
+            variant: ref.variant,
+            missing: issues.map((issue) => issue.field),
+          });
+        }
+      }
+    }
+
+    return { ready: gaps.length === 0, gaps };
   });
