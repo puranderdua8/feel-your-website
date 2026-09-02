@@ -41,9 +41,11 @@ function componentSources(): { name: string; source: string }[] {
  * tokens and are never expected to come from `compileCssVars`.
  */
 const EXTERNALLY_PROVIDED = new Set<string>([
-  // Published by @radix-ui's Select on the content element.
+  // Published by @radix-ui primitives as measured values on their own nodes.
   "--radix-select-trigger-height",
   "--radix-select-trigger-width",
+  "--radix-navigation-menu-viewport-height",
+  "--radix-navigation-menu-viewport-width",
   // Set by `<ToggleGroup>` itself: `style={{ "--gap": spacing }}`.
   "--gap",
 ]);
