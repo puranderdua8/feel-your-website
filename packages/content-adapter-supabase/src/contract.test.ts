@@ -14,6 +14,15 @@ import { SupabaseContentAdapter } from "./SupabaseContentAdapter.js";
  * fake: a contract this adapter merely compiled against, never actually
  * queried through PostgREST, would not have caught the RLS gap Phase 4 found
  * (`published_route_manifest` silently returning nothing to a real visitor).
+ *
+ * `test:contracts` runs this file and `writer.live.test.ts` with
+ * `--no-file-parallelism` on purpose. They share one local database, and
+ * `writer.live.test.ts` inserts default-locale `content_items` rows that only
+ * its own `afterAll` removes; run in parallel, those rows are visible to this
+ * file's unqualified `listContent({ locale: 'en' })` counts (the
+ * `listContent pagination` cases assert an exact `totalEnItems`), so it fails
+ * intermittently with an off-by-one. Serial execution keeps each file's
+ * fixture lifecycle fully nested.
  */
 const url = process.env.SUPABASE_URL;
 const anonKey = process.env.SUPABASE_ANON_KEY;
