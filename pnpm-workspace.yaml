@@ -41,6 +41,13 @@ catalog:
   "@tanstack/react-start": ^1.168.46
   "@tanstack/react-query": ^5.66.0
 
+  # Server runtime for the container images (apps/*/server.js). srvx is
+  # TanStack Start's own server layer — `dist/server/server.js` is already a
+  # srvx-compatible `{ fetch }` handler — so this pins, as a direct dep, the
+  # version Start otherwise pulls in transitively. Netlify does not use it;
+  # its adapter wraps the same handler its own way.
+  srvx: ^0.11.22
+
   # Test
   vitest: ^2.1.8
   jsdom: ^25.0.1

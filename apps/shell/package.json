@@ -7,6 +7,7 @@
     "dev": "vite dev",
     "build": "vite build && node scripts/generate-sw.mjs",
     "start": "vite start",
+    "start:node": "node server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -29,7 +30,8 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "srvx": "catalog:"
   },
   "devDependencies": {
     "@feel-your-website/config": "workspace:*",

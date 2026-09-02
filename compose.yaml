@@ -1,0 +1,39 @@
+# Local container run of both apps. `docker compose up --build` brings up:
+#
+#   shell  http://localhost:3000
+#   cms    http://localhost:3001   (sign in editor@example.com / demo)
+#
+# Both run on the in-memory adapter and the mock auth provider, so this needs
+# no secrets and no database. Pointing the cms at a real Supabase (local or
+# hosted) is a later change — set CONTENT_ADAPTER=supabase / AUTH_PROVIDER=
+# supabase and the SUPABASE_* vars here, the same ones apps/cms/.env uses for
+# `pnpm dev`.
+
+name: feel-your-website
+
+services:
+  shell:
+    build:
+      context: .
+      dockerfile: apps/shell/Dockerfile
+    image: feel-your-website/shell
+    environment:
+      PORT: "3000"
+      CONTENT_ADAPTER: memory
+      AUTH_PROVIDER: mock
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  cms:
+    build:
+      context: .
+      dockerfile: apps/cms/Dockerfile
+    image: feel-your-website/cms
+    environment:
+      PORT: "3001"
+      CONTENT_ADAPTER: memory
+      AUTH_PROVIDER: mock
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
