@@ -9,15 +9,10 @@
 -- this from; the memory fixture and this file are two independent adapters'
 -- test data that happen to describe the same content.
 --
--- `content_items` deliberately has no equivalent seed here. Nothing in
--- `apps/shell` reads it yet — `loadContent`/`getContent` are wired in the
--- BFF but no route calls them — and `content-adapter-supabase`'s own
--- contract test seeds and tears down its own `content_items` fixture rows
--- under the same key names content-core's `CONTRACT_FIXTURE` defines
--- (`guidance`, `legal`). Duplicating those names here previously caused a
--- primary-key collision between this seed and that test's `beforeAll` —
--- caught by actually running the contract suite against a freshly-seeded
--- database, not merely by each piece working in isolation.
+-- Only messages are seeded. Route content and SEO live on the route
+-- (`route_section_content` / `route_seo`) and are authored through the CMS,
+-- not seeded; the old `content_items` store was dropped in
+-- `20260909000100_drop_content_items.sql`.
 --
 -- Local dev and CI only: `supabase/config.toml`'s `db.seed` step (which runs
 -- this) has no equivalent against a hosted project — nothing here reaches

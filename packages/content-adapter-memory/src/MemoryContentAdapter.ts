@@ -1,14 +1,10 @@
 import {
-  ContentAdapterError,
   RouteCompositionConflictError,
   RouteCompositionError,
-  type Content,
+  type ContentAdapterError,
   type ContentAdapter,
   type ContentWriter,
-  type ListContentQuery,
   type Locale,
-  type JsonValue,
-  type Page,
   type RouteBundle,
   type RouteComposition,
   type RouteCompositionInput,
@@ -41,31 +37,20 @@ export type RouteSeed = Omit<RouteBundle, "seo"> & {
 };
 
 export interface MemoryContentSeed {
-  /** Default-variant content: `templateKey -> locale -> fields` */
-  content: Record<string, Record<Locale, Record<string, JsonValue>>>;
-  /**
-   * Named non-default content variants:
-   * `templateKey -> variant -> locale -> fields`. Additive — the default
-   * variant (`""`) always lives in `content`, never here.
-   */
-  variants?: Record<string, Record<string, Record<Locale, Record<string, JsonValue>>>>;
   /** `locale -> messages` */
   messages?: Record<Locale, Record<string, string>>;
   /**
    * Published route bundles, as section-instance trees.
    *
-   * Not `readonly`: `saveComposition` mutates this array in place, the same
-   * way `saveContentItem` mutates `content` — one class over one mutable seed.
+   * Not `readonly`: `saveComposition` mutates this array in place — one class
+   * over one mutable seed, so a save is visible to the next read.
    */
   routes?: RouteSeed[];
-  /** Locale served when the requested one has no translation. */
+  /** Locale served when a requested one is missing. Kept for parity with the real adapters. */
   defaultLocale?: Locale;
-  /** Timestamp stamped on every item, so output is deterministic. */
+  /** Timestamp stamped on generated rows, so output is deterministic. */
   updatedAt?: string;
 }
-
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 100;
 
 export interface MemoryContentAdapterOptions {
   /**
@@ -78,11 +63,11 @@ export interface MemoryContentAdapterOptions {
 export class MemoryContentAdapter
   implements ContentAdapter, ContentWriter, RouteCompositionWriter, RouteCompositionReader
 {
-  readonly #seed: Required<Pick<MemoryContentSeed, "content" | "defaultLocale" | "updatedAt">> &
+  readonly #seed: Required<Pick<MemoryContentSeed, "defaultLocale" | "updatedAt">> &
     MemoryContentSeed;
   readonly #failWith?: ContentAdapterError;
 
-  constructor(seed: MemoryContentSeed, options: MemoryContentAdapterOptions = {}) {
+  constructor(seed: MemoryContentSeed = {}, options: MemoryContentAdapterOptions = {}) {
     this.#seed = {
       defaultLocale: "en",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -91,82 +76,11 @@ export class MemoryContentAdapter
     this.#failWith = options.failWith;
   }
 
-  async getContent(templateKey: string, locale: Locale, variant = ""): Promise<Content | null> {
-    this.#guard();
-
-    const byLocale = this.#localesFor(templateKey, variant);
-    // A missing template — or a missing variant of it — is an expected
-    // outcome, not a failure. No fallback between variants.
-    if (!byLocale) return null;
-
-    const requested = byLocale[locale];
-    if (requested) {
-      return this.#toContent(templateKey, variant, locale, requested, true);
-    }
-
-    const fallback = byLocale[this.#seed.defaultLocale];
-    if (!fallback) return null;
-
-    // Served, but flagged: the caller must be able to tell it did not get the
-    // locale it asked for.
-    return this.#toContent(templateKey, variant, this.#seed.defaultLocale, fallback, false);
-  }
-
-  /** The `locale -> fields` map for one (templateKey, variant), or undefined. */
-  #localesFor(
-    templateKey: string,
-    variant: string,
-  ): Record<Locale, Record<string, JsonValue>> | undefined {
-    return variant === ""
-      ? this.#seed.content[templateKey]
-      : this.#seed.variants?.[templateKey]?.[variant];
-  }
-
-  async listContent(query: ListContentQuery): Promise<Page<Content>> {
-    this.#guard();
-
-    // Omitting `variant` lists the default (`""`) rows, from `content`; a
-    // named variant lists the keys that have that variant, from `variants`.
-    const variant = query.variant ?? "";
-    const source =
-      variant === ""
-        ? Object.keys(this.#seed.content)
-        : Object.keys(this.#seed.variants ?? {}).filter(
-            (key) => this.#seed.variants?.[key]?.[variant],
-          );
-
-    const keys = source
-      .filter((key) => !query.templateKeys || query.templateKeys.includes(key))
-      // Sorted so cursors stay stable across calls — an unstable order is how
-      // cursor pagination silently skips or repeats rows.
-      .sort();
-
-    const start = this.#decodeCursor(query.cursor ?? null, keys);
-    // Clamp rather than reject: backends differ in their maxima, and the same
-    // query must not succeed on one adapter and fail on another.
-    const limit = Math.min(Math.max(query.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
-
-    const items: Content[] = [];
-    let index = start;
-
-    while (index < keys.length && items.length < limit) {
-      const key = keys[index] as string;
-      const content = await this.getContent(key, query.locale, variant);
-      if (content) items.push(content);
-      index += 1;
-    }
-
-    return {
-      items,
-      nextCursor: index < keys.length ? this.#encodeCursor(index) : null,
-    };
-  }
-
   async getRouteManifest(locale: Locale): Promise<readonly RouteBundle[]> {
     this.#guard();
     void locale;
     // Only published routes — a seed route with no `published` flag is a
-    // fixture and counts as live; `saveComposition` can now create drafts.
+    // fixture and counts as live; `saveComposition` can create drafts.
     return (this.#seed.routes ?? [])
       .filter((route) => route.published !== false)
       .map((route) => ({
@@ -215,9 +129,8 @@ export class MemoryContentAdapter
   }
 
   // RouteCompositionWriter — the write counterpart to `getRouteManifest`, on
-  // this same class for the same reason `ContentWriter` is: both sides share
-  // the one mutable `#seed`, so a save is visible to the next read in local
-  // dev with no backend.
+  // this same class because both sides share the one mutable `#seed`, so a
+  // save is visible to the next read in local dev with no backend.
 
   async saveComposition(
     bundleId: string | null,
@@ -301,44 +214,8 @@ export class MemoryContentAdapter
     routes.splice(index, 1);
   }
 
-  // ContentWriter — see that interface's own doc for why this is not part of
-  // ContentAdapter. Implemented on the same class rather than a separate
-  // `MemoryContentWriter` purely because there is nothing to separate here:
-  // both already share this one mutable `#seed`, unlike the Supabase pair,
-  // where reads run anon and writes run as a permission-checked session —
-  // two genuinely different concerns split into two classes.
-
-  async saveContentItem(
-    templateKey: string,
-    locale: Locale,
-    fields: Readonly<Record<string, JsonValue>>,
-    variant = "",
-  ): Promise<Content> {
-    this.#guard();
-
-    if (variant === "") {
-      this.#seed.content[templateKey] ??= {};
-      this.#seed.content[templateKey][locale] = { ...fields };
-    } else {
-      this.#seed.variants ??= {};
-      this.#seed.variants[templateKey] ??= {};
-      this.#seed.variants[templateKey][variant] ??= {};
-      this.#seed.variants[templateKey][variant][locale] = { ...fields };
-    }
-
-    return this.#toContent(templateKey, variant, locale, fields, true);
-  }
-
-  async deleteContentItem(templateKey: string, locale: Locale, variant = ""): Promise<void> {
-    this.#guard();
-    // Idempotent by contract: deleting what is already absent is a no-op,
-    // not an error — `delete` on a missing key is simply a no-op already.
-    if (variant === "") {
-      delete this.#seed.content[templateKey]?.[locale];
-    } else {
-      delete this.#seed.variants?.[templateKey]?.[variant]?.[locale];
-    }
-  }
+  // ContentWriter — UI-chrome messages only. On the same class as the reader
+  // for the same reason as route composition: one mutable `#seed`.
 
   async saveMessage(locale: Locale, key: string, value: string): Promise<void> {
     this.#guard();
@@ -355,41 +232,5 @@ export class MemoryContentAdapter
 
   #guard(): void {
     if (this.#failWith) throw this.#failWith;
-  }
-
-  #toContent(
-    templateKey: string,
-    variant: string,
-    locale: Locale,
-    fields: Record<string, JsonValue>,
-    translated: boolean,
-  ): Content {
-    return {
-      templateKey,
-      variant,
-      locale,
-      translated,
-      fields,
-      updatedAt: this.#seed.updatedAt,
-    };
-  }
-
-  #encodeCursor(index: number): string {
-    return `idx:${index}`;
-  }
-
-  #decodeCursor(cursor: string | null, keys: readonly string[]): number {
-    if (cursor === null) return 0;
-
-    const match = /^idx:(\d+)$/.exec(cursor);
-    if (!match) {
-      throw new ContentAdapterError("invalid_request", "Malformed pagination cursor.");
-    }
-
-    const index = Number(match[1]);
-    if (index > keys.length) {
-      throw new ContentAdapterError("invalid_request", "Pagination cursor is out of range.");
-    }
-    return index;
   }
 }

@@ -106,11 +106,8 @@ export const signOut = createServerFn({ method: "POST" }).handler(async (): Prom
 
 // --- Content -----------------------------------------------------------
 
-// Section content is no longer a thing the CMS reads or writes on its own:
-// it lives on each route section instance (see `saveRouteComposition` below),
-// so there is no `saveContentItem` / `getSectionContent` here any more. The
-// `content_items` table and `ContentWriter`'s item methods are dead code the
-// B6 cleanup removes.
+// Section content lives on each route section instance (see
+// `saveRouteComposition` below); `ContentWriter` is UI-chrome messages only.
 
 /**
  * The configured content locales — what the header language switcher, the

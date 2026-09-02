@@ -9,20 +9,14 @@ import { SupabaseContentAdapter } from "./SupabaseContentAdapter.js";
 
 /**
  * Runs the shared `ContentAdapter` contract against a real local Supabase —
- * see `auth-supabase/src/contract.test.ts` for the sibling suite and the
- * same reasoning on why this needs a live backend rather than an in-process
- * fake: a contract this adapter merely compiled against, never actually
- * queried through PostgREST, would not have caught the RLS gap Phase 4 found
- * (`published_route_manifest` silently returning nothing to a real visitor).
+ * see `auth-supabase/src/contract.test.ts` for the sibling suite and the same
+ * reasoning on why this needs a live backend rather than an in-process fake:
+ * a contract this adapter merely compiled against, never actually queried
+ * through PostgREST, would not have caught the RLS gap Phase 4 found (a
+ * published view silently returning nothing to a real visitor).
  *
- * `test:contracts` runs this file and `writer.live.test.ts` with
- * `--no-file-parallelism` on purpose. They share one local database, and
- * `writer.live.test.ts` inserts default-locale `content_items` rows that only
- * its own `afterAll` removes; run in parallel, those rows are visible to this
- * file's unqualified `listContent({ locale: 'en' })` counts (the
- * `listContent pagination` cases assert an exact `totalEnItems`), so it fails
- * intermittently with an off-by-one. Serial execution keeps each file's
- * fixture lifecycle fully nested.
+ * Seeds one published route (tree + per-locale content + SEO) and some
+ * `content_messages`, then tears them down.
  */
 const url = process.env.SUPABASE_URL;
 const anonKey = process.env.SUPABASE_ANON_KEY;
@@ -34,24 +28,15 @@ const hasLocalSupabase = Boolean(url && anonKey && serviceRoleKey);
 // tests themselves don't execute — so `describe.skip` alone does not protect
 // work done at describe-body scope, like constructing a Supabase client.
 // See `auth-supabase/src/contract.test.ts` for the incident that made this
-// the pattern: a client built directly in the body ran unconditionally and
-// threw synchronously the moment nobody had `SUPABASE_URL` set, breaking
-// `pnpm test:contracts` for exactly the case this guard exists to handle
-// gracefully.
+// the pattern.
 if (hasLocalSupabase) {
   describe("SupabaseContentAdapter (live)", () => {
     const f = CONTRACT_FIXTURE;
-    // A third template key, beyond the two the fixture names, so
-    // `totalEnItems` (3) has something to count besides `translatedKey` and
-    // `untranslatedKey`. Prefixed so it can never collide with a real
-    // template key an app defines.
-    const thirdKey = "contract-test-help";
     const routeBundleName = "contract-test-route";
-    // Same reasoning, for `content_messages`: a real app's message keys look
-    // like `bootstrap.loading` (see supabase/seed/dev-content.sql), so this
-    // one deliberately doesn't — chosen the hard way once, when it collided
-    // with exactly that seed's row and failed with a bare "duplicate key"
-    // error that named neither file.
+    const sectionKey = "contract-test-help";
+    // A real app's message keys look like `bootstrap.loading` (see
+    // supabase/seed/dev-content.sql); this one deliberately doesn't, so it
+    // can't collide with that seed's rows.
     const messageKey = "contract-test.message";
 
     let admin: SupabaseClient;
@@ -59,42 +44,6 @@ if (hasLocalSupabase) {
 
     beforeAll(async () => {
       admin = createClient(url!, serviceRoleKey!);
-
-      // Every row states `variant` explicitly: PostgREST's bulk insert uses
-      // the union of keys across the array as the column list, so once one
-      // row names `variant` the rest get NULL (not the column default) and
-      // trip the NOT NULL constraint.
-      const { error: contentError } = await admin.from("content_items").insert([
-        {
-          template_key: f.translatedKey,
-          variant: "",
-          locale: f.defaultLocale,
-          fields: { title: "Guidance" },
-        },
-        {
-          template_key: f.translatedKey,
-          variant: "",
-          locale: f.otherLocale,
-          fields: { title: "मार्गदर्शन" },
-        },
-        {
-          template_key: f.untranslatedKey,
-          variant: "",
-          locale: f.defaultLocale,
-          fields: { title: "Legal" },
-        },
-        { template_key: thirdKey, variant: "", locale: f.defaultLocale, fields: { title: "Help" } },
-        // A named variant of `variantKey` (== `translatedKey`), default
-        // locale only — exercises variant selection + locale fallback within
-        // a variant.
-        {
-          template_key: f.variantKey,
-          variant: f.variantName,
-          locale: f.defaultLocale,
-          fields: { title: "Guidance (short)" },
-        },
-      ]);
-      if (contentError) throw contentError;
 
       const { error: messageError } = await admin.from("content_messages").insert([
         { locale: f.defaultLocale, key: messageKey, value: "Loading…" },
@@ -107,10 +56,8 @@ if (hasLocalSupabase) {
         .insert({
           vocabulary: "template_key",
           name: routeBundleName,
-          // `config_bundles.updated_by` carries no foreign key (see the
-          // audit trail's own note in ..._config_bundles.sql on why history
-          // must outlive what it describes) — any uuid is a valid value
-          // here.
+          // `config_bundles.updated_by` carries no foreign key — any uuid is a
+          // valid value here.
           updated_by: randomUUID(),
         })
         .select()
@@ -123,9 +70,9 @@ if (hasLocalSupabase) {
         .insert({ bundle_id: routeBundleId, path: "/contract-test", published: true });
       if (routeBundleError) throw routeBundleError;
 
-      // `getRouteManifest` reads `published_route_sections` — seed one root
-      // section instance for the published bundle, with per-locale content so
-      // the view's `content` aggregation is exercised, not just the `{}` path.
+      // `getRouteManifest` reads `published_route_sections` — one root section
+      // instance, with per-locale content so the view's `content` aggregation
+      // is exercised, not just the `{}` path.
       const { data: instance, error: routeSectionError } = await admin
         .from("route_section_instances")
         .insert({
@@ -133,7 +80,7 @@ if (hasLocalSupabase) {
           parent_instance_id: null,
           parent_slot: null,
           ordinal: 0,
-          section_key: thirdKey,
+          section_key: sectionKey,
           section_variant: "",
         })
         .select()
@@ -168,28 +115,18 @@ if (hasLocalSupabase) {
     });
 
     afterAll(async () => {
-      // cascades route_bundles + route_section_instances
+      // cascades route_bundles + route_section_instances + route_section_content + route_seo
       await admin.from("config_bundles").delete().eq("id", routeBundleId);
-      await admin
-        .from("content_items")
-        .delete()
-        .in("template_key", [f.translatedKey, f.untranslatedKey, thirdKey]);
       await admin.from("content_messages").delete().eq("key", messageKey);
     });
 
     runContentAdapterContract({
       name: "SupabaseContentAdapter",
-      createAdapter: () =>
-        new SupabaseContentAdapter({
-          url: url!,
-          anonKey: anonKey!,
-          defaultLocale: f.defaultLocale,
-        }),
+      createAdapter: () => new SupabaseContentAdapter({ url: url!, anonKey: anonKey! }),
       createUnavailableAdapter: () =>
         new SupabaseContentAdapter({
           url: url!,
           anonKey: anonKey!,
-          defaultLocale: f.defaultLocale,
           failWith: new ContentAdapterError("unavailable", "Content backend unreachable."),
         }),
     });

@@ -24,8 +24,8 @@
     "dev": "tsup --watch",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude '**/contract.test.ts' --exclude '**/writer.live.test.ts'",
-    "test:contracts": "vitest run --no-file-parallelism src/contract.test.ts src/writer.live.test.ts",
+    "test": "vitest run --exclude '**/contract.test.ts'",
+    "test:contracts": "vitest run src/contract.test.ts",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {

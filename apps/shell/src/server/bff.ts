@@ -1,6 +1,5 @@
 import {
   isContentAdapterError,
-  type Content,
   type RouteSectionNode,
   type RouteSeo,
 } from "@feel-your-website/content-core";
@@ -171,29 +170,3 @@ export const loadRoutePage = createServerFn({ method: "GET" })
 
     return { path: bundle.path, locale, tree: bundle.tree, seo: bundle.seo[locale] ?? {} };
   });
-
-/** Resolves one template's content, honouring locale fallback. */
-export const loadContent = createServerFn({ method: "GET" })
-  .validator((input: unknown): { templateKey: string; locale: string } => {
-    if (
-      typeof input !== "object" ||
-      input === null ||
-      typeof (input as { templateKey?: unknown }).templateKey !== "string"
-    ) {
-      throw new Error("templateKey must be a non-empty string");
-    }
-    const { templateKey, locale } = input as {
-      templateKey: string;
-      locale?: unknown;
-    };
-    return {
-      templateKey,
-      locale: typeof locale === "string" ? locale : "",
-    };
-  })
-  .handler(async ({ data }): Promise<Content | null> =>
-    // An explicit locale is honoured (the CMS previews other languages that
-    // way); otherwise the request's own locale applies, so a caller cannot
-    // accidentally fetch English for a Hindi user by omitting it.
-    getContentAdapter().getContent(data.templateKey, data.locale || resolveLocale()),
-  );

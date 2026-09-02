@@ -13,12 +13,12 @@ import { MemoryContentAdapter } from "./MemoryContentAdapter.js";
  */
 runRouteCompositionWriterContract({
   name: "MemoryContentAdapter",
-  createWriter: () => new MemoryContentAdapter({ content: {}, routes: [] }),
+  createWriter: () => new MemoryContentAdapter({ routes: [] }),
 });
 
 describe("MemoryContentAdapter route composition read/write", () => {
   it("reads back a saved draft through getComposition, and keeps it out of the manifest", async () => {
-    const adapter = new MemoryContentAdapter({ content: {}, routes: [] });
+    const adapter = new MemoryContentAdapter({ routes: [] });
 
     const saved = await adapter.saveComposition(
       null,
@@ -66,7 +66,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
   });
 
   it("returns null for an unknown bundle id", async () => {
-    const adapter = new MemoryContentAdapter({ content: {}, routes: [] });
+    const adapter = new MemoryContentAdapter({ routes: [] });
     expect(await adapter.getComposition(crypto.randomUUID())).toBeNull();
   });
 });

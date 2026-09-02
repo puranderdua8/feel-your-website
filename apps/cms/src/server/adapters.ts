@@ -101,7 +101,6 @@ export function getContentAdapter(): ContentAdapter {
     contentAdapter = new SupabaseContentAdapter({
       url: requireEnv("SUPABASE_URL"),
       anonKey: requireEnv("SUPABASE_ANON_KEY"),
-      defaultLocale: "en",
     });
   } else {
     // Shared with getContentWriter() below: MemoryContentAdapter implements
