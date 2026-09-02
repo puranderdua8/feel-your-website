@@ -1,4 +1,3 @@
-import type { SectionRef } from "@feel-your-website/content-core";
 import { renderComposition } from "@feel-your-website/section-registry";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
@@ -26,19 +25,12 @@ export const Route = createFileRoute("/$")({
   component: RoutePage,
 });
 
-function refKey(ref: SectionRef): string {
-  return JSON.stringify([ref.key, ref.variant]);
-}
-
 function RoutePage() {
   const page = Route.useLoaderData();
 
-  const byRef = new Map(page.content.map((entry) => [refKey(entry.ref), entry.content]));
-  const resolveContent = (ref: SectionRef) => byRef.get(refKey(ref)) ?? null;
-
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
-      {renderComposition(page.tree, resolveContent)}
+      {renderComposition(page.tree, page.locale)}
     </main>
   );
 }

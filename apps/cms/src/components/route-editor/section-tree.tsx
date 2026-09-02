@@ -1,5 +1,5 @@
 import type { RouteSectionNode, SectionSlotSpec } from "@feel-your-website/content-core";
-import { Button, Input } from "@feel-your-website/ui";
+import { Button } from "@feel-your-website/ui";
 import { useState } from "react";
 
 import { sectionCatalog } from "@/content/sections";
@@ -39,8 +39,8 @@ export function SectionTree({
           onMoveDown={
             index < tree.length - 1 ? () => onChange(moveRoot(tree, node.instanceId, 1)) : undefined
           }
-          onAddSlotChild={(parentId, slot, key, variant) =>
-            onChange(addSlotChild(tree, parentId, slot, newNode(key, variant)))
+          onAddSlotChild={(parentId, slot, key) =>
+            onChange(addSlotChild(tree, parentId, slot, newNode(key)))
           }
           onRemoveDescendant={(id) => onChange(removeNode(tree, id))}
         />
@@ -49,7 +49,7 @@ export function SectionTree({
       <AddSection
         accepts={[]}
         label="Add root section"
-        onAdd={(key, variant) => onChange([...tree, newNode(key, variant)])}
+        onAdd={(key) => onChange([...tree, newNode(key)])}
       />
     </div>
   );
@@ -73,7 +73,7 @@ function SectionNode({
   onRemove: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
-  onAddSlotChild: (parentId: string, slot: string, key: string, variant: string) => void;
+  onAddSlotChild: (parentId: string, slot: string, key: string) => void;
   onRemoveDescendant: (id: string) => void;
 }) {
   const def = sectionCatalog.byKey.get(node.ref.key);
@@ -106,7 +106,6 @@ function SectionNode({
           }`}
         >
           <span className="font-medium">{node.ref.key}</span>
-          {node.ref.variant && <span className="text-muted-foreground"> · {node.ref.variant}</span>}
         </button>
         {onMoveUp && (
           <Button type="button" size="sm" variant="ghost" onClick={onMoveUp} aria-label="Move up">
@@ -166,7 +165,7 @@ function Slot({
   depth: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onAddSlotChild: (parentId: string, slot: string, key: string, variant: string) => void;
+  onAddSlotChild: (parentId: string, slot: string, key: string) => void;
   onRemoveDescendant: (id: string) => void;
 }) {
   const full = slot.arity === "single" && nodes.length >= 1;
@@ -198,7 +197,7 @@ function Slot({
           <AddSection
             accepts={slot.accepts}
             label={`Fill ${slot.name}`}
-            onAdd={(key, variant) => onAddSlotChild(parentId, slot.name, key, variant)}
+            onAdd={(key) => onAddSlotChild(parentId, slot.name, key)}
           />
         )}
       </div>
@@ -213,14 +212,13 @@ function AddSection({
 }: {
   accepts: readonly string[];
   label: string;
-  onAdd: (key: string, variant: string) => void;
+  onAdd: (key: string) => void;
 }) {
   const options =
     accepts.length > 0
       ? sectionCatalog.definitions.filter((d) => accepts.includes(d.key))
       : sectionCatalog.definitions;
   const [key, setKey] = useState(options[0]?.key ?? "");
-  const [variant, setVariant] = useState("");
 
   return (
     <div className="flex items-end gap-2">
@@ -238,21 +236,7 @@ function AddSection({
           ))}
         </select>
       </label>
-      <Input
-        className="h-8 w-28"
-        placeholder="variant"
-        value={variant}
-        onChange={(event) => setVariant(event.target.value)}
-      />
-      <Button
-        type="button"
-        size="sm"
-        disabled={!key}
-        onClick={() => {
-          onAdd(key, variant.trim());
-          setVariant("");
-        }}
-      >
+      <Button type="button" size="sm" disabled={!key} onClick={() => onAdd(key)}>
         Add
       </Button>
     </div>

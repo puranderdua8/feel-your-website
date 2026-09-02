@@ -1,11 +1,8 @@
 import type {
-  Content,
   JsonValue,
   RouteCompositionSummary,
   RouteSectionNode,
-  SectionRef,
 } from "@feel-your-website/content-core";
-import { flattenTree } from "@feel-your-website/content-core";
 import { Can } from "@feel-your-website/rbac/react";
 import {
   Button,
@@ -17,12 +14,11 @@ import {
   Label,
   Switch,
 } from "@feel-your-website/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useContentLocale } from "@/i18n/content-locale";
 import {
   deleteRouteComposition,
-  getSectionContent,
   listRouteCompositions,
   loadRouteComposition,
   saveRouteComposition,
@@ -34,12 +30,17 @@ import { RoutePreview } from "./route-preview.js";
 import { PublishBar } from "./publish-bar.js";
 import { SectionFieldForm } from "./section-field-form.js";
 import { SectionTree } from "./section-tree.js";
-import { findNode, refKey } from "./tree-ops.js";
+import { findNode, setNodeContent } from "./tree-ops.js";
 
 /**
  * The Routes surface: a list on the left, and on the right a route's section
- * tree, a schema form for the selected section, a live in-process preview,
- * and a publish bar gated on per-locale completeness.
+ * tree, a schema form for the selected section's content at the active
+ * locale, a live in-process preview, and a publish bar gated on per-locale
+ * completeness.
+ *
+ * The route owns everything now — the section tree *and* every instance's
+ * per-locale content — so there is one save (`saveRouteComposition`) and the
+ * preview renders straight off the draft tree.
  */
 export function RouteEditor({ actor }: { actor: string }) {
   return (
@@ -72,10 +73,6 @@ function RouteEditorInner({ actor }: { actor: string }) {
   const [routes, setRoutes] = useState<readonly RouteCompositionSummary[]>([]);
   const [open, setOpen] = useState<OpenRoute | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [contentByRef, setContentByRef] = useState<Record<string, Content | null>>({});
-  const [draftByRef, setDraftByRef] = useState<Record<string, Readonly<Record<string, JsonValue>>>>(
-    {},
-  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,8 +87,6 @@ function RouteEditorInner({ actor }: { actor: string }) {
   const openRoute = useCallback(async (bundleId: string) => {
     setError(null);
     setSelectedNodeId(null);
-    setContentByRef({});
-    setDraftByRef({});
     const composition = await loadRouteComposition({ data: { bundleId } });
     if (!composition) {
       setError("That route could not be loaded.");
@@ -110,56 +105,8 @@ function RouteEditorInner({ actor }: { actor: string }) {
   function startNew() {
     setError(null);
     setSelectedNodeId(null);
-    setContentByRef({});
-    setDraftByRef({});
     setOpen({ ...BLANK });
   }
-
-  // Fetch content for every ref the tree references, for the preview.
-  useEffect(() => {
-    if (!open) return;
-    const refs = flattenTree(open.tree);
-    let cancelled = false;
-    void (async () => {
-      for (const ref of refs) {
-        const key = refKey(ref);
-        if (key in contentByRef) continue;
-        const content = await getSectionContent({
-          data: { key: ref.key, variant: ref.variant, locale: contentLocale },
-        });
-        if (cancelled) return;
-        setContentByRef((current) => ({ ...current, [key]: content }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // Re-fetch from scratch when the locale changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open?.tree, contentLocale]);
-
-  useEffect(() => {
-    setContentByRef({});
-    setDraftByRef({});
-  }, [contentLocale]);
-
-  const resolveContent = useMemo(() => {
-    return (ref: SectionRef): Content | null => {
-      const key = refKey(ref);
-      const draft = draftByRef[key];
-      if (draft) {
-        return {
-          templateKey: ref.key,
-          variant: ref.variant,
-          locale: contentLocale,
-          translated: true,
-          fields: draft,
-          updatedAt: "",
-        };
-      }
-      return contentByRef[key] ?? null;
-    };
-  }, [contentByRef, draftByRef, contentLocale]);
 
   async function save(published: boolean) {
     if (!open) return;
@@ -196,6 +143,14 @@ function RouteEditorInner({ actor }: { actor: string }) {
   }
 
   const selectedNode = open && selectedNodeId ? findNode(open.tree, selectedNodeId) : null;
+
+  function editSelectedContent(fields: Record<string, JsonValue>) {
+    if (!open || !selectedNode) return;
+    setOpen({
+      ...open,
+      tree: setNodeContent(open.tree, selectedNode.instanceId, contentLocale, fields),
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -288,25 +243,11 @@ function RouteEditorInner({ actor }: { actor: string }) {
               <CardContent>
                 {selectedNode ? (
                   <SectionFieldForm
-                    key={`${selectedNode.ref.key}:${selectedNode.ref.variant}:${contentLocale}`}
+                    key={`${selectedNode.instanceId}:${contentLocale}`}
                     sectionKey={selectedNode.ref.key}
-                    variant={selectedNode.ref.variant}
                     locale={contentLocale}
-                    onEdit={(fields) =>
-                      setDraftByRef((current) => ({
-                        ...current,
-                        [refKey(selectedNode.ref)]: fields,
-                      }))
-                    }
-                    onSaved={(content) => {
-                      const key = refKey(selectedNode.ref);
-                      setContentByRef((current) => ({ ...current, [key]: content }));
-                      setDraftByRef((current) => {
-                        const next = { ...current };
-                        delete next[key];
-                        return next;
-                      });
-                    }}
+                    fields={selectedNode.content[contentLocale] ?? {}}
+                    onChange={editSelectedContent}
                   />
                 ) : (
                   <p className="text-muted-foreground text-sm">
@@ -317,7 +258,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
             </Card>
           </div>
 
-          <RoutePreview tree={open.tree} resolveContent={resolveContent} />
+          <RoutePreview tree={open.tree} locale={contentLocale} />
 
           <PublishBar
             tree={open.tree}

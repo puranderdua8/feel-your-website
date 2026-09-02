@@ -68,14 +68,9 @@ export function PublishBar({
           <ul className="text-muted-foreground flex flex-col gap-0.5 text-xs">
             {readiness.gaps.map((gap, index) => (
               <li key={index}>
-                <code>{gap.locale}</code> · <code>{gap.sectionKey}</code>
-                {gap.variant && (
-                  <>
-                    {" "}
-                    (<code>{gap.variant}</code>)
-                  </>
-                )}{" "}
-                — {gap.missing.includes("*") ? "no content" : `missing: ${gap.missing.join(", ")}`}
+                <code>{gap.locale}</code> · <code>{gap.sectionKey}</code>{" "}
+                <span className="opacity-60">({gap.instanceId.slice(0, 8)})</span> —{" "}
+                {gap.missing.includes("*") ? "no content" : `missing: ${gap.missing.join(", ")}`}
               </li>
             ))}
           </ul>

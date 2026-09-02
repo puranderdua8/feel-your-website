@@ -1,12 +1,9 @@
 import {
-  collectEffectiveRefs,
   isContentAdapterError,
   type Content,
   type RouteSectionNode,
-  type SectionRef,
 } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
-import { sectionCatalog } from "@feel-your-website/section-registry";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import { createServerFn } from "@tanstack/react-start";
 
@@ -129,26 +126,24 @@ export const setLocale = createServerFn({ method: "POST" })
     return { locale: data.locale };
   });
 
-/** One resolved `(key, variant)` → content pair, wire-safe (no Map). */
-export interface RoutePageContent {
-  ref: SectionRef;
-  content: Content | null;
-}
-
 export interface RoutePage {
   path: string;
-  /** The section-instance tree to render. */
+  /** The negotiated locale — which of each node's content bags to render. */
+  locale: string;
+  /**
+   * The section-instance tree to render. Every node carries its own content
+   * for every locale, so there is nothing else to fetch — see
+   * `@feel-your-website/section-registry`'s `renderComposition`.
+   */
   tree: readonly RouteSectionNode[];
-  /** Content for every ref the tree depends on, including materialised slot defaults. */
-  content: readonly RoutePageContent[];
 }
 
 /**
- * Resolves a request path against the published route manifest, then
- * batch-fetches content for every section ref the route's tree depends on —
- * the piece that turns a CMS author publishing a route into an actual page.
- * `@feel-your-website/section-registry`'s `renderComposition` renders the
- * result; `src/routes/$.tsx` is the route that calls this.
+ * Resolves a request path against the published route manifest — the piece
+ * that turns a CMS author publishing a route into an actual page. The
+ * manifest's tree already carries per-instance, per-locale content, so this
+ * is one lookup with no content fan-out. `src/routes/$.tsx` calls it and
+ * `renderComposition` renders the result.
  *
  * Returns `null` for a path with no published bundle, rather than throwing —
  * "this route doesn't exist" is exactly what `notFound()` is for at the
@@ -165,24 +160,13 @@ export const loadRoutePage = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<RoutePage | null> => {
     const locale = resolveLocale();
 
-    // `getRouteManifest` ignores its own locale argument (route structure is
-    // shared across locales — see that method's own doc); only the content
-    // fetched below varies by locale.
+    // `getRouteManifest` ignores its own locale argument — route structure is
+    // shared across locales and every node ships content for all of them.
     const manifest = await getContentAdapter().getRouteManifest(locale);
     const bundle = manifest.find((candidate) => candidate.path === data.path);
     if (!bundle) return null;
 
-    // Every ref the tree needs, including the declared default of a required
-    // slot the author left empty — one parallel fetch, same as before.
-    const refs = collectEffectiveRefs(sectionCatalog, bundle.tree);
-    const content = await Promise.all(
-      refs.map(async (ref): Promise<RoutePageContent> => ({
-        ref,
-        content: await getContentAdapter().getContent(ref.key, locale, ref.variant),
-      })),
-    );
-
-    return { path: bundle.path, tree: bundle.tree, content };
+    return { path: bundle.path, locale, tree: bundle.tree };
   });
 
 /** Resolves one template's content, honouring locale fallback. */
