@@ -3,6 +3,7 @@ import {
   type FlatSectionRow,
   type RouteComposition,
   type RouteCompositionReader,
+  type RouteCompositionSummary,
 } from "@feel-your-website/content-core";
 import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -59,6 +60,30 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
           await options.cookies.setAll(cookies, headers);
         },
       },
+    });
+  }
+
+  async listCompositions(): Promise<readonly RouteCompositionSummary[]> {
+    const { data, error } = await this.#client
+      .from("config_bundles")
+      .select("id, name, version, updated_at, route_bundles!inner(path, published)")
+      .eq("vocabulary", "template_key")
+      .order("name");
+    if (error) throw mapRouteCompositionError(error);
+
+    return ((data ?? []) as HeaderRow[]).flatMap((row) => {
+      const meta = Array.isArray(row.route_bundles) ? row.route_bundles[0] : row.route_bundles;
+      if (!meta) return [];
+      return [
+        {
+          id: row.id,
+          name: row.name,
+          path: meta.path,
+          published: meta.published,
+          version: row.version,
+          updatedAt: row.updated_at,
+        },
+      ];
     });
   }
 

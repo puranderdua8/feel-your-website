@@ -14,6 +14,7 @@ import {
   type RouteComposition,
   type RouteCompositionInput,
   type RouteCompositionReader,
+  type RouteCompositionSummary,
   type RouteCompositionWriter,
 } from "@feel-your-website/content-core";
 import { randomUUID } from "node:crypto";
@@ -179,6 +180,18 @@ export class MemoryContentAdapter
         version: route.version,
         updatedAt: route.updatedAt,
       }));
+  }
+
+  async listCompositions(): Promise<readonly RouteCompositionSummary[]> {
+    this.#guard();
+    return (this.#seed.routes ?? []).map((route) => ({
+      id: route.id,
+      name: route.name ?? route.path,
+      path: route.path,
+      published: route.published ?? true,
+      version: route.version,
+      updatedAt: route.updatedAt,
+    }));
   }
 
   async getComposition(bundleId: string): Promise<RouteComposition | null> {
