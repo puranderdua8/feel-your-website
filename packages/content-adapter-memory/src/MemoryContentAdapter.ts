@@ -320,7 +320,7 @@ export class MemoryContentAdapter
     }
 
     const doomed = new Set<string>([bundleId]);
-    for (let grew = true; grew; ) {
+    for (let grew = true; grew;) {
       grew = false;
       for (const route of routes) {
         const parent = route.parentId ?? null;

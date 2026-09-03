@@ -18,7 +18,7 @@ nested routes).
   `templatePlaceholders`; `paramMetaToRecord`; `findPatternCollisions`. New
   errors `RoutePatternError` / `RoutePatternCollisionError`.
 - **`RouteBundle`** gains `pathSegment`, `parentId`, `paramNames`, `paramMeta`
-  (new `RouteParamMeta`). `path` is now documented as an absolute *pattern*.
+  (new `RouteParamMeta`). `path` is now documented as an absolute _pattern_.
 - **`ContentAdapter`** gains `getRouteHeaders()` (new `RouteHeader`) — a
   section-tree-free list for building site nav / breadcrumbs.
 - **`RouteCompositionWriter`** gains `deleteSubtree()`. `RouteCompositionInput`

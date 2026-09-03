@@ -346,7 +346,9 @@ describe("findPatternCollisions", () => {
   });
 
   it("skips a malformed existing pattern", () => {
-    expect(findPatternCollisions(["/blog//x", "/blog/:slug"], "/blog/:id")).toEqual(["/blog/:slug"]);
+    expect(findPatternCollisions(["/blog//x", "/blog/:slug"], "/blog/:id")).toEqual([
+      "/blog/:slug",
+    ]);
   });
 });
 

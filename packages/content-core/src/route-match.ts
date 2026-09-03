@@ -82,7 +82,10 @@ export interface RoutePattern {
  */
 export function parseRoutePattern(raw: string): RoutePattern {
   if (typeof raw !== "string" || !raw.startsWith("/")) {
-    throw new RoutePatternError("a pattern must be an absolute path starting with '/'", String(raw));
+    throw new RoutePatternError(
+      "a pattern must be an absolute path starting with '/'",
+      String(raw),
+    );
   }
   if (raw === "/") return Object.freeze({ raw, segments: [], paramNames: [] });
   if (raw.endsWith("/")) {
@@ -520,10 +523,7 @@ export function interpolateTemplate(
 }
 
 /** {@link interpolateTemplate} applied to every templatable field of a `RouteSeo`. */
-export function interpolateSeo(
-  seo: RouteSeo,
-  params: Readonly<Record<string, string>>,
-): RouteSeo {
+export function interpolateSeo(seo: RouteSeo, params: Readonly<Record<string, string>>): RouteSeo {
   const fill = (value: string | undefined): string | undefined =>
     value === undefined ? undefined : interpolateTemplate(value, params).value;
 
