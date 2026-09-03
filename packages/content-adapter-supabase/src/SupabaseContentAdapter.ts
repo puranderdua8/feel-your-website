@@ -1,11 +1,13 @@
 import {
   assembleSectionTree,
+  parseRoutePattern,
   type ContentAdapter,
   type ContentAdapterError,
   type FlatSectionRow,
   type JsonValue,
   type Locale,
   type RouteBundle,
+  type RouteHeader,
   type RouteSeo,
 } from "@feel-your-website/content-core";
 import { randomUUID } from "node:crypto";
@@ -119,11 +121,38 @@ export class SupabaseContentAdapter implements ContentAdapter {
     return [...byBundle.entries()].map(([id, entry]) => ({
       id,
       path: entry.path,
+      // Hierarchy + parameter metadata land with migration 20260911000100; until
+      // then every route reads as a flat, top-level one and its `paramNames` are
+      // derived from the path pattern.
+      pathSegment: entry.path,
+      parentId: null,
+      paramNames: safeParamNames(entry.path),
+      paramMeta: {},
       tree: assembleSectionTree(entry.rows),
       seo: seoByBundle.get(id) ?? {},
       version: entry.version,
       updatedAt: entry.updatedAt,
     }));
+  }
+
+  async getRouteHeaders(): Promise<readonly RouteHeader[]> {
+    // Derived from the manifest for now; migration 20260911000100 adds a slim
+    // `published_route_headers` view so this stops pulling section rows.
+    const manifest = await this.getRouteManifest("");
+    return manifest.map((bundle) => {
+      const title: Record<string, string | undefined> = {};
+      for (const [routeLocale, seo] of Object.entries(bundle.seo)) {
+        title[routeLocale] = seo.title;
+      }
+      return {
+        id: bundle.id,
+        pathSegment: bundle.pathSegment,
+        path: bundle.path,
+        parentId: bundle.parentId,
+        hasParams: bundle.paramNames.length > 0,
+        title,
+      };
+    });
   }
 
   async getMessages(locale: Locale): Promise<Readonly<Record<string, string>>> {
@@ -142,5 +171,14 @@ export class SupabaseContentAdapter implements ContentAdapter {
 
   #guard(): void {
     if (this.#failWith) throw this.#failWith;
+  }
+}
+
+/** Path pattern -> param names, tolerating a legacy literal path. */
+function safeParamNames(path: string): readonly string[] {
+  try {
+    return parseRoutePattern(path).paramNames;
+  } catch {
+    return [];
   }
 }

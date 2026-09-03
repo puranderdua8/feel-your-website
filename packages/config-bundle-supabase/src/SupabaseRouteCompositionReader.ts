@@ -83,6 +83,10 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
           id: row.id,
           name: row.name,
           path: meta.path,
+          // Hierarchy columns land with migration 20260911000100; until then a
+          // route is flat and top-level.
+          pathSegment: meta.path,
+          parentId: null,
           published: meta.published,
           version: row.version,
           updatedAt: row.updated_at,
@@ -142,6 +146,10 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       id: header.id,
       name: header.name,
       path: routeMeta.path,
+      // Hierarchy + parameter columns land with migration 20260911000100.
+      pathSegment: routeMeta.path,
+      parentId: null,
+      params: [],
       published: routeMeta.published,
       version: header.version,
       updatedAt: header.updated_at,

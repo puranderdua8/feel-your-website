@@ -60,6 +60,13 @@ export type RouteCompositionErrorCode =
   | "conflict"
   /** The caller lacks `manage:routes`. */
   | "forbidden"
+  /**
+   * The write is structurally rejected: a parent cycle, a child published under
+   * a draft parent (or a parent unpublished while a child is live), a delete of
+   * a route that still has children, a reserved path, or a colliding path
+   * pattern. Not retryable — the author must change the request.
+   */
+  | "invalid"
   /** The backend could not be reached. Retryable. */
   | "unavailable";
 

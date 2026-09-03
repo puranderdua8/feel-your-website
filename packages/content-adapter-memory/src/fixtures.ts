@@ -59,5 +59,54 @@ export const contractSeed: MemoryContentSeed = {
       version: 1,
       updatedAt: "2026-01-01T00:00:00.000Z",
     },
+    // A parent/child pair: `/blog` is the top-level section, `/blog/:slug` its
+    // nested, parameterised child. The child names its own segment (`:slug`)
+    // and points at the parent; its absolute pattern is composed from the two.
+    {
+      id: "route-blog",
+      path: "/blog",
+      tree: [
+        {
+          instanceId: "blog-hero",
+          sectionKey: "hero",
+          content: {
+            en: { title: "Blog", subtitle: "Notes and updates." },
+            hi: { title: "ब्लॉग", subtitle: "टिप्पणियाँ और अपडेट।" },
+          },
+          slots: {},
+        },
+      ],
+      seo: {
+        en: { title: "Blog — feel-your-website" },
+        hi: { title: "ब्लॉग — feel-your-website" },
+      },
+      version: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "route-blog-post",
+      parentId: "route-blog",
+      pathSegment: ":slug",
+      params: [{ name: "slug", label: "Post slug" }],
+      tree: [
+        {
+          instanceId: "blog-post-body",
+          sectionKey: "help",
+          content: {
+            en: { title: "Post", body: "This post has no body yet." },
+            hi: { title: "पोस्ट", body: "इस पोस्ट में अभी कोई सामग्री नहीं है।" },
+          },
+          slots: {},
+        },
+      ],
+      // The `{{slug}}` placeholder is filled from the matched route params by
+      // the shell before the title reaches `<head>`.
+      seo: {
+        en: { title: "{{slug}} — Blog" },
+        hi: { title: "{{slug}} — ब्लॉग" },
+      },
+      version: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
   ],
 };

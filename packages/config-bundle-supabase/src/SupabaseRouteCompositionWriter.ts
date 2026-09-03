@@ -1,5 +1,7 @@
 import {
   flattenTree,
+  paramMetaToRecord,
+  parseRoutePattern,
   type RouteBundle,
   type RouteCompositionInput,
   type RouteCompositionWriter,
@@ -77,6 +79,12 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       // what was just written — tree (with per-instance content) and SEO.
       tree: input.tree,
       seo: input.seo,
+      // Hierarchy fields are echoed from the input; migration 20260911000100
+      // makes `save_route_composition` persist and return them.
+      pathSegment: input.pathSegment ?? input.path,
+      parentId: input.parentId ?? null,
+      paramNames: safeParamNames(input.path),
+      paramMeta: paramMetaToRecord((input.params ?? []).map((param) => ({ ...param }))),
       version: row.version,
       updatedAt: row.updated_at,
     };
@@ -91,5 +99,26 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       p_expected_version: expectedVersion,
     });
     if (error) throw mapRouteCompositionError(error, expectedVersion);
+  }
+
+  async deleteSubtree(bundleId: string, expectedVersion: number, actor: string): Promise<void> {
+    void actor;
+    // `delete_route_subtree` collects the subtree in one recursive CTE and
+    // deletes it leaf-first, version-checking only the root. Added by migration
+    // 20260911000100.
+    const { error } = await this.#client.rpc("delete_route_subtree", {
+      p_id: bundleId,
+      p_expected_version: expectedVersion,
+    });
+    if (error) throw mapRouteCompositionError(error, expectedVersion);
+  }
+}
+
+/** Path pattern -> param names, tolerating a legacy literal path. */
+function safeParamNames(path: string): readonly string[] {
+  try {
+    return parseRoutePattern(path).paramNames;
+  } catch {
+    return [];
   }
 }

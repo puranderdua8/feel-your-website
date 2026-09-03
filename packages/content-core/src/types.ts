@@ -75,9 +75,22 @@ export interface RouteSectionNode {
 }
 
 /**
+ * Author-facing metadata for one `:name` path parameter — the human label the
+ * CMS shows beside it (`"Post slug"` for `:slug`). Keyed by parameter name on
+ * {@link RouteBundle.paramMeta}; stored as `route_bundles.param_meta`.
+ */
+export interface RouteParamMeta {
+  readonly label: string;
+}
+
+/**
  * A route's search-engine and social metadata, for one locale. Every field is
  * optional — a route may set only a title, or nothing at all. The shell turns
  * this into `<head>` tags; the CMS authors it per locale alongside the tree.
+ *
+ * String fields may contain `{{name}}` placeholders that the shell interpolates
+ * from the matched route's path parameters (see `route-match.ts`'s
+ * `interpolateSeo`).
  */
 export interface RouteSeo {
   /** `<title>` and `og:title`. */
@@ -97,8 +110,28 @@ export interface RouteSeo {
 /** A route's composition: the section-instance tree that renders at a path. */
 export interface RouteBundle {
   id: string;
-  /** The route path this bundle renders at, e.g. `/help`. */
+  /**
+   * The absolute path **pattern** this bundle renders at, e.g. `/help` or
+   * `/blog/:slug`. Derived from {@link pathSegment} and the parent chain — see
+   * `route-match.ts`'s `composeAbsolutePattern`. Matched against a request
+   * pathname by `matchRoute`, not by string equality.
+   */
   path: string;
+  /**
+   * This route's own contribution to {@link path}: the full path for a
+   * top-level route (`/blog`), a single segment for a nested one (`:slug`).
+   * The stored source of truth — `route_bundles.path_segment`.
+   */
+  pathSegment: string;
+  /**
+   * The parent route bundle's id, for layout nesting and breadcrumbs, or `null`
+   * for a top-level route.
+   */
+  parentId: string | null;
+  /** The `:name` parameters in {@link path}, in order. Derived from `path`. */
+  paramNames: readonly string[];
+  /** Per-parameter author metadata, keyed by parameter name. */
+  paramMeta: Readonly<Record<string, RouteParamMeta>>;
   /**
    * Root section instances in render order. Each owns its own slot fills —
    * this is the shape the shell renders and the CMS route editor edits.
