@@ -111,9 +111,12 @@ revoke execute on function public.route_recompute_subtree_paths(uuid)
 
 -- 3. save_route_composition -------------------------------------------------
 
--- The arg list changes (`p_path` -> `p_path_segment`, plus `p_parent_id` /
--- `p_params`), so drop and recreate.
-drop function public.save_route_composition(uuid, text, text, boolean, integer, jsonb, text[], jsonb);
+-- The new signature takes a path *segment* + parent + params instead of an
+-- absolute `p_path`. It is a genuinely new function (different argument list),
+-- created alongside the old 8-arg one rather than replacing it — the previously
+-- deployed app still calls the 8-arg form, so that stays as a thin
+-- backward-compatible wrapper (redefined at the end of this section) until a
+-- later cleanup drops it. No `drop`, so no deploy-ordering hazard.
 
 create function public.save_route_composition(
   p_id               uuid,
@@ -271,6 +274,31 @@ begin
 
   return v_bundle;
 end;
+$$;
+
+-- Backward-compatible 8-arg wrapper: the pre-hierarchy app passes an absolute
+-- `p_path` and no parent, which is exactly a top-level route whose segment is
+-- that path. Kept so a hosted push does not have to be lock-stepped with the
+-- app deploy; a later migration drops it once nothing calls it.
+create or replace function public.save_route_composition(
+  p_id               uuid,
+  p_name             text,
+  p_path             text,
+  p_published        boolean,
+  p_expected_version integer,
+  p_tree             jsonb,
+  p_items            text[],
+  p_seo              jsonb default '{}'::jsonb
+)
+returns public.config_bundles
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.save_route_composition(
+    p_id, p_name, p_path, p_published, p_expected_version,
+    p_tree, p_items, p_seo, null, '[]'::jsonb
+  );
 $$;
 
 -- 4. delete_config_bundle: refuse a route that still has children -----------
