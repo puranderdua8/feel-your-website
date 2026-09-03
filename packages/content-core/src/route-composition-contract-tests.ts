@@ -28,6 +28,13 @@ import type { RouteSectionNode } from "./types.js";
 export const ROUTE_COMPOSITION_FIXTURE = {
   name: "Contract Route",
   path: "/contract-composed",
+  /** A parent/child pair for the hierarchy tests. */
+  parentName: "Contract Parent",
+  parentPath: "/contract-parent",
+  childName: "Contract Child",
+  childSegment: ":slug",
+  childPath: "/contract-parent/:slug",
+  param: { name: "slug", label: "Slug" },
   /** Client-minted instance ids — real uuids, since a Postgres backend casts them. */
   rootCard: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   slotIcon: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -40,13 +47,21 @@ export interface RouteCompositionWriterContractOptions {
   name: string;
   /** A fresh, empty writer per call, so test ordering cannot matter. */
   createWriter: () => Promise<RouteCompositionWriter> | RouteCompositionWriter;
+  /**
+   * Whether the backend enforces the route-hierarchy invariants (parent
+   * pointer, cycle rejection, publish ordering, subtree delete). Defaults to
+   * `true`. Set `false` for a backend whose migration has not yet landed them.
+   */
+  supportsHierarchy?: boolean;
 }
 
 export function runRouteCompositionWriterContract(
   options: RouteCompositionWriterContractOptions,
 ): void {
   const { name, createWriter } = options;
+  const supportsHierarchy = options.supportsHierarchy ?? true;
   const f = ROUTE_COMPOSITION_FIXTURE;
+  const hierarchyIt = supportsHierarchy ? it : it.skip;
 
   const heroTree = (): RouteSectionNode[] => [
     {
@@ -221,6 +236,202 @@ export function runRouteCompositionWriterContract(
       } catch (error) {
         expect(isRouteCompositionError(error) && error.code === "not_found").toBe(true);
       }
+    });
+
+    // --- Hierarchy: parent/child, parameters, publish ordering, subtree delete.
+
+    const savePublishedParent = (writer: RouteCompositionWriter) =>
+      writer.saveComposition(
+        null,
+        { name: f.parentName, path: f.parentPath, published: true, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+
+    hierarchyIt("creates a child route under a parent, composing the absolute path", async () => {
+      const writer = await createWriter();
+      const parent = await savePublishedParent(writer);
+
+      const child = await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: true,
+          tree: heroTree(),
+          seo: { en: { title: "{{slug}}" } },
+        },
+        null,
+        "user-1",
+      );
+
+      expect(child.parentId).toBe(parent.id);
+      expect(child.path).toBe(f.childPath);
+      expect([...child.paramNames]).toEqual([f.param.name]);
+      expect(child.paramMeta[f.param.name]?.label).toBe(f.param.label);
+    });
+
+    hierarchyIt("rejects a parent cycle", async () => {
+      const writer = await createWriter();
+      const a = await savePublishedParent(writer);
+      const b = await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: "child",
+          parentId: a.id,
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.saveComposition(
+          a.id,
+          {
+            name: f.parentName,
+            path: f.parentPath,
+            pathSegment: f.parentPath,
+            parentId: b.id,
+            published: true,
+            tree: heroTree(),
+            seo: {},
+          },
+          a.version,
+          "user-1",
+        );
+        expect.unreachable("a parent cycle should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
+
+    hierarchyIt("refuses to publish a child while its parent is a draft", async () => {
+      const writer = await createWriter();
+      const parent = await writer.saveComposition(
+        null,
+        { name: f.parentName, path: f.parentPath, published: false, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.saveComposition(
+          null,
+          {
+            name: f.childName,
+            path: f.childPath,
+            pathSegment: f.childSegment,
+            parentId: parent.id,
+            params: [f.param],
+            published: true,
+            tree: heroTree(),
+            seo: {},
+          },
+          null,
+          "user-1",
+        );
+        expect.unreachable("a live child under a draft parent should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
+
+    hierarchyIt("refuses to unpublish a parent that has a published child", async () => {
+      const writer = await createWriter();
+      const parent = await savePublishedParent(writer);
+      await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.saveComposition(
+          parent.id,
+          { name: f.parentName, path: f.parentPath, published: false, tree: heroTree(), seo: {} },
+          parent.version,
+          "user-1",
+        );
+        expect.unreachable("unpublishing a parent with a live child should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
+
+    hierarchyIt("refuses a plain delete of a route that has children", async () => {
+      const writer = await createWriter();
+      const parent = await savePublishedParent(writer);
+      await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.deleteComposition(parent.id, parent.version, "user-1");
+        expect.unreachable("deleting a parent with children should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
+
+    hierarchyIt("deletes a whole subtree in one call", async () => {
+      const writer = await createWriter();
+      const parent = await savePublishedParent(writer);
+      await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      await writer.deleteSubtree(parent.id, parent.version, "user-1");
+
+      // Gone: the parent path is free to recreate at version 1.
+      const recreated = await writer.saveComposition(
+        null,
+        { name: f.parentName, path: f.parentPath, published: false, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+      expect(recreated.version).toBe(1);
     });
   });
 }

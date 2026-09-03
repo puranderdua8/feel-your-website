@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ContentAdapter } from "./adapter.js";
 import { CONTRACT_FIXTURE } from "./contract-fixture.js";
 import { ContentAdapterError } from "./errors.js";
+import { parseRoutePattern } from "./route-match.js";
 import type { RouteSectionNode } from "./types.js";
 
 /**
@@ -48,6 +49,13 @@ export interface ContentAdapterContractOptions {
    * skipping them leaves the error contract unverified for this adapter.
    */
   createUnavailableAdapter?: () => Promise<ContentAdapter> | ContentAdapter;
+  /**
+   * Whether the seeded backend carries route hierarchy — a parent/child pair
+   * and a parameterised route. Defaults to `true`. Set `false` for a backend
+   * whose migration has not yet landed the `parent_bundle_id` / `param_meta`
+   * columns, to skip the hierarchy assertions (they resume once it has).
+   */
+  supportsHierarchy?: boolean;
 }
 
 // Re-exported so a suite can import fixture and runner from one place.
@@ -55,6 +63,7 @@ export { CONTRACT_FIXTURE };
 
 export function runContentAdapterContract(options: ContentAdapterContractOptions): void {
   const { name, createAdapter, createUnavailableAdapter } = options;
+  const supportsHierarchy = options.supportsHierarchy ?? true;
   const f = CONTRACT_FIXTURE;
 
   describe(`ContentAdapter contract: ${name}`, () => {
@@ -70,8 +79,36 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
           // SEO is a plain `locale -> RouteSeo` object, never null.
           expect(bundle.seo).toBeTypeOf("object");
           expect(bundle.seo).not.toBeNull();
+
+          // Every bundle carries its hierarchy + parameter fields.
+          expect(typeof bundle.pathSegment).toBe("string");
+          expect(bundle.pathSegment.length).toBeGreaterThan(0);
+          expect(bundle.parentId === null || typeof bundle.parentId === "string").toBe(true);
+          expect(Array.isArray(bundle.paramNames)).toBe(true);
+          expect(bundle.paramMeta).toBeTypeOf("object");
+          expect(bundle.paramMeta).not.toBeNull();
+          if (bundle.paramNames.length > 0) {
+            expect(bundle.path).toContain(":");
+            expect([...parseRoutePattern(bundle.path).paramNames]).toEqual([...bundle.paramNames]);
+          }
         }
       });
+
+      (supportsHierarchy ? it : it.skip)(
+        "exposes a resolvable parent/child hierarchy and a parameterised route",
+        async () => {
+          const adapter = await createAdapter();
+          const manifest = await adapter.getRouteManifest(f.defaultLocale);
+          const ids = new Set(manifest.map((bundle) => bundle.id));
+
+          const child = manifest.find((bundle) => bundle.parentId !== null);
+          expect(child, "the seed should include a nested route").toBeDefined();
+          expect(ids.has(child!.parentId!)).toBe(true);
+
+          const parameterised = manifest.find((bundle) => bundle.paramNames.length > 0);
+          expect(parameterised, "the seed should include a parameterised route").toBeDefined();
+        },
+      );
 
       it("returns an array, never null, when there are no routes", async () => {
         const adapter = await createAdapter();
@@ -104,6 +141,40 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
           expect(Array.isArray(bundle.tree)).toBe(true);
           for (const node of bundle.tree) assertNode(node);
         }
+      });
+    });
+
+    describe("getRouteHeaders", () => {
+      it("returns a lightweight, well-formed header per published route", async () => {
+        const adapter = await createAdapter();
+        const [headers, manifest] = await Promise.all([
+          adapter.getRouteHeaders(),
+          adapter.getRouteManifest(f.defaultLocale),
+        ]);
+
+        expect(Array.isArray(headers)).toBe(true);
+        // Same set of published routes as the manifest, by id.
+        expect(new Set(headers.map((h) => h.id))).toEqual(new Set(manifest.map((b) => b.id)));
+
+        for (const header of headers) {
+          expect(header.path.startsWith("/")).toBe(true);
+          expect(typeof header.pathSegment).toBe("string");
+          expect(header.parentId === null || typeof header.parentId === "string").toBe(true);
+          expect(typeof header.hasParams).toBe("boolean");
+          expect(header.hasParams).toBe(header.path.includes(":"));
+          expect(header.title).toBeTypeOf("object");
+          expect(header.title).not.toBeNull();
+        }
+      });
+
+      (supportsHierarchy ? it : it.skip)("names a parent that is itself a header", async () => {
+        const adapter = await createAdapter();
+        const headers = await adapter.getRouteHeaders();
+        const ids = new Set(headers.map((h) => h.id));
+
+        const child = headers.find((h) => h.parentId !== null);
+        expect(child, "the seed should include a nested route").toBeDefined();
+        expect(ids.has(child!.parentId!)).toBe(true);
       });
     });
 

@@ -121,6 +121,9 @@ if (hasLocalSupabase) {
 
     runContentAdapterContract({
       name: "SupabaseContentAdapter",
+      // Route hierarchy (parent_bundle_id / param_meta) lands with migration
+      // 20260911000100; this seed has no nested route until then.
+      supportsHierarchy: false,
       createAdapter: () => new SupabaseContentAdapter({ url: url!, anonKey: anonKey! }),
       createUnavailableAdapter: () =>
         new SupabaseContentAdapter({
