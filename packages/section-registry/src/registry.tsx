@@ -1,5 +1,7 @@
 import type { JsonValue } from "@feel-your-website/content-core";
 
+import type { RouteRenderContext } from "./context.js";
+
 /** A section's rendered content: a plain field bag, or `null` when unfilled. */
 export type SectionFields = Readonly<Record<string, JsonValue>> | null;
 
@@ -23,6 +25,15 @@ export interface SectionComponentProps {
   fields: Readonly<Record<string, JsonValue>>;
   /** Rendered slot children, keyed by `SectionSlotSpec.name`. `{}` for a leaf. */
   slots: Readonly<Record<string, React.ReactNode>>;
+  /**
+   * The route this section is rendered on — params, pathname, breadcrumb chain.
+   * Absent when there is no route context (the CMS section gallery). Optional so
+   * the leaf sections below, which only read `fields`/`slots`, are unaffected.
+   *
+   * `route.params` are raw URL segments: untrusted input. Escape any value
+   * before putting it in markup, a URL, or a query.
+   */
+  route?: RouteRenderContext;
 }
 
 export type SectionComponent = (props: SectionComponentProps) => React.JSX.Element;
@@ -127,9 +138,10 @@ export function renderSection(
   sectionKey: string,
   fields: SectionFields,
   slots: Readonly<Record<string, React.ReactNode>> = {},
+  route?: RouteRenderContext,
 ): React.JSX.Element {
   const Component = SECTION_REGISTRY[sectionKey];
   if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
   if (!fields) return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
-  return <Component fields={fields} slots={slots} />;
+  return <Component fields={fields} slots={slots} route={route} />;
 }

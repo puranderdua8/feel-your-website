@@ -3,6 +3,7 @@
 // same components). Kept vendor-neutral: it depends only on
 // `@feel-your-website/content-core`'s content model, never on an adapter.
 
+export * from "./context.js";
 export * from "./registry.js";
 export * from "./sections.js";
 export * from "./compose.js";
