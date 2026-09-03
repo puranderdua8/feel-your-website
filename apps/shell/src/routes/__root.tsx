@@ -5,6 +5,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import type { ReactNode } from "react";
 
 import { ServiceWorkerNotice } from "@/components/service-worker";
+import { SiteNav } from "@/components/site-nav";
 import { loadBootstrap, type BootstrapPayload } from "@/server/bff";
 import appCss from "../styles.css?url";
 
@@ -59,6 +60,7 @@ function RootComponent() {
         <PermissionsProvider permissions={new Set(bootstrap.permissions)}>
           <ThemeProvider theme="base">
             <ServiceWorkerNotice />
+            <SiteNav nav={bootstrap.nav} />
             <Outlet />
           </ThemeProvider>
         </PermissionsProvider>

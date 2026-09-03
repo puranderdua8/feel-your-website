@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
 import { getAuthProvider, getContentAdapter } from "./adapters.js";
+import { buildNav, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 
 /**
@@ -32,7 +33,12 @@ export interface BootstrapPayload {
   userId: string | null;
   /** True when messages came from the bootstrap set because the CMS failed. */
   degraded: boolean;
+  /** The published-route forest for the site nav — param routes excluded. `[]` on a CMS outage. */
+  nav: NavNode[];
 }
+
+export type { NavNode } from "./nav.js";
+export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-page.js";
 
 /**
  * Everything the shell needs to render its first frame: negotiated locale,
@@ -72,17 +78,25 @@ export const loadBootstrap = createServerFn({ method: "GET" }).handler(
     }
 
     let messages: Record<string, string> = { ...BOOTSTRAP_MESSAGES };
+    let nav: NavNode[] = [];
     let degraded = false;
 
     try {
-      const fromCms = await getContentAdapter().getMessages(locale);
+      const adapter = getContentAdapter();
+      const [fromCms, headers] = await Promise.all([
+        adapter.getMessages(locale),
+        // `getRouteHeaders`, never `getRouteManifest` — this call is on every
+        // SSR navigation and must not pull section rows.
+        adapter.getRouteHeaders(),
+      ]);
       messages = { ...messages, ...fromCms };
+      nav = buildNav(headers, locale);
     } catch (error) {
-      // A CMS outage must degrade to the bootstrap set, not to a blank page.
-      // This is the whole reason that set exists.
+      // A CMS outage must degrade to the bootstrap set and an empty nav, not to
+      // a blank page. This is the whole reason that set exists.
       degraded = true;
       console.error(
-        "[cms] messages unavailable, serving bootstrap set:",
+        "[cms] content unavailable, serving bootstrap set:",
         isContentAdapterError(error) ? error.code : error,
       );
     }
@@ -93,6 +107,7 @@ export const loadBootstrap = createServerFn({ method: "GET" }).handler(
       permissions: [...permissions],
       userId: session?.userId ?? null,
       degraded,
+      nav,
     };
   },
 );
@@ -122,8 +137,6 @@ export const setLocale = createServerFn({ method: "POST" })
     persistLocale(data.locale);
     return { locale: data.locale };
   });
-
-export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-page.js";
 
 /**
  * Resolves a request path against the published route manifest — the piece
