@@ -19,9 +19,12 @@ interface PostgrestLikeError {
  *
  * Every code switched on here is one this repo's own migrations raise on
  * purpose — `raise_bundle_conflict`'s `PT409`, `write_bundle_header`'s
- * `PT404`, the RPC's own `42501` — so switching on `error.code` is safe here
- * in a way it would not be for an incidental PostgREST code. Anything else
- * falls through to `unavailable`, same as `mapConfigError`.
+ * `PT404`, the RPC's own `42501`, and `save_route_composition` /
+ * `delete_config_bundle`'s `PT422` for a structural rejection (parent cycle,
+ * publish ordering, colliding path pattern, delete of a route with children) —
+ * so switching on `error.code` is safe here in a way it would not be for an
+ * incidental PostgREST code. Anything else falls through to `unavailable`,
+ * same as `mapConfigError`.
  */
 export function mapRouteCompositionError(
   error: unknown,
@@ -37,6 +40,14 @@ export function mapRouteCompositionError(
 
   if (pg?.code === "PT404") {
     return new RouteCompositionError("not_found", pg.message ?? "No route bundle with that id.", {
+      cause: error,
+    });
+  }
+
+  // `PT422` is raised explicitly by the RPCs; `23505` is a unique_violation the
+  // RPC did not catch (a raced concurrent write onto `normalized_path`).
+  if (pg?.code === "PT422" || pg?.code === "23505") {
+    return new RouteCompositionError("invalid", pg.message ?? "That route change is not allowed.", {
       cause: error,
     });
   }

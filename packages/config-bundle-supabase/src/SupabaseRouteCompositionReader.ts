@@ -5,6 +5,7 @@ import {
   type RouteComposition,
   type RouteCompositionReader,
   type RouteCompositionSummary,
+  type RouteParamSpec,
   type RouteSeo,
 } from "@feel-your-website/content-core";
 import { createServerClient } from "@supabase/ssr";
@@ -27,13 +28,36 @@ export interface SupabaseRouteCompositionReaderOptions {
   cookies: CookieAdapter;
 }
 
+interface RouteBundleMeta {
+  path: string;
+  path_segment: string;
+  published: boolean;
+  parent_bundle_id: string | null;
+  param_meta: unknown;
+}
+
 interface HeaderRow {
   id: string;
   name: string;
   version: number;
   updated_at: string;
-  route_bundles:
-    { path: string; published: boolean } | { path: string; published: boolean }[] | null;
+  route_bundles: RouteBundleMeta | RouteBundleMeta[] | null;
+}
+
+/** Coerces the `param_meta` JSON into `RouteParamSpec[]`, dropping junk. */
+function toParamSpecs(raw: unknown): RouteParamSpec[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const record = entry as Record<string, unknown>;
+    if (typeof record.name !== "string" || record.name === "") return [];
+    return [
+      {
+        name: record.name,
+        label: typeof record.label === "string" ? record.label : record.name,
+      },
+    ];
+  });
 }
 
 interface InstanceRow {
@@ -70,7 +94,9 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
   async listCompositions(): Promise<readonly RouteCompositionSummary[]> {
     const { data, error } = await this.#client
       .from("config_bundles")
-      .select("id, name, version, updated_at, route_bundles!inner(path, published)")
+      .select(
+        "id, name, version, updated_at, route_bundles!inner(path, path_segment, published, parent_bundle_id, param_meta)",
+      )
       .eq("vocabulary", "template_key")
       .order("name");
     if (error) throw mapRouteCompositionError(error);
@@ -83,10 +109,8 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
           id: row.id,
           name: row.name,
           path: meta.path,
-          // Hierarchy columns land with migration 20260911000100; until then a
-          // route is flat and top-level.
-          pathSegment: meta.path,
-          parentId: null,
+          pathSegment: meta.path_segment,
+          parentId: meta.parent_bundle_id ?? null,
           published: meta.published,
           version: row.version,
           updatedAt: row.updated_at,
@@ -98,7 +122,9 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
   async getComposition(bundleId: string): Promise<RouteComposition | null> {
     const { data: header, error: headerError } = await this.#client
       .from("config_bundles")
-      .select("id, name, version, updated_at, route_bundles(path, published)")
+      .select(
+        "id, name, version, updated_at, route_bundles(path, path_segment, published, parent_bundle_id, param_meta)",
+      )
       .eq("id", bundleId)
       .eq("vocabulary", "template_key")
       .maybeSingle<HeaderRow>();
@@ -146,10 +172,9 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       id: header.id,
       name: header.name,
       path: routeMeta.path,
-      // Hierarchy + parameter columns land with migration 20260911000100.
-      pathSegment: routeMeta.path,
-      parentId: null,
-      params: [],
+      pathSegment: routeMeta.path_segment,
+      parentId: routeMeta.parent_bundle_id ?? null,
+      params: toParamSpecs(routeMeta.param_meta),
       published: routeMeta.published,
       version: header.version,
       updatedAt: header.updated_at,

@@ -554,6 +554,129 @@ if (hasLocalSupabase) {
       });
     });
 
+    it("composes a nested route's path and round-trips its parent + params", async () => {
+      const w = writer();
+      const seg = `live-test-rcw-${randomUUID()}`;
+      const parent = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}`,
+          published: true,
+          tree: root("hero"),
+          seo: {},
+        },
+        null,
+        "x",
+      );
+
+      const child = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}/:slug`,
+          pathSegment: ":slug",
+          parentId: parent.id,
+          params: [{ name: "slug", label: "Slug" }],
+          published: true,
+          tree: root("help"),
+          seo: {},
+        },
+        null,
+        "x",
+      );
+
+      const { data: row } = await admin
+        .from("route_bundles")
+        .select("path, path_segment, normalized_path, parent_bundle_id, param_meta")
+        .eq("bundle_id", child.id)
+        .single();
+      expect(row).toMatchObject({
+        path: `/${seg}/:slug`,
+        path_segment: ":slug",
+        normalized_path: `/${seg}/:param`,
+        parent_bundle_id: parent.id,
+        param_meta: [{ name: "slug", label: "Slug" }],
+      });
+
+      await w.deleteSubtree(parent.id, parent.version, "x");
+      const { count } = await admin
+        .from("route_bundles")
+        .select("*", { count: "exact", head: true })
+        .in("bundle_id", [parent.id, child.id]);
+      expect(count).toBe(0);
+    });
+
+    it("rejects a parent cycle and a live child under a draft parent", async () => {
+      const w = writer();
+      const seg = `live-test-rcw-${randomUUID()}`;
+      const parent = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}`,
+          published: false,
+          tree: root("hero"),
+          seo: {},
+        },
+        null,
+        "x",
+      );
+
+      // Live child under a draft parent.
+      await expect(
+        w.saveComposition(
+          null,
+          {
+            name: `live-test-rcw-${randomUUID()}`,
+            path: `/${seg}/:slug`,
+            pathSegment: ":slug",
+            parentId: parent.id,
+            params: [{ name: "slug", label: "Slug" }],
+            published: true,
+            tree: root("help"),
+            seo: {},
+          },
+          null,
+          "x",
+        ),
+      ).rejects.toMatchObject({ code: "invalid" });
+
+      // Make both a draft chain, then try to point the parent at its own child.
+      const child = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}/child`,
+          pathSegment: "child",
+          parentId: parent.id,
+          published: false,
+          tree: root("help"),
+          seo: {},
+        },
+        null,
+        "x",
+      );
+      await expect(
+        w.saveComposition(
+          parent.id,
+          {
+            name: `live-test-rcw-${randomUUID()}`,
+            path: `/${seg}`,
+            pathSegment: `/${seg}`,
+            parentId: child.id,
+            published: false,
+            tree: root("hero"),
+            seo: {},
+          },
+          parent.version,
+          "x",
+        ),
+      ).rejects.toMatchObject({ code: "invalid" });
+
+      await w.deleteSubtree(parent.id, parent.version, "x");
+    });
+
     function root(key: string) {
       return [{ instanceId: randomUUID(), sectionKey: key, content: {}, slots: {} }];
     }
