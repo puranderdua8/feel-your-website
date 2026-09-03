@@ -1,6 +1,8 @@
 import {
   assembleSectionTree,
+  paramMetaToRecord,
   parseRoutePattern,
+  splitSegment,
   type ContentAdapter,
   type ContentAdapterError,
   type FlatSectionRow,
@@ -8,6 +10,7 @@ import {
   type Locale,
   type RouteBundle,
   type RouteHeader,
+  type RouteParamMeta,
   type RouteSeo,
 } from "@feel-your-website/content-core";
 import { randomUUID } from "node:crypto";
@@ -16,6 +19,22 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { mapContentError } from "./mapContentError.js";
 import { type RouteSeoRow, rowToRouteSeo } from "./routeSeo.js";
+
+/** One `published_route_sections` row; the last two are absent on a pre-migration DB. */
+interface SectionRow {
+  bundle_id: string;
+  path: string;
+  version: number;
+  updated_at: string;
+  instance_id: string;
+  parent_instance_id: string | null;
+  parent_slot: string | null;
+  ordinal: number;
+  section_key: string;
+  content: unknown;
+  parent_bundle_id?: string | null;
+  param_meta?: unknown;
+}
 
 export interface SupabaseContentAdapterOptions {
   /** The project URL — `SUPABASE_URL`. Safe to log; not secret. */
@@ -69,17 +88,15 @@ export class SupabaseContentAdapter implements ContentAdapter {
     // per-instance). Two reads in parallel; the tree is assembled here in
     // TypeScript via the shared helper, same as the memory adapter.
     const [{ data, error }, { data: seoData, error: seoError }] = await Promise.all([
-      this.#client
-        .from("published_route_sections")
-        .select(
-          "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, content",
-        ),
+      this.#selectSections(),
       this.#client
         .from("published_route_seo")
         .select("bundle_id, locale, title, description, canonical, og_image, keywords, robots"),
     ]);
     if (error) throw mapContentError(error);
     if (seoError) throw mapContentError(seoError);
+
+    const sectionRows = (data ?? []) as SectionRow[];
 
     const seoByBundle = new Map<string, Record<string, RouteSeo>>();
     for (const row of (seoData ?? []) as (RouteSeoRow & { bundle_id: string })[]) {
@@ -90,44 +107,52 @@ export class SupabaseContentAdapter implements ContentAdapter {
 
     const byBundle = new Map<
       string,
-      { path: string; version: number; updatedAt: string; rows: FlatSectionRow[] }
+      {
+        path: string;
+        parentId: string | null;
+        paramMeta: Readonly<Record<string, RouteParamMeta>>;
+        version: number;
+        updatedAt: string;
+        rows: FlatSectionRow[];
+      }
     >();
 
-    for (const row of data ?? []) {
-      const bundleId = row.bundle_id as string;
-      let entry = byBundle.get(bundleId);
+    for (const row of sectionRows) {
+      let entry = byBundle.get(row.bundle_id);
       if (!entry) {
         entry = {
-          path: row.path as string,
-          version: row.version as number,
-          updatedAt: row.updated_at as string,
+          path: row.path,
+          parentId: row.parent_bundle_id ?? null,
+          paramMeta: paramMetaToRecord(row.param_meta),
+          version: row.version,
+          updatedAt: row.updated_at,
           rows: [],
         };
-        byBundle.set(bundleId, entry);
+        byBundle.set(row.bundle_id, entry);
       }
       entry.rows.push({
-        instanceId: row.instance_id as string,
-        parentInstanceId: (row.parent_instance_id as string | null) ?? null,
-        parentSlot: (row.parent_slot as string | null) ?? null,
-        ordinal: row.ordinal as number,
-        sectionKey: row.section_key as string,
+        instanceId: row.instance_id,
+        parentInstanceId: row.parent_instance_id ?? null,
+        parentSlot: row.parent_slot ?? null,
+        ordinal: row.ordinal,
+        sectionKey: row.section_key,
         // The view aggregates route_section_content into a `locale -> fields`
         // object; `{}` when the instance has no content rows yet.
-        content:
-          (row.content as Record<string, Record<string, JsonValue>> | null | undefined) ?? {},
+        content: (row.content as Record<string, Record<string, JsonValue>> | null) ?? {},
       });
     }
+
+    const pathById = new Map([...byBundle.entries()].map(([id, entry]) => [id, entry.path]));
 
     return [...byBundle.entries()].map(([id, entry]) => ({
       id,
       path: entry.path,
-      // Hierarchy + parameter metadata land with migration 20260911000100; until
-      // then every route reads as a flat, top-level one and its `paramNames` are
-      // derived from the path pattern.
-      pathSegment: entry.path,
-      parentId: null,
+      // Derived from the parent's absolute pattern; a route with no parent
+      // contributes its whole path.
+      pathSegment: segmentOf(entry.path, entry.parentId, pathById),
+      parentId: entry.parentId,
       paramNames: safeParamNames(entry.path),
-      paramMeta: {},
+      paramMeta: entry.paramMeta,
       tree: assembleSectionTree(entry.rows),
       seo: seoByBundle.get(id) ?? {},
       version: entry.version,
@@ -136,23 +161,21 @@ export class SupabaseContentAdapter implements ContentAdapter {
   }
 
   async getRouteHeaders(): Promise<readonly RouteHeader[]> {
-    // Derived from the manifest for now; migration 20260911000100 adds a slim
-    // `published_route_headers` view so this stops pulling section rows.
-    const manifest = await this.getRouteManifest("");
-    return manifest.map((bundle) => {
-      const title: Record<string, string | undefined> = {};
-      for (const [routeLocale, seo] of Object.entries(bundle.seo)) {
-        title[routeLocale] = seo.title;
-      }
-      return {
-        id: bundle.id,
-        pathSegment: bundle.pathSegment,
-        path: bundle.path,
-        parentId: bundle.parentId,
-        hasParams: bundle.paramNames.length > 0,
-        title,
-      };
-    });
+    this.#guard();
+
+    const { data, error } = await this.#client
+      .from("published_route_headers")
+      .select("bundle_id, path, path_segment, parent_bundle_id, param_meta, title");
+    if (error) throw mapContentError(error);
+
+    return (data ?? []).map((row) => ({
+      id: row.bundle_id as string,
+      pathSegment: row.path_segment as string,
+      path: row.path as string,
+      parentId: (row.parent_bundle_id as string | null | undefined) ?? null,
+      hasParams: (row.path as string).includes(":"),
+      title: (row.title as Record<string, string | undefined> | null) ?? {},
+    }));
   }
 
   async getMessages(locale: Locale): Promise<Readonly<Record<string, string>>> {
@@ -169,6 +192,34 @@ export class SupabaseContentAdapter implements ContentAdapter {
     return messages;
   }
 
+  /**
+   * Reads `published_route_sections`, tolerating a database that is a migration
+   * behind: `20260911000100` appends `parent_bundle_id` / `param_meta`, so if
+   * the code deploys before the migration runs, the full select 404s on the
+   * missing column. Rather than 500 every shell page, retry with the stable
+   * column set and degrade to flat routing (logged once).
+   */
+  async #selectSections() {
+    this.#guard();
+    const base =
+      "bundle_id, path, version, updated_at, instance_id, parent_instance_id, parent_slot, ordinal, section_key, content";
+
+    const full = await this.#client
+      .from("published_route_sections")
+      .select(`${base}, parent_bundle_id, param_meta`);
+    if (!full.error || full.error.code !== "42703") return full;
+
+    if (!this.#warnedNoHierarchy) {
+      this.#warnedNoHierarchy = true;
+      console.warn(
+        "[content-adapter-supabase] migration 20260911000100 not applied — route nesting inert until it is",
+      );
+    }
+    return this.#client.from("published_route_sections").select(base);
+  }
+
+  #warnedNoHierarchy = false;
+
   #guard(): void {
     if (this.#failWith) throw this.#failWith;
   }
@@ -180,5 +231,21 @@ function safeParamNames(path: string): readonly string[] {
     return parseRoutePattern(path).paramNames;
   } catch {
     return [];
+  }
+}
+
+/** A route's own segment: the whole path when top-level, else `path` minus the parent's. */
+function segmentOf(
+  path: string,
+  parentId: string | null,
+  pathById: ReadonlyMap<string, string>,
+): string {
+  if (!parentId) return path;
+  const parentPath = pathById.get(parentId);
+  if (!parentPath) return path;
+  try {
+    return splitSegment(path, parentPath);
+  } catch {
+    return path;
   }
 }

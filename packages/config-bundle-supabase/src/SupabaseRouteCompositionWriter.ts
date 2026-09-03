@@ -58,16 +58,22 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
   ): Promise<RouteBundle> {
     void actor; // the RPC derives the writer from auth.uid(), not this string.
 
+    // A caller that only supplies an absolute `path` (and no parent) is
+    // authoring a top-level route, so its segment *is* that path.
+    const pathSegment = input.pathSegment ?? input.path;
+
     const { data, error } = await this.#client.rpc("save_route_composition", {
       p_id: bundleId,
       p_name: input.name,
-      p_path: input.path,
+      p_path_segment: pathSegment,
       p_published: input.published,
       p_expected_version: expectedVersion,
       p_tree: input.tree,
       // The audit trail still records a flat key list alongside the tree.
       p_items: [...flattenTree(input.tree)],
       p_seo: input.seo,
+      p_parent_id: input.parentId ?? null,
+      p_params: input.params ?? [],
     });
     if (error) throw mapRouteCompositionError(error, expectedVersion);
 

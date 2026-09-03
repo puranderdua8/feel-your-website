@@ -41,6 +41,7 @@ if (hasLocalSupabase) {
 
     let admin: SupabaseClient;
     let routeBundleId: string;
+    let childBundleId: string;
 
     beforeAll(async () => {
       admin = createClient(url!, serviceRoleKey!);
@@ -65,9 +66,13 @@ if (hasLocalSupabase) {
       if (bundleError || !bundle) throw bundleError ?? new Error("bundle insert returned no row");
       routeBundleId = bundle.id as string;
 
-      const { error: routeBundleError } = await admin
-        .from("route_bundles")
-        .insert({ bundle_id: routeBundleId, path: "/contract-test", published: true });
+      const { error: routeBundleError } = await admin.from("route_bundles").insert({
+        bundle_id: routeBundleId,
+        path: "/contract-test",
+        path_segment: "/contract-test",
+        normalized_path: "/contract-test",
+        published: true,
+      });
       if (routeBundleError) throw routeBundleError;
 
       // `getRouteManifest` reads `published_route_sections` — one root section
@@ -111,19 +116,55 @@ if (hasLocalSupabase) {
         keywords: ["help", "support"],
       });
       if (routeSeoError) throw routeSeoError;
+
+      // A nested, parameterised child of the route above — exercises the
+      // hierarchy assertions: `parent_bundle_id`, a derived `path_segment`, and
+      // `param_meta` / `normalized_path`. Inserted directly rather than through
+      // the RPC, so this suite stays independent of the writer.
+      const { data: childBundle, error: childBundleError } = await admin
+        .from("config_bundles")
+        .insert({
+          vocabulary: "template_key",
+          name: `${routeBundleName}-child`,
+          updated_by: randomUUID(),
+        })
+        .select()
+        .single();
+      if (childBundleError || !childBundle) {
+        throw childBundleError ?? new Error("child bundle insert returned no row");
+      }
+      childBundleId = childBundle.id as string;
+
+      const { error: childRouteError } = await admin.from("route_bundles").insert({
+        bundle_id: childBundleId,
+        parent_bundle_id: routeBundleId,
+        path: "/contract-test/:slug",
+        path_segment: ":slug",
+        normalized_path: "/contract-test/:param",
+        param_meta: [{ name: "slug", label: "Slug" }],
+        published: true,
+      });
+      if (childRouteError) throw childRouteError;
+
+      const { error: childInstanceError } = await admin.from("route_section_instances").insert({
+        bundle_id: childBundleId,
+        parent_instance_id: null,
+        parent_slot: null,
+        ordinal: 0,
+        section_key: sectionKey,
+      });
+      if (childInstanceError) throw childInstanceError;
     });
 
     afterAll(async () => {
       // cascades route_bundles + route_section_instances + route_section_content + route_seo
+      await admin.from("config_bundles").delete().eq("id", childBundleId);
       await admin.from("config_bundles").delete().eq("id", routeBundleId);
       await admin.from("content_messages").delete().eq("key", messageKey);
     });
 
     runContentAdapterContract({
       name: "SupabaseContentAdapter",
-      // Route hierarchy (parent_bundle_id / param_meta) lands with migration
-      // 20260911000100; this seed has no nested route until then.
-      supportsHierarchy: false,
       createAdapter: () => new SupabaseContentAdapter({ url: url!, anonKey: anonKey! }),
       createUnavailableAdapter: () =>
         new SupabaseContentAdapter({
