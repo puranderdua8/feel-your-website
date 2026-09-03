@@ -65,6 +65,8 @@ export const contractSeed: MemoryContentSeed = {
     {
       id: "route-blog",
       path: "/blog",
+      // A layout route: the `hero` is shared chrome, and the reserved `outlet`
+      // node is where the matched child (`/blog/:slug`) renders.
       tree: [
         {
           instanceId: "blog-hero",
@@ -75,6 +77,7 @@ export const contractSeed: MemoryContentSeed = {
           },
           slots: {},
         },
+        { instanceId: "blog-outlet", sectionKey: "outlet", content: {}, slots: {} },
       ],
       seo: {
         en: { title: "Blog — feel-your-website" },
