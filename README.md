@@ -455,33 +455,48 @@ way) but is deliberately smaller in a few specific ways:
 
 ## Rendering CMS-authored routes
 
-A route is a **tree of section instances**: each node names a section
-(`SectionRef` = a section key + a named content variant) and fills that
-section's slots with child nodes. The CMS route editor writes the tree
-through `RouteCompositionWriter`; the shell renders it. Two pieces:
+A route is a **tree of section instances**: each node names a section by key
+and fills that section's slots with child nodes, and every node carries its
+own per-locale content. Routes also form a **hierarchy** — a route may name a
+`parentId`, and its path is a **pattern** that can contain `:name` segments
+(`/blog/:slug`, `/docs/:category/:page`). The CMS route editor writes all of
+this through `RouteCompositionWriter`; the shell renders it. The pieces:
 
-- **`src/routes/$.tsx`** — a catch-all route. TanStack Router always prefers
-  a static file match (`index.tsx`, `admin.tsx`) over a splat one, so this
-  only ever sees a path nothing else claimed. Its loader calls
-  `loadRoutePage()` (`src/server/bff.ts`), which looks the path up in the
-  published manifest, batch-fetches content for every ref the tree depends on
-  (`collectEffectiveRefs`, which also pulls in the declared default of a
-  required slot left empty), and renders via `renderComposition`. No match →
-  `throw notFound()`, handled by the root route's `notFoundComponent`.
+- **`@feel-your-website/content-core`'s `route-match.ts`** — one pure module,
+  shared by both adapters and the shell, that owns "which route does this URL
+  resolve to". It compiles the published patterns into a segment trie and
+  walks it depth-first, **preferring a static segment over a `:param` one** and
+  backtracking, so precedence is a property of the traversal, not a score. It
+  also holds `normalizeRequestPath` (trailing slashes, `//`, percent-decoding),
+  `resolveParentChain`, and `{{param}}` template interpolation.
+- **`src/server/resolve-route-page.ts`** (pure) + **`loadRoutePage()`**
+  (`src/server/bff.ts`, the thin server-fn wrapper) — match the pathname,
+  reject a reserved path (`src/reserved-paths.ts`) or a hostile param value,
+  walk the parent chain into a root-first `layers` stack, and interpolate the
+  SEO templates with the extracted params. Returns `null` for any of those,
+  which the route layer turns into `notFound()`.
+- **`src/routes/$.tsx`** — the catch-all. TanStack Router prefers a static
+  file match (`admin.tsx`) over the splat, so `/admin` is reserved and never
+  reaches here. `src/routes/index.tsx` (`/`) is **not** reserved: it also
+  calls `loadRoutePage()` and renders a CMS route published at `/`, falling
+  back to the built-in home otherwise.
+- **`src/components/route-page.tsx`** — folds `layers` innermost-first: each
+  parent layout wraps the next through its reserved `outlet` section node,
+  down to the matched route. `head()` emits the already-interpolated SEO.
 - **`@feel-your-website/section-registry`** — maps a section key to the React
   component that renders it, shared by the shell (render) and the CMS
-  (in-process preview). The keys registered (`hero`, `guidance`, `footer`,
-  the atoms `icon` / `text` / `image` / `button`, the composite `card`, plus
-  `help` for the one fixture route `content-adapter-memory`'s seed ships)
-  match `apps/cms/src/content/sections.ts` exactly, on purpose — local dev
-  with no backend at all still has to render something real at `/help`. An
-  unregistered key or missing content renders a visible placeholder rather
-  than silently shortening the page.
+  (in-process preview). `renderComposition(tree, locale, { route, outlet })`
+  publishes the route context (params, breadcrumb chain) to every section and
+  resolves `outlet` nodes. An unregistered key or missing content renders a
+  visible placeholder rather than silently shortening the page.
 
 The Supabase read model is `published_route_sections` (a flat, one-row-per-
-instance `security_invoker` view); the tree is assembled in TypeScript by the
-shared `assembleSectionTree`, never a recursive SQL CTE, so the memory and
-Postgres adapters build it identically.
+instance `security_invoker` view, now also carrying `parent_bundle_id` /
+`param_meta`); the tree is assembled in TypeScript by the shared
+`assembleSectionTree`, never a recursive SQL CTE, so the memory and Postgres
+adapters build it identically. `route_bundles` stores each route's own
+`path_segment` and derives the absolute `path` from the parent chain, so
+renaming a parent is a one-row edit.
 
 **This only reflects what a given deployment's `shell` site is actually
 pointed at.** `getRouteManifest()` goes through the same `ContentAdapter`

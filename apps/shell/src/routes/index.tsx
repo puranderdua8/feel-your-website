@@ -4,12 +4,22 @@ import { ThemeProvider } from "@feel-your-website/theme/client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { RoutePageView, seoToHead } from "@/components/route-page";
 import { localeConfig } from "@/i18n/config";
+import { loadRoutePage, type RoutePage } from "@/server/bff";
 
 import { ThemeShowcase } from "@/components/theme-showcase";
 import { Route as RootRoute } from "./__root";
 
+/**
+ * The home page delegates to the route matcher: if a CMS route is published at
+ * `/`, it renders that; otherwise it falls back to the built-in showcase below.
+ * `/` is not a reserved path (see `reserved-paths.ts`) precisely so it can be
+ * authored.
+ */
 export const Route = createFileRoute("/")({
+  loader: async (): Promise<RoutePage | null> => loadRoutePage({ data: { path: "/" } }),
+  head: ({ loaderData }) => (loaderData ? seoToHead(loaderData) : {}),
   component: Home,
 });
 
@@ -18,6 +28,10 @@ const THEMES = ["base", "corporate", "playful"] as const;
 function Home() {
   const t = useTranslations();
   const bootstrap = RootRoute.useLoaderData();
+  const page = Route.useLoaderData();
+
+  // A CMS-authored `/` wins; the showcase below is the fallback.
+  if (page) return <RoutePageView page={page} />;
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-8 p-8">

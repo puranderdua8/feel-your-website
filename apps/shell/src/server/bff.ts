@@ -1,8 +1,4 @@
-import {
-  isContentAdapterError,
-  type RouteSectionNode,
-  type RouteSeo,
-} from "@feel-your-website/content-core";
+import { isContentAdapterError } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import { createServerFn } from "@tanstack/react-start";
@@ -10,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
 import { getAuthProvider, getContentAdapter } from "./adapters.js";
+import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 
 /**
  * The BFF.
@@ -126,30 +123,16 @@ export const setLocale = createServerFn({ method: "POST" })
     return { locale: data.locale };
   });
 
-export interface RoutePage {
-  path: string;
-  /** The negotiated locale — which of each node's content bags to render. */
-  locale: string;
-  /**
-   * The section-instance tree to render. Every node carries its own content
-   * for every locale, so there is nothing else to fetch — see
-   * `@feel-your-website/section-registry`'s `renderComposition`.
-   */
-  tree: readonly RouteSectionNode[];
-  /** This route's SEO metadata for `locale` — `{}` when it has none. */
-  seo: RouteSeo;
-}
+export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-page.js";
 
 /**
  * Resolves a request path against the published route manifest — the piece
- * that turns a CMS author publishing a route into an actual page. The
- * manifest's tree already carries per-instance, per-locale content, so this
- * is one lookup with no content fan-out. `src/routes/$.tsx` calls it and
- * `renderComposition` renders the result.
+ * that turns a CMS author publishing a route into an actual page. The matching,
+ * parent-chain walk, param sanitising and SEO interpolation are the pure
+ * {@link resolveRoutePage}; this wrapper just supplies the locale and manifest.
  *
- * Returns `null` for a path with no published bundle, rather than throwing —
- * "this route doesn't exist" is exactly what `notFound()` is for at the
- * route layer, not a BFF-level error.
+ * Returns `null` for no match, a reserved path, or a hostile param — all of
+ * which are `notFound()` at the route layer, not BFF errors to throw.
  */
 export const loadRoutePage = createServerFn({ method: "GET" })
   .validator((input: unknown): { path: string } => {
@@ -161,12 +144,8 @@ export const loadRoutePage = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<RoutePage | null> => {
     const locale = resolveLocale();
-
     // `getRouteManifest` ignores its own locale argument — route structure is
     // shared across locales and every node ships content for all of them.
     const manifest = await getContentAdapter().getRouteManifest(locale);
-    const bundle = manifest.find((candidate) => candidate.path === data.path);
-    if (!bundle) return null;
-
-    return { path: bundle.path, locale, tree: bundle.tree, seo: bundle.seo[locale] ?? {} };
+    return resolveRoutePage(data.path, manifest, locale);
   });
