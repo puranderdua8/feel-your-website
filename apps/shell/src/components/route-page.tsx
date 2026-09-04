@@ -1,6 +1,7 @@
 import { renderComposition, type RouteRenderContext } from "@feel-your-website/section-registry";
 import type { ReactNode } from "react";
 
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import type { RoutePage } from "@/server/bff";
 
 /** Turns a resolved page's (already param-interpolated) SEO into `head()` meta / links. */
@@ -50,5 +51,10 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
     rendered = renderComposition(page.layers[i]!.tree, page.locale, { route, outlet: rendered });
   }
 
-  return <main className="mx-auto flex max-w-3xl flex-col gap-8 p-8">{rendered}</main>;
+  return (
+    <main className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
+      <Breadcrumbs chain={page.chain} />
+      {rendered}
+    </main>
+  );
 }

@@ -36,6 +36,7 @@ describe("resolveRoutePage", () => {
     expect(page!.pattern).toBe("/blog/:slug");
     expect(page!.layers.map((l) => l.bundleId)).toEqual(["blog", "blog-post"]);
     expect(page!.chain.map((c) => c.title)).toEqual(["Blog", "hello - Blog"]);
+    expect(page!.chain.map((c) => c.href)).toEqual(["/blog", "/blog/hello"]);
     expect(page!.seo.title).toBe("hello - Blog");
     expect(page!.seo.canonical).toBe("https://x.test/blog/hello");
   });

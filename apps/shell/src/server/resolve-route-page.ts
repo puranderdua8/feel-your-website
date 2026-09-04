@@ -1,4 +1,5 @@
 import {
+  buildHref,
   interpolateSeo,
   interpolateTemplate,
   matchRoute,
@@ -23,6 +24,8 @@ export interface RouteChainEntry {
   id: string;
   /** Absolute pattern, e.g. `/blog/:slug`. */
   path: string;
+  /** The concrete URL for this entry, params filled in from the matched route. */
+  href: string;
   /** Display label — the interpolated SEO title, else the last path segment. */
   title: string;
 }
@@ -119,7 +122,14 @@ export function resolveRoutePage(
 
   const chain: RouteChainEntry[] = chainBundles.map((bundle) => {
     const interpolated = interpolateTemplate(bundle.seo[locale]?.title ?? "", params).value.trim();
-    return { id: bundle.id, path: bundle.path, title: interpolated || lastSegment(bundle.path) };
+    return {
+      id: bundle.id,
+      path: bundle.path,
+      // Every ancestor's `:name` segments are a prefix of the matched pattern's,
+      // so `params` covers them.
+      href: buildHref(bundle.path, params),
+      title: interpolated || lastSegment(bundle.path),
+    };
   });
 
   return {
