@@ -4,21 +4,36 @@ import { useState } from "react";
 
 import { sectionCatalog } from "@/content/sections";
 
-import { addSlotChild, moveRoot, newNode, removeNode } from "./tree-ops.js";
+import {
+  addSlotChild,
+  hasOutlet,
+  moveRoot,
+  newNode,
+  newOutletNode,
+  removeNode,
+} from "./tree-ops.js";
 
 /**
  * The section-instance tree editor. Add / remove / reorder root sections;
  * expand a node to fill its slots with other sections (filtered by
  * `slot.accepts`). Selecting a node hands it to the field form on the side.
+ *
+ * `outlet` — where a layout route's matched child renders — is deliberately
+ * not in `sectionCatalog`, so it never appears in the generic "add section"
+ * dropdown. It gets its own control here instead, offered only while this
+ * route has (or is being set up to have) children, and only once.
  */
 export function SectionTree({
   tree,
   selectedId,
+  isLayout,
   onSelect,
   onChange,
 }: {
   tree: readonly RouteSectionNode[];
   selectedId: string | null;
+  /** Whether this route has children or is meant to — gates the "Add outlet" control. */
+  isLayout: boolean;
   onSelect: (id: string) => void;
   onChange: (tree: readonly RouteSectionNode[]) => void;
 }) {
@@ -46,11 +61,23 @@ export function SectionTree({
         />
       ))}
 
-      <AddSection
-        accepts={[]}
-        label="Add root section"
-        onAdd={(key) => onChange([...tree, newNode(key)])}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <AddSection
+          accepts={[]}
+          label="Add root section"
+          onAdd={(key) => onChange([...tree, newNode(key)])}
+        />
+        {isLayout && !hasOutlet(tree) && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onChange([...tree, newOutletNode()])}
+          >
+            + Add outlet
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
