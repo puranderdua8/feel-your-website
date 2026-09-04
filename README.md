@@ -490,6 +490,52 @@ this through `RouteCompositionWriter`; the shell renders it. The pieces:
   resolves `outlet` nodes. An unregistered key or missing content renders a
   visible placeholder rather than silently shortening the page.
 
+**Authoring the hierarchy, in the CMS's Routes tab
+(`apps/cms/src/components/route-editor/`):**
+
+- **`server/route-input.ts`** is the one place every path/hierarchy/param/SEO
+  rule this platform enforces is written down — `validateRouteInput` (parent
+  cycle, reserved path, structural pattern collision, `:param` ↔ label
+  consistency, publish ordering, `{{placeholder}}` ⊆ params). It has no
+  server-only import, so it bundles into the browser unchanged: the editor's
+  live preview runs the exact function `saveRouteComposition` runs as the
+  authority, not a hand-kept-in-sync copy.
+- **`path-builder.tsx`** edits this route's own contribution as static-text or
+  `:param` segments — a root's segment is the whole pattern, a child's is
+  exactly one, shown after its parent's locked prefix. **`param-editor.tsx`**
+  offers one label per `:name` the composed pattern actually contains.
+  **`parent-picker.tsx`** lists the hierarchy (via `route-hierarchy.tsx`'s
+  `buildRouteForest`/`walkForest`, shared with the now-nested `route-list.tsx`)
+  with the route itself and its own descendants excluded, so a route can never
+  be reparented under its own subtree. **`path-pattern-preview.tsx`** composes
+  the candidate absolute pattern, a sample URL, and every live
+  `validateRouteInput` issue as you type.
+- **`section-tree.tsx`** offers "Add outlet" as its own control — never a
+  `sectionCatalog` entry a generic "add section" list could surface — shown
+  only while the route has children and hidden again once one exists;
+  `tree-ops.ts` and the server both reject a second one.
+- Deleting a route with children goes through **`deleteRouteSubtree`**, behind
+  a confirm dialog that names every descendant it would remove — a plain
+  delete still refuses outright.
+
+**The site nav and breadcrumbs are generated from the same hierarchy, not
+hand-authored:**
+
+- **`server/nav.ts`'s `buildNav`** turns the published route headers into a
+  forest, keyed on `parentId`. A route whose path carries a `:name` has no
+  single URL, so it — and everything under it — is left out of the menu; its
+  static ancestors stay. It's fed by **`getRouteHeaders()`**, deliberately not
+  `getRouteManifest()`: this runs in `loadBootstrap` on _every_ SSR
+  navigation, and the header read pulls no section rows. `bootstrap.nav`
+  degrades to `[]` on a CMS outage, same as the rest of bootstrap.
+- **`components/site-nav.tsx`** renders it two levels deep — a childless route
+  as a link, one with children as a dropdown of itself plus its descendants
+  (deeper nesting flattens into that one list) — and **`breadcrumbs.tsx`**
+  renders `RoutePage.chain` (root→leaf, from `resolveParentChain`) as a trail,
+  showing nothing for a top-level route (`chain.length < 2`). Both are plain
+  `<a href>`: every path is server-rendered by `/$` (or `/`) regardless of
+  which link reaches it.
+
 The Supabase read model is `published_route_sections` (a flat, one-row-per-
 instance `security_invoker` view, now also carrying `parent_bundle_id` /
 `param_meta`); the tree is assembled in TypeScript by the shared
