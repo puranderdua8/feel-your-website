@@ -9,6 +9,7 @@ import type {
   RouteBundle,
   RouteComposition,
   RouteCompositionSummary,
+  RouteParamSpec,
   RouteSectionNode,
   RouteSeo,
   SiteLocale,
@@ -20,7 +21,7 @@ import {
   validateSectionFields,
 } from "@feel-your-website/content-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
-import { sectionCatalog } from "@feel-your-website/section-registry";
+import { OUTLET_SECTION_KEY, sectionCatalog } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 
 import {
@@ -32,6 +33,7 @@ import {
   getRouteCompositionWriter,
   getSiteSettingsStore,
 } from "./adapters.js";
+import { composeCandidatePath, parseParams, validateRouteInput } from "./route-input.js";
 
 /**
  * The BFF — same role as `apps/shell/src/server/bff.ts`: the only code that
@@ -320,11 +322,22 @@ export const loadRouteComposition = createServerFn({ method: "GET" })
     getRouteCompositionReader().getComposition(data.bundleId),
   );
 
+/** Number of `outlet` marker nodes anywhere in the tree — at most one is allowed. */
+function countOutlets(tree: readonly RouteSectionNode[]): number {
+  let count = 0;
+  for (const node of flattenNodes(tree)) {
+    if (node.sectionKey === OUTLET_SECTION_KEY) count += 1;
+  }
+  return count;
+}
+
 /**
- * Creates (`bundleId` absent) or replaces a route's section tree. The tree is
- * validated against the section catalog here — an unknown section key is
- * rejected before the write, matching how `route_templates.template_key` is
- * validated at author time rather than by the database.
+ * Creates (`bundleId` absent) or replaces a route's section tree, path,
+ * hierarchy and parameters. `validateRouteInput` — the same pure module the
+ * editor's live preview runs — is the authority here for everything the
+ * database's own constraints and RPC checks can't express (reserved paths,
+ * param/label bookkeeping, SEO placeholders); `save_route_composition` is the
+ * transactional backstop for the rest (cycles, publish ordering, collisions).
  */
 export const saveRouteComposition = createServerFn({ method: "POST" })
   .validator(
@@ -333,23 +346,37 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     ): {
       bundleId: string | null;
       name: string;
-      path: string;
+      parentId: string | null;
+      pathSegment: string;
+      params: RouteParamSpec[];
       published: boolean;
       tree: RouteSectionNode[];
       seo: Record<string, RouteSeo>;
       expectedVersion: number | null;
       actor: string;
     } => {
-      const { bundleId, name, path, published, tree, seo, expectedVersion, actor } = (input ??
-        {}) as Record<string, unknown>;
+      const {
+        bundleId,
+        name,
+        parentId,
+        pathSegment,
+        params,
+        published,
+        tree,
+        seo,
+        expectedVersion,
+        actor,
+      } = (input ?? {}) as Record<string, unknown>;
       if (typeof name !== "string" || name.trim() === "") throw new Error("name is required.");
-      if (typeof path !== "string" || !path.startsWith("/")) {
-        throw new Error("path is required and must start with /.");
+      if (typeof pathSegment !== "string" || pathSegment.trim() === "") {
+        throw new Error("A path is required.");
       }
       return {
         bundleId: typeof bundleId === "string" && bundleId !== "" ? bundleId : null,
         name,
-        path,
+        parentId: typeof parentId === "string" && parentId !== "" ? parentId : null,
+        pathSegment,
+        params: parseParams(params),
         published: Boolean(published),
         tree: parseTree(tree),
         seo: parseSeo(seo),
@@ -359,16 +386,46 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }): Promise<RouteBundle> => {
-    const unknown = findUnknownSectionKeys(sectionCatalog, flattenTree(data.tree));
+    const unknown = findUnknownSectionKeys(sectionCatalog, flattenTree(data.tree)).filter(
+      (key) => key !== OUTLET_SECTION_KEY,
+    );
     if (unknown.length > 0) {
       throw new Error(`Unknown section(s): ${unknown.join(", ")}`);
     }
+    if (countOutlets(data.tree) > 1) {
+      throw new Error("A route can carry only one outlet.");
+    }
+
+    const siblings = await getRouteCompositionReader().listCompositions();
+    const issues = validateRouteInput({
+      bundleId: data.bundleId,
+      parentId: data.parentId,
+      pathSegment: data.pathSegment,
+      params: data.params,
+      published: data.published,
+      seo: data.seo,
+      siblings,
+    });
+    if (issues.length > 0) {
+      throw new Error(issues.map((issue) => issue.message).join(" "));
+    }
+
+    const path = composeCandidatePath({
+      parentId: data.parentId,
+      pathSegment: data.pathSegment,
+      siblings,
+    });
+    // `validateRouteInput` above already confirmed this composes cleanly.
+    if (!path) throw new Error("That path is not valid.");
 
     return getRouteCompositionWriter().saveComposition(
       data.bundleId,
       {
         name: data.name,
-        path: data.path,
+        path,
+        pathSegment: data.pathSegment,
+        parentId: data.parentId,
+        params: data.params,
         published: data.published,
         tree: data.tree,
         seo: data.seo,
@@ -378,7 +435,7 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     );
   });
 
-/** Deletes a route bundle and its whole section tree. */
+/** Deletes a route bundle and its whole section tree. Refuses if it still has children. */
 export const deleteRouteComposition = createServerFn({ method: "POST" })
   .validator((input: unknown): { bundleId: string; expectedVersion: number; actor: string } => {
     const { bundleId, expectedVersion, actor } = (input ?? {}) as Record<string, unknown>;
@@ -395,6 +452,23 @@ export const deleteRouteComposition = createServerFn({ method: "POST" })
     );
   });
 
+/** Deletes a route bundle **and every descendant route** — the explicit, confirmed counterpart above. */
+export const deleteRouteSubtree = createServerFn({ method: "POST" })
+  .validator((input: unknown): { bundleId: string; expectedVersion: number; actor: string } => {
+    const { bundleId, expectedVersion, actor } = (input ?? {}) as Record<string, unknown>;
+    if (typeof bundleId !== "string" || typeof expectedVersion !== "number") {
+      throw new Error("bundleId and expectedVersion are required.");
+    }
+    return { bundleId, expectedVersion, actor: typeof actor === "string" ? actor : "unknown" };
+  })
+  .handler(async ({ data }): Promise<void> => {
+    await getRouteCompositionWriter().deleteSubtree(
+      data.bundleId,
+      data.expectedVersion,
+      data.actor,
+    );
+  });
+
 export interface PublishGap {
   locale: string;
   /** The offending section instance in the tree. */
@@ -404,26 +478,42 @@ export interface PublishGap {
   missing: string[];
 }
 
+/** A structural (not per-locale-content) publish concern. */
+export interface StructuralIssue {
+  message: string;
+  /** Blocks publish; `false` is a warning shown but not enforced. */
+  blocking: boolean;
+}
+
 export interface PublishReadiness {
   ready: boolean;
   gaps: PublishGap[];
+  structuralIssues: StructuralIssue[];
 }
 
 /**
  * Whether a tree can be published: every section instance in it must have
  * complete content — every required field present and well-typed — in every
- * configured site locale. The route owns the content, so this walks the
- * tree's nodes directly; there is no separate content store to consult.
+ * configured site locale — and the tree's `outlet` usage must make sense for
+ * whether this route actually has children. The route owns the content, so
+ * this walks the tree's nodes directly; there is no separate content store to
+ * consult. `hasChildren` is supplied by the caller (the editor already has the
+ * full route list loaded) rather than re-fetched here.
  */
 export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
-  .validator((input: unknown): { tree: RouteSectionNode[] } => ({
-    tree: parseTree((input as { tree?: unknown } | undefined)?.tree),
-  }))
+  .validator((input: unknown): { tree: RouteSectionNode[]; hasChildren: boolean } => {
+    const row = (input ?? {}) as Record<string, unknown>;
+    return { tree: parseTree(row.tree), hasChildren: Boolean(row.hasChildren) };
+  })
   .handler(async ({ data }): Promise<PublishReadiness> => {
     const locales = await getSiteSettingsStore().getLocales();
     const gaps: PublishGap[] = [];
 
     for (const node of flattenNodes(data.tree)) {
+      // The outlet marks where a child renders; it carries no content of its
+      // own and is never a translation gap.
+      if (node.sectionKey === OUTLET_SECTION_KEY) continue;
+
       const def = sectionCatalog.byKey.get(node.sectionKey);
       for (const { locale } of locales) {
         const fields = node.content[locale] ?? {};
@@ -448,5 +538,25 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
       }
     }
 
-    return { ready: gaps.length === 0, gaps };
+    const outletCount = countOutlets(data.tree);
+    const structuralIssues: StructuralIssue[] = [];
+    if (outletCount > 1) {
+      structuralIssues.push({ message: "A route can carry only one outlet.", blocking: true });
+    } else if (data.hasChildren && outletCount === 0) {
+      structuralIssues.push({
+        message: "This route has children but no outlet — they won't render inside it.",
+        blocking: true,
+      });
+    } else if (!data.hasChildren && outletCount === 1) {
+      structuralIssues.push({
+        message: "This route has an outlet but no children yet.",
+        blocking: false,
+      });
+    }
+
+    return {
+      ready: gaps.length === 0 && structuralIssues.every((issue) => !issue.blocking),
+      gaps,
+      structuralIssues,
+    };
   });

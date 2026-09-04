@@ -5,17 +5,21 @@ import { useCallback, useEffect, useState } from "react";
 import { checkRoutePublishReadiness, type PublishReadiness } from "@/server/bff";
 
 /**
- * Save draft / publish, with a per-locale completeness gate. `Publish` is
- * disabled while any configured locale is missing content for a section the
- * route depends on — unless the author explicitly forces it.
+ * Save draft / publish, with a per-locale completeness gate plus the
+ * structural outlet/children check. `Publish` is disabled while any
+ * configured locale is missing content for a section the route depends on, or
+ * a blocking structural issue stands — unless the author explicitly forces it.
  */
 export function PublishBar({
   tree,
+  hasChildren,
   pending,
   onSaveDraft,
   onPublish,
 }: {
   tree: readonly RouteSectionNode[];
+  /** Whether another route already names this one as its parent. */
+  hasChildren: boolean;
   pending: boolean;
   onSaveDraft: () => void;
   onPublish: () => void;
@@ -27,16 +31,16 @@ export function PublishBar({
   const check = useCallback(async () => {
     setChecking(true);
     try {
-      setReadiness(await checkRoutePublishReadiness({ data: { tree } }));
+      setReadiness(await checkRoutePublishReadiness({ data: { tree, hasChildren } }));
     } finally {
       setChecking(false);
     }
-  }, [tree]);
+  }, [tree, hasChildren]);
 
   useEffect(() => {
     setReadiness(null);
     setForce(false);
-  }, [tree]);
+  }, [tree, hasChildren]);
 
   const blocked = readiness !== null && !readiness.ready && !force;
 
@@ -57,28 +61,42 @@ export function PublishBar({
             className={readiness.ready ? "text-sm text-emerald-600" : "text-destructive text-sm"}
           >
             {readiness.ready
-              ? "Ready — every locale is complete."
-              : `${readiness.gaps.length} translation gap(s).`}
+              ? "Ready to publish."
+              : `${readiness.gaps.length} translation gap(s), ${readiness.structuralIssues.length} structural issue(s).`}
           </span>
         )}
       </div>
 
+      {readiness !== null && readiness.structuralIssues.length > 0 && (
+        <ul className="flex flex-col gap-0.5 text-xs">
+          {readiness.structuralIssues.map((issue, index) => (
+            <li
+              key={index}
+              className={issue.blocking ? "text-destructive" : "text-muted-foreground"}
+            >
+              {issue.blocking ? "⛔" : "⚠️"} {issue.message}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {readiness !== null && readiness.gaps.length > 0 && (
-        <>
-          <ul className="text-muted-foreground flex flex-col gap-0.5 text-xs">
-            {readiness.gaps.map((gap, index) => (
-              <li key={index}>
-                <code>{gap.locale}</code> · <code>{gap.sectionKey}</code>{" "}
-                <span className="opacity-60">({gap.instanceId.slice(0, 8)})</span> —{" "}
-                {gap.missing.includes("*") ? "no content" : `missing: ${gap.missing.join(", ")}`}
-              </li>
-            ))}
-          </ul>
-          <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
-            Publish anyway
-          </label>
-        </>
+        <ul className="text-muted-foreground flex flex-col gap-0.5 text-xs">
+          {readiness.gaps.map((gap, index) => (
+            <li key={index}>
+              <code>{gap.locale}</code> · <code>{gap.sectionKey}</code>{" "}
+              <span className="opacity-60">({gap.instanceId.slice(0, 8)})</span> —{" "}
+              {gap.missing.includes("*") ? "no content" : `missing: ${gap.missing.join(", ")}`}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {readiness !== null && !readiness.ready && (
+        <label className="flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
+          Publish anyway
+        </label>
       )}
     </div>
   );
