@@ -129,10 +129,13 @@ function Placeholder({ children }: { children: React.ReactNode }): React.JSX.Ele
  * Renders one section: its component, fed a field bag and its already-rendered
  * slot children.
  *
- * A missing component or missing content is rendered visibly rather than
- * skipped — a route published against a key this build doesn't know, or an
- * instance nobody has filled in yet for this locale, is a mistake worth
- * seeing on the page.
+ * A missing component or a genuinely empty instance is rendered visibly rather
+ * than skipped — a route published against a key this build doesn't know, or a
+ * leaf nobody has filled in yet for this locale, is a mistake worth seeing on
+ * the page. But a composite whose own fields are all optional (`card`) may
+ * legitimately carry no content bag of its own — its point is the slot
+ * children — so an instance with anything slotted into it always renders,
+ * `fields` defaulting to an empty bag.
  */
 export function renderSection(
   sectionKey: string,
@@ -142,6 +145,12 @@ export function renderSection(
 ): React.JSX.Element {
   const Component = SECTION_REGISTRY[sectionKey];
   if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
-  if (!fields) return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
-  return <Component fields={fields} slots={slots} route={route} />;
+
+  const hasSlotChildren = Object.values(slots).some(
+    (child) => child != null && (!Array.isArray(child) || child.length > 0),
+  );
+  if (!fields && !hasSlotChildren) {
+    return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
+  }
+  return <Component fields={fields ?? {}} slots={slots} route={route} />;
 }

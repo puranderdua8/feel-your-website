@@ -85,6 +85,30 @@ describe("renderComposition", () => {
     expect(screen.getByText("Bare")).toBeTruthy();
   });
 
+  it("renders a card with slot children but no own content — `heading` is optional", () => {
+    const tree: RouteSectionNode[] = [
+      node({
+        instanceId: "card",
+        sectionKey: "card",
+        // No `content` bag at all for this locale, only slot children.
+        slots: {
+          body: [
+            node({
+              instanceId: "t",
+              sectionKey: "text",
+              content: { en: { value: "Just the body" } },
+            }),
+          ],
+        },
+      }),
+    ];
+
+    render(renderComposition(tree, "en"));
+
+    expect(screen.getByText("Just the body")).toBeTruthy();
+    expect(screen.queryByText(/has no content yet/)).toBeNull();
+  });
+
   it("renders a visible placeholder when a node has no content for the locale", () => {
     const tree: RouteSectionNode[] = [
       node({
