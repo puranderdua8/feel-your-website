@@ -72,6 +72,12 @@ describe("resolveRoutePage", () => {
     const page = resolveRoutePage("/blog/featured", manifest, "en");
     expect(page!.chain.at(-1)!.title).toBe("featured");
   });
+
+  it("falls back to the resolved param value, not the `:name` token, for a param route with no title", () => {
+    const tags = bundle({ id: "tags", path: "/tags/:tag", paramNames: ["tag"] });
+    const page = resolveRoutePage("/tags/react", [...manifest, tags], "en");
+    expect(page!.chain.at(-1)!.title).toBe("react");
+  });
 });
 
 describe("sanitizeParam", () => {

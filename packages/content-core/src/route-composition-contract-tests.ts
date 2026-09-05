@@ -433,5 +433,70 @@ export function runRouteCompositionWriterContract(
       );
       expect(recreated.version).toBe(1);
     });
+
+    hierarchyIt(
+      "rejects a parent rename that would drag a descendant onto an existing route",
+      async () => {
+        const writer = await createWriter();
+        // parent `/contract-parent`, child `/contract-parent/:slug`.
+        const parent = await savePublishedParent(writer);
+        await writer.saveComposition(
+          null,
+          {
+            name: f.childName,
+            path: f.childPath,
+            pathSegment: f.childSegment,
+            parentId: parent.id,
+            params: [f.param],
+            published: true,
+            tree: heroTree(),
+            seo: {},
+          },
+          null,
+          "user-1",
+        );
+
+        // An unrelated route whose pattern the child *would* collide with once
+        // its parent is renamed: `/renamed/:other` ~ `/renamed/:param`.
+        await writer.saveComposition(
+          null,
+          {
+            name: "Contract Other",
+            path: "/renamed/:other",
+            pathSegment: "/renamed/:other",
+            params: [{ name: "other", label: "Other" }],
+            published: true,
+            tree: heroTree(),
+            seo: {},
+          },
+          null,
+          "user-1",
+        );
+
+        // Renaming the parent to `/renamed` makes the child `/renamed/:slug`,
+        // which normalises identically to `/renamed/:other`. The parent's own
+        // new path is unique — only the descendant collides — so a check that
+        // only looked at the route being saved would wrongly allow this.
+        try {
+          await writer.saveComposition(
+            parent.id,
+            {
+              name: f.parentName,
+              path: "/renamed",
+              pathSegment: "/renamed",
+              parentId: null,
+              published: true,
+              tree: heroTree(),
+              seo: {},
+            },
+            parent.version,
+            "user-1",
+          );
+          expect.unreachable("a descendant collision should have thrown");
+        } catch (error) {
+          expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+        }
+      },
+    );
   });
 }

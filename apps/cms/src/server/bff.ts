@@ -392,11 +392,30 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     if (unknown.length > 0) {
       throw new Error(`Unknown section(s): ${unknown.join(", ")}`);
     }
-    if (countOutlets(data.tree) > 1) {
+    const outletCount = countOutlets(data.tree);
+    if (outletCount > 1) {
       throw new Error("A route can carry only one outlet.");
     }
 
     const siblings = await getRouteCompositionReader().listCompositions();
+
+    // Computed here, not trusted from the client: `hasChildren` gates a
+    // blocking publish rule below, so it must reflect the real sibling set,
+    // not whatever the editor's local state happened to send.
+    const hasChildren =
+      data.bundleId !== null && siblings.some((s) => s.parentId === data.bundleId);
+    // `checkRoutePublishReadiness` surfaces this same rule to the editor as a
+    // live, non-authoritative hint — but that check is opt-in (a button the
+    // author can simply never press) and never runs on the actual save path.
+    // Publishing a layout with no outlet means its children render as
+    // orphaned standalone pages with no chrome, so this is enforced here too,
+    // unconditionally, the same way the single-outlet rule above already is.
+    if (data.published && hasChildren && outletCount === 0) {
+      throw new Error(
+        "This route has children but no outlet — add one before publishing, or they will render as standalone pages with no layout.",
+      );
+    }
+
     const issues = validateRouteInput({
       bundleId: data.bundleId,
       parentId: data.parentId,

@@ -37,10 +37,17 @@ export function PublishBar({
     }
   }, [tree, hasChildren]);
 
+  // Runs automatically whenever the tree or the children set changes, not
+  // only when the author happens to press "Check readiness" — leaving that
+  // button unclicked was exactly how a layout with children and no outlet
+  // used to reach Publish with the button never disabled. Debounced so a
+  // burst of content-field keystrokes collapses into one round trip; the
+  // server still enforces the blocking rules independently on save.
   useEffect(() => {
-    setReadiness(null);
     setForce(false);
-  }, [tree, hasChildren]);
+    const timer = setTimeout(() => void check(), 400);
+    return () => clearTimeout(timer);
+  }, [check]);
 
   const blocked = readiness !== null && !readiness.ready && !force;
 

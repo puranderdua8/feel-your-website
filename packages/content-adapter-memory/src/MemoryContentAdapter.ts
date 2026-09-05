@@ -216,14 +216,52 @@ export class MemoryContentAdapter
     const resolvedPath = this.#composePath(parentId, pathSegment);
 
     // Structural-collision guard — the in-memory mirror of the DB's
-    // `unique (normalized_path)`.
-    const normalized = safeNormalize(resolvedPath);
-    for (const other of routes) {
-      if (other.id === bundleId) continue;
-      if (safeNormalize(this.#absolutePath(other)) === normalized) {
+    // `unique (normalized_path)`. A rename or reparent doesn't only move this
+    // route's own path: every existing descendant's absolute path is derived
+    // from it too (`#absolutePath` walks the live parent chain), so moving the
+    // parent can silently collide a *descendant's* path with an unrelated
+    // route even when this route's own new path is fine on its own. Postgres
+    // catches exactly this — `route_recompute_subtree_paths` runs inside a
+    // `unique_violation` trap in `save_route_composition` — so this mirrors it:
+    // recompute what the whole moved subtree's paths *would* become, and check
+    // every one of them against every route outside that subtree, before
+    // committing anything.
+    const descendantIds = bundleId ? this.#descendantIds(bundleId, routes) : [];
+    const movedSubtree = new Set<string>(bundleId ? [bundleId, ...descendantIds] : []);
+    // `path: undefined` forces `#absolutePath` to recompute this route's own
+    // top-level path from the new `pathSegment` rather than reusing the stale
+    // literal `path` a root route stores.
+    const hypothetical = bundleId
+      ? routes.map((route) =>
+          route.id === bundleId ? { ...route, pathSegment, parentId, path: undefined } : route,
+        )
+      : routes;
+
+    const toCheck: { id: string | null; path: string }[] = [{ id: bundleId, path: resolvedPath }];
+    for (const id of descendantIds) {
+      const seed = hypothetical.find((route) => route.id === id);
+      if (seed) toCheck.push({ id, path: this.#absolutePath(seed, hypothetical) });
+    }
+
+    for (const { id, path } of toCheck) {
+      const normalized = safeNormalize(path);
+      for (const other of routes) {
+        if (movedSubtree.has(other.id)) continue;
+        if (safeNormalize(this.#absolutePath(other)) !== normalized) continue;
+
+        if (id === bundleId) {
+          // This route's own path — matches the DB's `on conflict` guard.
+          throw new RouteCompositionError(
+            "conflict",
+            `Another route already matches the pattern "${path}".`,
+          );
+        }
+        // A descendant would be dragged onto an existing pattern by this
+        // rename/reparent — the DB raises PT422 (-> "invalid") from the
+        // `route_recompute_subtree_paths` unique_violation trap; match that.
         throw new RouteCompositionError(
-          "conflict",
-          `Another route already matches the pattern "${resolvedPath}".`,
+          "invalid",
+          `This change would move a descendant route to "${path}", which already matches another route.`,
         );
       }
     }
@@ -358,21 +396,52 @@ export class MemoryContentAdapter
     return (this.#seed.routes ?? []).filter((route) => route.published !== false);
   }
 
-  /** The absolute path pattern for a seed, walking its parent chain. */
-  #absolutePath(seed: RouteSeed, seen: Set<string> = new Set()): string {
+  /**
+   * The absolute path pattern for a seed, walking its parent chain.
+   *
+   * `routes` defaults to the live seed array; `saveComposition`'s collision
+   * guard passes a hypothetical one instead, to recompute what a descendant's
+   * path *would* become under a rename or reparent that hasn't been committed
+   * yet.
+   */
+  #absolutePath(
+    seed: RouteSeed,
+    routes: readonly RouteSeed[] = this.#seed.routes ?? [],
+    seen: Set<string> = new Set(),
+  ): string {
     const parentId = seed.parentId ?? null;
     const ownSegment = seed.pathSegment ?? seed.path ?? "/";
     if (!parentId || seen.has(seed.id)) return seed.path ?? ownSegment;
 
     seen.add(seed.id);
-    const parent = (this.#seed.routes ?? []).find((route) => route.id === parentId);
+    const parent = routes.find((route) => route.id === parentId);
     if (!parent) return seed.path ?? ownSegment;
 
     try {
-      return composeAbsolutePattern(this.#absolutePath(parent, seen), ownSegment);
+      return composeAbsolutePattern(this.#absolutePath(parent, routes, seen), ownSegment);
     } catch {
       return seed.path ?? ownSegment;
     }
+  }
+
+  /** `id`'s descendants (not including itself), computed from the flat seed list. */
+  #descendantIds(id: string, routes: readonly RouteSeed[]): string[] {
+    const childrenOf = new Map<string, string[]>();
+    for (const route of routes) {
+      const parent = route.parentId ?? null;
+      if (parent)
+        (childrenOf.get(parent) ?? childrenOf.set(parent, []).get(parent)!).push(route.id);
+    }
+    const out: string[] = [];
+    const stack = [id];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const child of childrenOf.get(current) ?? []) {
+        out.push(child);
+        stack.push(child);
+      }
+    }
+    return out;
   }
 
   /** Composes the absolute pattern for a route about to be written. */
