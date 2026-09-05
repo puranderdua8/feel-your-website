@@ -4,6 +4,7 @@ import {
   interpolateTemplate,
   matchRoute,
   normalizeRequestPath,
+  parseRoutePattern,
   resolveParentChain,
   type RouteBundle,
   type RouteSectionNode,
@@ -77,10 +78,20 @@ export function sanitizeParam(value: string): string | null {
   return value;
 }
 
-/** `/blog/:slug` -> `:slug`; `/` -> `home`. Fallback breadcrumb label. */
-function lastSegment(pattern: string): string {
-  const parts = pattern.split("/").filter(Boolean);
-  return parts.at(-1) ?? "home";
+/**
+ * A breadcrumb label for a route whose SEO title is unset (or interpolates to
+ * empty): the pattern's last segment — but resolved to the request's actual
+ * value when that segment is a `:param`, never the raw `:name` token, which no
+ * visitor could read. `/` falls back to `"home"`.
+ */
+function fallbackTitle(pattern: string, params: Readonly<Record<string, string>>): string {
+  try {
+    const last = parseRoutePattern(pattern).segments.at(-1);
+    if (!last) return "home";
+    return last.kind === "param" ? params[last.value] || last.value : last.value;
+  } catch {
+    return "home";
+  }
 }
 
 /**
@@ -128,7 +139,7 @@ export function resolveRoutePage(
       // Every ancestor's `:name` segments are a prefix of the matched pattern's,
       // so `params` covers them.
       href: buildHref(bundle.path, params),
-      title: interpolated || lastSegment(bundle.path),
+      title: interpolated || fallbackTitle(bundle.path, params),
     };
   });
 

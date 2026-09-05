@@ -78,19 +78,38 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
     if (error) throw mapRouteCompositionError(error, expectedVersion);
 
     const row = data as { id: string; version: number; updated_at: string };
+
+    // Read back the persisted hierarchy fields rather than echoing the input.
+    // The RPC composes `path` / `normalized_path` server-side from the parent
+    // chain, and a concurrent parent rename between this caller's sibling read
+    // and this write would make `input.path` stale — the DB row is right, so
+    // return that. `route_bundles_read_authors` RLS lets this `manage:routes`
+    // session read its own just-written (possibly draft) row.
+    const { data: persisted, error: readError } = await this.#client
+      .from("route_bundles")
+      .select("path, path_segment, parent_bundle_id, param_meta")
+      .eq("bundle_id", row.id)
+      .single();
+    if (readError) throw mapRouteCompositionError(readError, expectedVersion);
+
+    const meta = persisted as {
+      path: string;
+      path_segment: string;
+      parent_bundle_id: string | null;
+      param_meta: unknown;
+    };
+
     return {
       id: row.id,
-      path: input.path,
-      // Echoed: the RPC returns only the bundle header, and this is exactly
-      // what was just written — tree (with per-instance content) and SEO.
+      path: meta.path,
+      // The RPC returns only the bundle header, but tree (with per-instance
+      // content) and SEO are exactly what was just written.
       tree: input.tree,
       seo: input.seo,
-      // Hierarchy fields are echoed from the input; migration 20260911000100
-      // makes `save_route_composition` persist and return them.
-      pathSegment: input.pathSegment ?? input.path,
-      parentId: input.parentId ?? null,
-      paramNames: safeParamNames(input.path),
-      paramMeta: paramMetaToRecord((input.params ?? []).map((param) => ({ ...param }))),
+      pathSegment: meta.path_segment,
+      parentId: meta.parent_bundle_id,
+      paramNames: safeParamNames(meta.path),
+      paramMeta: paramMetaToRecord(meta.param_meta),
       version: row.version,
       updatedAt: row.updated_at,
     };
