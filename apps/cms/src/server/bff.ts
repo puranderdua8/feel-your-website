@@ -536,22 +536,33 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
       const def = sectionCatalog.byKey.get(node.sectionKey);
       for (const { locale } of locales) {
         const fields = node.content[locale] ?? {};
+
+        // `validateSectionFields` is the authority on whether an instance's
+        // content is complete for a locale: a section whose fields are all
+        // optional (e.g. `card`, which is really about its slots) is complete
+        // with an empty bag, and must not be flagged just for being empty.
+        if (def) {
+          const issues = validateSectionFields(def, fields);
+          if (issues.length > 0) {
+            gaps.push({
+              locale,
+              instanceId: node.instanceId,
+              sectionKey: node.sectionKey,
+              missing: issues.map((issue) => issue.field),
+            });
+          }
+          continue;
+        }
+
+        // No catalog entry — `saveRouteComposition` rejects unknown keys, so
+        // this is unreachable in practice, but if it happens we can't judge
+        // completeness, so treat any missing content as a gap.
         if (Object.keys(fields).length === 0) {
           gaps.push({
             locale,
             instanceId: node.instanceId,
             sectionKey: node.sectionKey,
             missing: ["*"],
-          });
-          continue;
-        }
-        const issues = def ? validateSectionFields(def, fields) : [];
-        if (issues.length > 0) {
-          gaps.push({
-            locale,
-            instanceId: node.instanceId,
-            sectionKey: node.sectionKey,
-            missing: issues.map((issue) => issue.field),
           });
         }
       }

@@ -49,6 +49,16 @@ describe("validateSectionFields", () => {
     expect(validateSectionFields(card, { title: "Hi" })).toEqual([]);
   });
 
+  it("treats an empty bag as complete when every field is optional", () => {
+    const slotsOnly: SectionDefinition = {
+      key: "wrap",
+      description: "All-optional composite.",
+      fields: [{ name: "heading", label: "Heading", type: "text" }],
+      slots: [{ name: "body", label: "Body", accepts: ["text"], arity: "list" }],
+    };
+    expect(validateSectionFields(slotsOnly, {})).toEqual([]);
+  });
+
   it("type-checks number, boolean and select when present", () => {
     const issues = validateSectionFields(card, {
       title: "Hi",
