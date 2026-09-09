@@ -327,6 +327,40 @@ importers:
         specifier: 'catalog:'
         version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1(supports-color@7.2.0))(lightningcss@1.33.0)(supports-color@7.2.0)(terser@5.51.2)
 
+  packages/action-invoker-http:
+    dependencies:
+      '@feel-your-website/action-core':
+        specifier: workspace:*
+        version: link:../action-core
+      '@feel-your-website/content-core':
+        specifier: workspace:*
+        version: link:../content-core
+    devDependencies:
+      '@feel-your-website/action-registry':
+        specifier: workspace:*
+        version: link:../action-registry
+      '@feel-your-website/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.1
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      jsdom:
+        specifier: 'catalog:'
+        version: 25.0.1(supports-color@7.2.0)
+      tsup:
+        specifier: 'catalog:'
+        version: 8.5.1(jiti@2.7.0)(postcss@8.5.26)(supports-color@7.2.0)(typescript@5.9.3)(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1(supports-color@7.2.0))(lightningcss@1.33.0)(supports-color@7.2.0)(terser@5.51.2)
+
   packages/action-registry:
     dependencies:
       '@feel-your-website/action-core':
