@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { flattenTree } from "./compose.js";
 import { isRouteCompositionError, RouteCompositionConflictError } from "./errors.js";
-import type { RouteCompositionWriter } from "./route-composition-writer.js";
+import type { RouteCompositionReader, RouteCompositionWriter } from "./route-composition-writer.js";
 import type { RouteSectionNode } from "./types.js";
 
 /**
@@ -49,6 +49,14 @@ export interface RouteCompositionWriterContractOptions {
   /** A fresh, empty writer per call, so test ordering cannot matter. */
   createWriter: () => Promise<RouteCompositionWriter> | RouteCompositionWriter;
   /**
+   * Optional: a reader bound to the **same store** as the writer passed in
+   * (from the current `createWriter()` call). When given, the suite adds
+   * assertions that read state back — currently that `hasOutlet` on the
+   * summary reflects the saved tree. An adapter that implements both
+   * interfaces just returns itself.
+   */
+  readerFor?: (writer: RouteCompositionWriter) => RouteCompositionReader;
+  /**
    * Whether the backend enforces the route-hierarchy invariants (parent
    * pointer, cycle rejection, publish ordering, subtree delete). Defaults to
    * `true`. Set `false` for a backend whose migration has not yet landed them.
@@ -59,10 +67,11 @@ export interface RouteCompositionWriterContractOptions {
 export function runRouteCompositionWriterContract(
   options: RouteCompositionWriterContractOptions,
 ): void {
-  const { name, createWriter } = options;
+  const { name, createWriter, readerFor } = options;
   const supportsHierarchy = options.supportsHierarchy ?? true;
   const f = ROUTE_COMPOSITION_FIXTURE;
   const hierarchyIt = supportsHierarchy ? it : it.skip;
+  const readerIt = readerFor ? it : it.skip;
 
   const heroTree = (): RouteSectionNode[] => [
     {
@@ -610,6 +619,38 @@ export function runRouteCompositionWriterContract(
       } catch (error) {
         expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
       }
+    });
+
+    readerIt("reports hasOutlet on the summary, matching the saved tree", async () => {
+      const writer = await createWriter();
+      const reader = readerFor!(writer);
+
+      const plain = await writer.saveComposition(
+        null,
+        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+      const layout = await writer.saveComposition(
+        null,
+        { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
+        null,
+        "user-1",
+      );
+
+      const byId = new Map((await reader.listCompositions()).map((r) => [r.id, r]));
+      expect(byId.get(plain.id)?.hasOutlet).toBe(false);
+      expect(byId.get(layout.id)?.hasOutlet).toBe(true);
+      expect((await reader.getComposition(layout.id))?.hasOutlet).toBe(true);
+
+      // Adding an outlet to `plain` flips it.
+      await writer.saveComposition(
+        plain.id,
+        { name: f.name, path: f.path, published: false, tree: layoutTree(), seo: {} },
+        plain.version,
+        "user-1",
+      );
+      expect((await reader.getComposition(plain.id))?.hasOutlet).toBe(true);
     });
   });
 }
