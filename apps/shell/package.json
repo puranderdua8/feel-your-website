@@ -14,6 +14,9 @@
     "clean": "rm -rf .output .netlify dist .turbo"
   },
   "dependencies": {
+    "@feel-your-website/action-core": "workspace:*",
+    "@feel-your-website/action-invoker-http": "workspace:*",
+    "@feel-your-website/action-registry": "workspace:*",
     "@feel-your-website/auth": "workspace:*",
     "@feel-your-website/auth-supabase": "workspace:*",
     "@feel-your-website/config-schema": "workspace:*",

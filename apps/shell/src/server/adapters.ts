@@ -1,9 +1,23 @@
+import {
+  InMemoryActionCacheStore,
+  MemoryActionInvoker,
+  type ActionInvoker,
+  type ActionResult,
+} from "@feel-your-website/action-core";
+import {
+  CachingActionInvoker,
+  HttpActionInvoker,
+  parseHttpActionBindings,
+} from "@feel-your-website/action-invoker-http";
+import { actionCatalog } from "@feel-your-website/action-registry";
 import { MockAuthProvider, type AuthProvider } from "@feel-your-website/auth";
 import { SupabaseAuthProvider, type CookieAdapter } from "@feel-your-website/auth-supabase";
 import { contractSeed, MemoryContentAdapter } from "@feel-your-website/content-adapter-memory";
 import { SupabaseContentAdapter } from "@feel-your-website/content-adapter-supabase";
 import type { ContentAdapter } from "@feel-your-website/content-core";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
+
+import { loadActionConfig } from "./config/action.js";
 
 /**
  * The dependency-injection point. There is exactly one.
@@ -80,8 +94,19 @@ function tanstackCookieAdapter(): CookieAdapter {
   };
 }
 
+/**
+ * Always fails with `not_found`. The zero-config state, so an unset
+ * `ACTION_INVOKER` needs no upstream and no credentials.
+ */
+class NullActionInvoker implements ActionInvoker {
+  invoke(): Promise<ActionResult> {
+    return Promise.resolve({ ok: false, code: "not_found" });
+  }
+}
+
 let contentAdapter: ContentAdapter | null = null;
 let authProvider: AuthProvider | null = null;
+let actionInvoker: ActionInvoker | null = null;
 
 export function getContentAdapter(): ContentAdapter {
   if (contentAdapter) return contentAdapter;
@@ -134,8 +159,45 @@ export function getAuthProvider(): AuthProvider {
   return authProvider;
 }
 
+/**
+ * The registered-actions invoker: `none` (a no-op that always returns
+ * `not_found`), `memory` (an echoing fake for local work), or `http` (real
+ * upstreams, response-cached for queries). Config and its validation live in
+ * `config/action.ts`; turning the decoded blob into `HttpActionBindings` and
+ * constructing the invoker are here because this is the one file the seam
+ * test lets name a concrete backend.
+ */
+export function getActionInvoker(): ActionInvoker {
+  if (actionInvoker) return actionInvoker;
+
+  const config = loadActionConfig();
+
+  if (config.kind === "none") {
+    actionInvoker = new NullActionInvoker();
+  } else if (config.kind === "memory") {
+    actionInvoker = new MemoryActionInvoker({ echoUnseeded: true });
+  } else {
+    if (config.cache === "blobs") {
+      throw new Error('ACTION_CACHE="blobs" is not implemented yet — use "memory".');
+    }
+    actionInvoker = new CachingActionInvoker({
+      inner: new HttpActionInvoker({
+        catalog: actionCatalog,
+        bindings: parseHttpActionBindings(config.rawBindings),
+        hostAllowlist: config.hostAllowlist,
+        firstPartyHosts: config.firstPartyHosts,
+      }),
+      catalog: actionCatalog,
+      store: new InMemoryActionCacheStore(),
+    });
+  }
+
+  return actionInvoker;
+}
+
 /** Test seam: forces the next call to rebuild from current env. */
 export function resetAdapters(): void {
   contentAdapter = null;
   authProvider = null;
+  actionInvoker = null;
 }

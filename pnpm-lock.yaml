@@ -195,6 +195,15 @@ importers:
 
   apps/shell:
     dependencies:
+      '@feel-your-website/action-core':
+        specifier: workspace:*
+        version: link:../../packages/action-core
+      '@feel-your-website/action-invoker-http':
+        specifier: workspace:*
+        version: link:../../packages/action-invoker-http
+      '@feel-your-website/action-registry':
+        specifier: workspace:*
+        version: link:../../packages/action-registry
       '@feel-your-website/auth':
         specifier: workspace:*
         version: link:../../packages/auth
