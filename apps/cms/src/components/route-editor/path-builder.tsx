@@ -21,6 +21,10 @@ interface Segment {
  * root's `"/"` for one render right after `parentId` changes (`index.tsx`
  * resets it properly on the next state update; this keeps that instant from
  * rendering `(invalid)`).
+ *
+ * A trailing empty segment (`/blog/`, `about/`) is kept — it is the "row the
+ * author is about to type into" that `add()` produces; `serializeSegments`
+ * round-trips it.
  */
 function parseSegments(pathSegment: string): Segment[] {
   const body = pathSegment.replace(/^\//, "");
@@ -57,11 +61,13 @@ export function PathBuilder({
 }) {
   const isRoot = parentPath === null;
   const parsed = parseSegments(pathSegment);
-  // A child always contributes exactly one segment — rendered from the start,
-  // never gated behind "+ segment", because an empty single segment and zero
-  // segments both serialise to the same "" and can't otherwise be told apart.
-  const segments =
-    isRoot || parsed.length > 0 ? parsed : [{ kind: "static", value: "" } as Segment];
+  // Always render at least one segment row, for a root as well as a child: an
+  // empty single segment and zero segments both serialise the same (`/` for a
+  // root, `""` for a child), so a row gated behind "+ segment" could never be
+  // reached — a root route would be uncreatable. One always-present row means
+  // an empty root row is simply the homepage `/`, and "+ segment" adds beyond
+  // the first.
+  const segments = parsed.length > 0 ? parsed : [{ kind: "static", value: "" } as Segment];
 
   function replace(index: number, next: Segment): void {
     const copy = [...segments];
@@ -82,8 +88,11 @@ export function PathBuilder({
     onChange(serializeSegments([...segments, { kind: "static", value: "" }], isRoot));
   }
 
-  const canAddMore = isRoot;
-  const canRemove = isRoot && segments.length > 0; // a nested route always keeps its one segment
+  const lastSegment = segments[segments.length - 1];
+  // Only a root has multiple own segments. Disabled while the current last row
+  // is still blank, so the button is never a silent no-op.
+  const canAddMore = isRoot && lastSegment !== undefined && lastSegment.value.trim() !== "";
+  const canRemove = segments.length > 1; // a nested route always keeps its one segment
 
   return (
     <div className="flex flex-col gap-2">
@@ -91,11 +100,6 @@ export function PathBuilder({
         {!isRoot && (
           <span className="text-muted-foreground bg-muted rounded px-2 py-1 font-mono text-sm">
             {parentPath}/
-          </span>
-        )}
-        {isRoot && segments.length === 0 && (
-          <span className="text-muted-foreground bg-muted rounded px-2 py-1 font-mono text-sm">
-            /
           </span>
         )}
         {segments.map((segment, index) => (
@@ -135,8 +139,8 @@ export function PathBuilder({
             )}
           </div>
         ))}
-        {canAddMore && (
-          <Button type="button" size="sm" variant="outline" onClick={add}>
+        {isRoot && (
+          <Button type="button" size="sm" variant="outline" disabled={!canAddMore} onClick={add}>
             + segment
           </Button>
         )}
