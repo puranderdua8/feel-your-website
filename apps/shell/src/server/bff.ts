@@ -6,6 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
 import { getAuthProvider, getContentAdapter } from "./adapters.js";
+import { assertSameOrigin } from "./http-guards.js";
 import { buildNav, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 
@@ -134,6 +135,7 @@ export const setLocale = createServerFn({ method: "POST" })
     return { locale };
   })
   .handler(async ({ data }): Promise<{ locale: string }> => {
+    assertSameOrigin();
     persistLocale(data.locale);
     return { locale: data.locale };
   });
