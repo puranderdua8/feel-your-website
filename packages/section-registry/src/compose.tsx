@@ -2,6 +2,7 @@ import type { Locale, RouteSectionNode } from "@feel-your-website/content-core";
 import { Fragment } from "react";
 
 import { OUTLET_SECTION_KEY, RouteRenderProvider, type RouteRenderContext } from "./context.js";
+import type { RenderLink } from "./link.js";
 import { renderSection } from "./registry.js";
 
 export interface RenderCompositionOptions {
@@ -18,6 +19,12 @@ export interface RenderCompositionOptions {
    * what a CMS preview or a mis-authored leaf route wants.
    */
   readonly outlet?: React.ReactNode;
+  /**
+   * Host-injected CTA link renderer, threaded to every `button` section. The
+   * shell passes a client-side `<Link>`-aware implementation; the CMS a plain
+   * `<a>`; omitted, `ButtonSection` falls back to a plain `<a>` itself.
+   */
+  readonly renderLink?: RenderLink;
 }
 
 /**
@@ -65,7 +72,13 @@ function renderNode(
     ));
   }
 
-  return renderSection(node.sectionKey, node.content[locale] ?? null, slots, options?.route);
+  return renderSection(
+    node.sectionKey,
+    node.content[locale] ?? null,
+    slots,
+    options?.route,
+    options?.renderLink,
+  );
 }
 
 /** Stand-in shown where a child route would render — CMS preview, or a leaf route carrying an outlet by mistake. */

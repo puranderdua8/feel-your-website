@@ -107,13 +107,35 @@ export const sectionCatalog = defineSections([
   },
   {
     key: "button",
-    description: "A labelled link.",
+    description: "A call-to-action — an internal or external link (later, a registered action).",
     fields: [
       { name: "label", label: "Label", type: "text", required: true },
-      { name: "href", label: "Link URL", type: "url", required: true },
+      {
+        name: "mode",
+        label: "Behaviour",
+        type: "select",
+        options: ["link", "action"],
+        default: "link",
+        helpText: "A link navigates; an action calls a registered endpoint on click.",
+      },
+      {
+        name: "href",
+        label: "Link URL",
+        type: "url",
+        showWhen: { field: "mode", equals: "link" },
+        helpText: "An internal path (/about) or a full URL (https://…, mailto:…).",
+      },
+      {
+        name: "linkTarget",
+        label: "Open in",
+        type: "select",
+        options: ["same-tab", "new-tab"],
+        default: "same-tab",
+        showWhen: { field: "mode", equals: "link" },
+      },
     ],
     slots: [],
-    sample: { fields: { label: "Get started", href: "#" } },
+    sample: { fields: { label: "Get started", mode: "link", href: "#" } },
   },
   {
     key: "card",
@@ -129,7 +151,7 @@ export const sectionCatalog = defineSections([
         icon: [{ sectionKey: "icon", fields: { name: "sparkles" } }],
         body: [
           { sectionKey: "text", fields: { value: "Body text inside the card." } },
-          { sectionKey: "button", fields: { label: "Learn more", href: "#" } },
+          { sectionKey: "button", fields: { label: "Learn more", mode: "link", href: "#" } },
         ],
       },
     },

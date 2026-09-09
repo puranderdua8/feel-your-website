@@ -1,6 +1,7 @@
 import type { JsonValue } from "@feel-your-website/content-core";
 
 import type { RouteRenderContext } from "./context.js";
+import { classifyHref, type LinkSpec, type RenderLink } from "./link.js";
 
 /** A section's rendered content: a plain field bag, or `null` when unfilled. */
 export type SectionFields = Readonly<Record<string, JsonValue>> | null;
@@ -34,6 +35,12 @@ export interface SectionComponentProps {
    * before putting it in markup, a URL, or a query.
    */
   route?: RouteRenderContext;
+  /**
+   * Host-injected CTA link renderer (see {@link RenderLink}). Absent in the
+   * CMS gallery and until the shell wires it — `ButtonSection` then falls back
+   * to a plain `<a>`.
+   */
+  renderLink?: RenderLink;
 }
 
 export type SectionComponent = (props: SectionComponentProps) => React.JSX.Element;
@@ -88,14 +95,54 @@ const ImageSection: SectionComponent = ({ fields }) =>
     <span className="text-muted-foreground text-sm">(no image)</span>
   );
 
-const ButtonSection: SectionComponent = ({ fields }) => (
-  <a
-    href={text(fields, "href") || "#"}
-    className="bg-primary text-primary-foreground inline-flex w-fit items-center rounded-[var(--radius)] px-3 py-1.5 text-sm font-medium"
-  >
-    {text(fields, "label")}
-  </a>
-);
+const CTA_CLASS =
+  "bg-primary text-primary-foreground inline-flex w-fit items-center rounded-[var(--radius)] px-3 py-1.5 text-sm font-medium";
+
+/** A CTA that can't render as a link (unsafe href, or `action` mode before it is wired). */
+function DisabledCta({ label }: { label: string }): React.JSX.Element {
+  return (
+    <span className={`${CTA_CLASS} cursor-not-allowed opacity-50`} aria-disabled="true">
+      {label}
+    </span>
+  );
+}
+
+/**
+ * A call-to-action. `mode: "link"` (the default) renders an internal or
+ * external link; `mode: "action"` is wired later and renders a disabled
+ * placeholder until then. An unsafe href renders the placeholder too.
+ */
+const ButtonSection: SectionComponent = ({ fields, renderLink }) => {
+  const label = text(fields, "label");
+  const mode = text(fields, "mode") || "link";
+  if (mode !== "link") return <DisabledCta label={label} />;
+
+  const { kind, href } = classifyHref(text(fields, "href"));
+  if (kind === "unsafe") return <DisabledCta label={label} />;
+
+  const newTab = text(fields, "linkTarget") === "new-tab";
+  const spec: LinkSpec = {
+    href,
+    internal: kind === "internal",
+    newTab,
+    label,
+    className: CTA_CLASS,
+    children: label,
+  };
+
+  if (renderLink) return <>{renderLink(spec)}</>;
+
+  // Fallback: a plain anchor (CMS preview, and the shell until it injects a renderer).
+  return (
+    <a
+      href={href}
+      className={CTA_CLASS}
+      {...(newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {label}
+    </a>
+  );
+};
 
 const CardSection: SectionComponent = ({ fields, slots }) => (
   <section className="border-border flex flex-col gap-3 rounded-[var(--radius)] border p-4">
@@ -142,6 +189,7 @@ export function renderSection(
   fields: SectionFields,
   slots: Readonly<Record<string, React.ReactNode>> = {},
   route?: RouteRenderContext,
+  renderLink?: RenderLink,
 ): React.JSX.Element {
   const Component = SECTION_REGISTRY[sectionKey];
   if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
@@ -152,5 +200,5 @@ export function renderSection(
   if (!fields && !hasSlotChildren) {
     return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
   }
-  return <Component fields={fields ?? {}} slots={slots} route={route} />;
+  return <Component fields={fields ?? {}} slots={slots} route={route} renderLink={renderLink} />;
 }
