@@ -25,21 +25,37 @@ describe("PathBuilder", () => {
     expect((screen.getByPlaceholderText("slug") as HTMLInputElement).value).toBe("slug");
   });
 
-  it("offers to add more segments only on a root route", () => {
+  it("offers '+ segment' only on a root route, once the last row has text", () => {
     render(<PathBuilder parentPath={null} pathSegment="/docs" onChange={vi.fn()} />);
-    expect(screen.getByText("+ segment")).toBeTruthy();
+    expect((screen.getByText("+ segment") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("renders `/` for a root route with no segments yet", () => {
-    render(<PathBuilder parentPath={null} pathSegment="/" onChange={vi.fn()} />);
-    expect(screen.getByText("/")).toBeTruthy();
+  it("still shows one editable segment for a brand-new ROOT with an empty pathSegment", () => {
+    // Regression: `/` (no segments) and `/` (one empty segment) serialise
+    // identically, so a row gated behind "+ segment" could never be reached and
+    // a top-level route was uncreatable through the UI. The row must render
+    // unconditionally; "+ segment" stays disabled until it has text.
+    const onChange = vi.fn();
+    render(<PathBuilder parentPath={null} pathSegment="/" onChange={onChange} />);
+
+    const input = screen.getByPlaceholderText("about") as HTMLInputElement;
+    expect(input.value).toBe("");
+    expect((screen.getByText("+ segment") as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(input, { target: { value: "home" } });
+    expect(onChange).toHaveBeenLastCalledWith("/home");
+  });
+
+  it("adds a second root segment once the first has text", () => {
+    const onChange = vi.fn();
+    render(<PathBuilder parentPath={null} pathSegment="/docs" onChange={onChange} />);
+
+    fireEvent.click(screen.getByText("+ segment"));
+    // A trailing empty segment the author is about to fill.
+    expect(onChange).toHaveBeenLastCalledWith("/docs/");
   });
 
   it("still shows one editable segment for a brand-new child with an empty pathSegment", () => {
-    // Regression: an empty single segment and zero segments both serialise to
-    // `""`, so the row can't be gated behind "+ segment" the way a root's can
-    // — it must render unconditionally, or a new child route can never get
-    // its first segment typed in.
     const onChange = vi.fn();
     render(<PathBuilder parentPath="/blog" pathSegment="" onChange={onChange} />);
 
