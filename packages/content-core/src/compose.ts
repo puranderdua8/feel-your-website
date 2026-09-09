@@ -99,3 +99,31 @@ export function flattenTree(tree: readonly RouteSectionNode[]): readonly string[
 export function flattenNodes(tree: readonly RouteSectionNode[]): readonly RouteSectionNode[] {
   return [...walk(tree)];
 }
+
+/**
+ * The reserved `sectionKey` marking where a parent route's layout renders its
+ * matched child. It is *not* a `sectionCatalog` entry — `renderComposition`
+ * (in `@feel-your-website/section-registry`) intercepts a node with this key
+ * before the component registry is ever consulted. Owned here, beside
+ * `RouteSectionNode`, because "does this route's tree carry an outlet" is a
+ * content-model fact that adapters, the shell and the CMS all need to read the
+ * same way; `section-registry` re-exports it for existing importers.
+ */
+export const OUTLET_SECTION_KEY = "outlet";
+
+/** Whether the tree carries an {@link OUTLET_SECTION_KEY} node anywhere (slots included). */
+export function treeHasOutlet(tree: readonly RouteSectionNode[]): boolean {
+  for (const node of walk(tree)) {
+    if (node.sectionKey === OUTLET_SECTION_KEY) return true;
+  }
+  return false;
+}
+
+/** How many {@link OUTLET_SECTION_KEY} nodes the tree carries — at most one is valid. */
+export function countOutlets(tree: readonly RouteSectionNode[]): number {
+  let count = 0;
+  for (const node of walk(tree)) {
+    if (node.sectionKey === OUTLET_SECTION_KEY) count += 1;
+  }
+  return count;
+}

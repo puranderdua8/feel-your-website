@@ -15,13 +15,15 @@ import type {
   SiteLocale,
 } from "@feel-your-website/content-core";
 import {
+  countOutlets,
   findUnknownSectionKeys,
   flattenNodes,
   flattenTree,
+  OUTLET_SECTION_KEY,
   validateSectionFields,
 } from "@feel-your-website/content-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
-import { OUTLET_SECTION_KEY, sectionCatalog } from "@feel-your-website/section-registry";
+import { sectionCatalog } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 
 import {
@@ -321,15 +323,6 @@ export const loadRouteComposition = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<RouteComposition | null> =>
     getRouteCompositionReader().getComposition(data.bundleId),
   );
-
-/** Number of `outlet` marker nodes anywhere in the tree — at most one is allowed. */
-function countOutlets(tree: readonly RouteSectionNode[]): number {
-  let count = 0;
-  for (const node of flattenNodes(tree)) {
-    if (node.sectionKey === OUTLET_SECTION_KEY) count += 1;
-  }
-  return count;
-}
 
 /**
  * Creates (`bundleId` absent) or replaces a route's section tree, path,

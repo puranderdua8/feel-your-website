@@ -2,6 +2,14 @@ import type { Locale } from "@feel-your-website/content-core";
 import { createContext, useContext } from "react";
 
 /**
+ * Re-exported from `@feel-your-website/content-core`, which now owns it (a
+ * content-model fact adapters need too). Kept exported from here so existing
+ * `import { OUTLET_SECTION_KEY } from "@feel-your-website/section-registry"`
+ * call sites are unchanged.
+ */
+export { OUTLET_SECTION_KEY } from "@feel-your-website/content-core";
+
+/**
  * What a section knows about the route it is being rendered on.
  *
  * Threaded by {@link renderComposition} and exposed both as an optional
@@ -34,14 +42,6 @@ export interface RouteChainEntry {
   /** Display label — an interpolated SEO title, or the last path segment. */
   readonly title: string;
 }
-
-/**
- * The reserved section key that marks where a parent route's layout renders its
- * matched child. Deliberately *not* a `sectionCatalog` entry — the CMS offers a
- * dedicated control for it in exactly one place — so it is handled by
- * {@link renderComposition} directly, before the component registry is consulted.
- */
-export const OUTLET_SECTION_KEY = "outlet";
 
 const RouteRenderCtx = createContext<RouteRenderContext | null>(null);
 

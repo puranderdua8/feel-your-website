@@ -1,5 +1,5 @@
 import type { JsonValue, Locale, RouteSectionNode } from "@feel-your-website/content-core";
-import { OUTLET_SECTION_KEY } from "@feel-your-website/section-registry";
+import { OUTLET_SECTION_KEY, treeHasOutlet } from "@feel-your-website/content-core";
 
 /**
  * Immutable edits on a `RouteSectionNode[]` keyed by `instanceId`. The route
@@ -84,13 +84,7 @@ export function addSlotChild(
 }
 
 /** Whether `tree` already carries an `outlet` node anywhere. At most one is allowed. */
-export function hasOutlet(tree: readonly RouteSectionNode[]): boolean {
-  return tree.some(
-    (node) =>
-      node.sectionKey === OUTLET_SECTION_KEY ||
-      Object.values(node.slots).some((children) => hasOutlet(children)),
-  );
-}
+export { treeHasOutlet as hasOutlet };
 
 /** A fresh `outlet` marker node — where this route's matched child renders. */
 export function newOutletNode(): RouteSectionNode {

@@ -69,4 +69,118 @@ describe("MemoryContentAdapter route composition read/write", () => {
     const adapter = new MemoryContentAdapter({ routes: [] });
     expect(await adapter.getComposition(crypto.randomUUID())).toBeNull();
   });
+
+  it("reports hasOutlet on the summary, matching the saved tree", async () => {
+    const adapter = new MemoryContentAdapter({ routes: [] });
+    const hero = () => ({
+      instanceId: crypto.randomUUID(),
+      sectionKey: "hero",
+      content: {},
+      slots: {},
+    });
+    const outlet = () => ({
+      instanceId: crypto.randomUUID(),
+      sectionKey: "outlet",
+      content: {},
+      slots: {},
+    });
+
+    const plain = await adapter.saveComposition(
+      null,
+      { name: "Plain", path: "/plain", published: false, tree: [hero()], seo: {} },
+      null,
+      "u",
+    );
+    const layout = await adapter.saveComposition(
+      null,
+      { name: "Layout", path: "/layout", published: false, tree: [hero(), outlet()], seo: {} },
+      null,
+      "u",
+    );
+
+    const byId = new Map((await adapter.listCompositions()).map((r) => [r.id, r]));
+    expect(byId.get(plain.id)?.hasOutlet).toBe(false);
+    expect(byId.get(layout.id)?.hasOutlet).toBe(true);
+    expect((await adapter.getComposition(layout.id))?.hasOutlet).toBe(true);
+
+    // Adding an outlet to `plain` flips it.
+    const composition = await adapter.getComposition(plain.id);
+    await adapter.saveComposition(
+      plain.id,
+      {
+        name: "Plain",
+        path: "/plain",
+        published: false,
+        tree: [...composition!.tree, outlet()],
+        seo: {},
+      },
+      plain.version,
+      "u",
+    );
+    expect((await adapter.getComposition(plain.id))?.hasOutlet).toBe(true);
+  });
+
+  it("publishing one route leaves every other route's published flag untouched", async () => {
+    const adapter = new MemoryContentAdapter({ routes: [] });
+    const tree = () => [
+      {
+        instanceId: crypto.randomUUID(),
+        sectionKey: "outlet",
+        content: {},
+        slots: {},
+      },
+    ];
+
+    const home = await adapter.saveComposition(
+      null,
+      { name: "Home", path: "/home", published: true, tree: tree(), seo: {} },
+      null,
+      "u",
+    );
+    const about = await adapter.saveComposition(
+      null,
+      {
+        name: "About",
+        path: "/home/about",
+        pathSegment: "about",
+        parentId: home.id,
+        published: true,
+        tree: [{ instanceId: crypto.randomUUID(), sectionKey: "hero", content: {}, slots: {} }],
+        seo: {},
+      },
+      null,
+      "u",
+    );
+
+    // Re-save `/home` (still published, e.g. an outlet edit). `/home/about`
+    // must stay exactly as it was — one save, one route.
+    await adapter.saveComposition(
+      home.id,
+      { name: "Home", path: "/home", published: true, tree: tree(), seo: {} },
+      home.version,
+      "u",
+    );
+    let list = new Map((await adapter.listCompositions()).map((r) => [r.id, r.published]));
+    expect(list.get(about.id)).toBe(true);
+
+    // Unpublish `/home/about` (its version is unchanged — re-saving `/home`
+    // never touched it). `/home` stays published.
+    await adapter.saveComposition(
+      about.id,
+      {
+        name: "About",
+        path: "/home/about",
+        pathSegment: "about",
+        parentId: home.id,
+        published: false,
+        tree: [{ instanceId: crypto.randomUUID(), sectionKey: "hero", content: {}, slots: {} }],
+        seo: {},
+      },
+      about.version,
+      "u",
+    );
+    list = new Map((await adapter.listCompositions()).map((r) => [r.id, r.published]));
+    expect(list.get(home.id)).toBe(true);
+    expect(list.get(about.id)).toBe(false);
+  });
 });
