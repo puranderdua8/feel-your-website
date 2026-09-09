@@ -25,21 +25,12 @@ export interface RouteCompositionInput {
   /** The bundle's name (`config_bundles.name`), unique within the route vocabulary. */
   readonly name: string;
   /**
-   * The absolute path it renders at, e.g. `/pricing`. Must start with `/`.
-   *
-   * Retained for callers that still author a flat absolute path. When
-   * {@link pathSegment} is given it is authoritative and this is ignored; the
-   * CMS route editor moves to `pathSegment` + {@link parentId} in a later
-   * phase, at which point this field is dropped.
+   * This route's own path contribution — the full absolute path (`/pricing`,
+   * must start with `/`) for a top-level route, a single segment (`":slug"`,
+   * `"reviews"`) for a nested one. The absolute pattern is composed from this
+   * and the parent chain.
    */
-  readonly path: string;
-  /**
-   * This route's own path contribution — the full path for a top-level route,
-   * a single segment (`":slug"`, `"reviews"`) for a nested one. When set,
-   * overrides {@link path}; the absolute pattern is composed from this and the
-   * parent chain.
-   */
-  readonly pathSegment?: string;
+  readonly pathSegment: string;
   /** Parent route bundle id for layout nesting, or `null`/omitted for top-level. */
   readonly parentId?: string | null;
   /** Author metadata for the path's `:name` parameters, in order. */

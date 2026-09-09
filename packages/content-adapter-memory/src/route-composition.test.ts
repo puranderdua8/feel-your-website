@@ -10,10 +10,13 @@ import { MemoryContentAdapter } from "./MemoryContentAdapter.js";
  *
  * A fresh, empty adapter per call: the suite creates and updates bundles, so
  * a shared instance would let one test's writes leak into the next.
+ * `readerFor` returns the same adapter — it implements both interfaces — so
+ * the read-back assertions (`hasOutlet` on the summary) run here too.
  */
 runRouteCompositionWriterContract({
   name: "MemoryContentAdapter",
   createWriter: () => new MemoryContentAdapter({ routes: [] }),
+  readerFor: (writer) => writer as MemoryContentAdapter,
 });
 
 describe("MemoryContentAdapter route composition read/write", () => {
@@ -24,7 +27,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
       null,
       {
         name: "Pricing",
-        path: "/pricing",
+        pathSegment: "/pricing",
         published: false,
         tree: [
           {
@@ -57,7 +60,13 @@ describe("MemoryContentAdapter route composition read/write", () => {
 
     const published = await adapter.saveComposition(
       saved.id,
-      { name: "Pricing", path: "/pricing", published: true, tree: composition!.tree, seo: {} },
+      {
+        name: "Pricing",
+        pathSegment: "/pricing",
+        published: true,
+        tree: composition!.tree,
+        seo: {},
+      },
       saved.version,
       "user-1",
     );
@@ -70,55 +79,8 @@ describe("MemoryContentAdapter route composition read/write", () => {
     expect(await adapter.getComposition(crypto.randomUUID())).toBeNull();
   });
 
-  it("reports hasOutlet on the summary, matching the saved tree", async () => {
-    const adapter = new MemoryContentAdapter({ routes: [] });
-    const hero = () => ({
-      instanceId: crypto.randomUUID(),
-      sectionKey: "hero",
-      content: {},
-      slots: {},
-    });
-    const outlet = () => ({
-      instanceId: crypto.randomUUID(),
-      sectionKey: "outlet",
-      content: {},
-      slots: {},
-    });
-
-    const plain = await adapter.saveComposition(
-      null,
-      { name: "Plain", path: "/plain", published: false, tree: [hero()], seo: {} },
-      null,
-      "u",
-    );
-    const layout = await adapter.saveComposition(
-      null,
-      { name: "Layout", path: "/layout", published: false, tree: [hero(), outlet()], seo: {} },
-      null,
-      "u",
-    );
-
-    const byId = new Map((await adapter.listCompositions()).map((r) => [r.id, r]));
-    expect(byId.get(plain.id)?.hasOutlet).toBe(false);
-    expect(byId.get(layout.id)?.hasOutlet).toBe(true);
-    expect((await adapter.getComposition(layout.id))?.hasOutlet).toBe(true);
-
-    // Adding an outlet to `plain` flips it.
-    const composition = await adapter.getComposition(plain.id);
-    await adapter.saveComposition(
-      plain.id,
-      {
-        name: "Plain",
-        path: "/plain",
-        published: false,
-        tree: [...composition!.tree, outlet()],
-        seo: {},
-      },
-      plain.version,
-      "u",
-    );
-    expect((await adapter.getComposition(plain.id))?.hasOutlet).toBe(true);
-  });
+  // `hasOutlet` on the summary is covered by the shared contract suite above
+  // (via `readerFor`), against every backend rather than only this one.
 
   it("publishing one route leaves every other route's published flag untouched", async () => {
     const adapter = new MemoryContentAdapter({ routes: [] });
@@ -133,7 +95,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
 
     const home = await adapter.saveComposition(
       null,
-      { name: "Home", path: "/home", published: true, tree: tree(), seo: {} },
+      { name: "Home", pathSegment: "/home", published: true, tree: tree(), seo: {} },
       null,
       "u",
     );
@@ -141,7 +103,6 @@ describe("MemoryContentAdapter route composition read/write", () => {
       null,
       {
         name: "About",
-        path: "/home/about",
         pathSegment: "about",
         parentId: home.id,
         published: true,
@@ -156,7 +117,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
     // must stay exactly as it was — one save, one route.
     await adapter.saveComposition(
       home.id,
-      { name: "Home", path: "/home", published: true, tree: tree(), seo: {} },
+      { name: "Home", pathSegment: "/home", published: true, tree: tree(), seo: {} },
       home.version,
       "u",
     );
@@ -169,7 +130,6 @@ describe("MemoryContentAdapter route composition read/write", () => {
       about.id,
       {
         name: "About",
-        path: "/home/about",
         pathSegment: "about",
         parentId: home.id,
         published: false,
