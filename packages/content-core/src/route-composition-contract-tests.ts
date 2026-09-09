@@ -112,7 +112,7 @@ export function runRouteCompositionWriterContract(
 
       const bundle = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
@@ -129,7 +129,7 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.name,
-          path: f.path,
+          pathSegment: f.path,
           published: true,
           tree: cardTree(),
           seo: { en: { title: "Card page", keywords: ["a", "b"] } },
@@ -153,14 +153,14 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const created = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
 
       const updated = await writer.saveComposition(
         created.id,
-        { name: f.name, path: f.path, published: true, tree: cardTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: true, tree: cardTree(), seo: {} },
         created.version,
         "user-1",
       );
@@ -173,13 +173,13 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const created = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
       await writer.saveComposition(
         created.id,
-        { name: f.name, path: f.path, published: false, tree: cardTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: cardTree(), seo: {} },
         created.version,
         "user-1",
       );
@@ -187,7 +187,7 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           created.id,
-          { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+          { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
           created.version,
           "user-1",
         );
@@ -206,7 +206,7 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           f.unknownId,
-          { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+          { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
           1,
           "user-1",
         );
@@ -220,7 +220,7 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const created = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
@@ -238,7 +238,7 @@ export function runRouteCompositionWriterContract(
       // Gone: recreating at the same path now succeeds at version 1.
       const recreated = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
@@ -260,7 +260,13 @@ export function runRouteCompositionWriterContract(
     const savePublishedParent = (writer: RouteCompositionWriter) =>
       writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: true, tree: layoutTree(), seo: {} },
+        {
+          name: f.parentName,
+          pathSegment: f.parentPath,
+          published: true,
+          tree: layoutTree(),
+          seo: {},
+        },
         null,
         "user-1",
       );
@@ -273,7 +279,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -298,7 +303,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: "child",
           parentId: a.id,
           published: true,
@@ -314,7 +318,6 @@ export function runRouteCompositionWriterContract(
           a.id,
           {
             name: f.parentName,
-            path: f.parentPath,
             pathSegment: f.parentPath,
             parentId: b.id,
             published: true,
@@ -334,7 +337,13 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const parent = await writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
+        {
+          name: f.parentName,
+          pathSegment: f.parentPath,
+          published: false,
+          tree: layoutTree(),
+          seo: {},
+        },
         null,
         "user-1",
       );
@@ -344,7 +353,6 @@ export function runRouteCompositionWriterContract(
           null,
           {
             name: f.childName,
-            path: f.childPath,
             pathSegment: f.childSegment,
             parentId: parent.id,
             params: [f.param],
@@ -368,7 +376,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -383,7 +390,13 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           parent.id,
-          { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
+          {
+            name: f.parentName,
+            pathSegment: f.parentPath,
+            published: false,
+            tree: layoutTree(),
+            seo: {},
+          },
           parent.version,
           "user-1",
         );
@@ -400,7 +413,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -427,7 +439,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -444,7 +455,13 @@ export function runRouteCompositionWriterContract(
       // Gone: the parent path is free to recreate at version 1.
       const recreated = await writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
+        {
+          name: f.parentName,
+          pathSegment: f.parentPath,
+          published: false,
+          tree: layoutTree(),
+          seo: {},
+        },
         null,
         "user-1",
       );
@@ -461,7 +478,6 @@ export function runRouteCompositionWriterContract(
           null,
           {
             name: f.childName,
-            path: f.childPath,
             pathSegment: f.childSegment,
             parentId: parent.id,
             params: [f.param],
@@ -479,7 +495,6 @@ export function runRouteCompositionWriterContract(
           null,
           {
             name: "Contract Other",
-            path: "/renamed/:other",
             pathSegment: "/renamed/:other",
             params: [{ name: "other", label: "Other" }],
             published: true,
@@ -499,7 +514,6 @@ export function runRouteCompositionWriterContract(
             parent.id,
             {
               name: f.parentName,
-              path: "/renamed",
               pathSegment: "/renamed",
               parentId: null,
               published: true,
@@ -521,7 +535,13 @@ export function runRouteCompositionWriterContract(
       // A published parent that is NOT a layout — `heroTree()`, no outlet.
       const parent = await writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: true, tree: heroTree(), seo: {} },
+        {
+          name: f.parentName,
+          pathSegment: f.parentPath,
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
         null,
         "user-1",
       );
@@ -531,7 +551,6 @@ export function runRouteCompositionWriterContract(
           null,
           {
             name: f.childName,
-            path: f.childPath,
             pathSegment: f.childSegment,
             parentId: parent.id,
             params: [f.param],
@@ -552,7 +571,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -567,7 +585,13 @@ export function runRouteCompositionWriterContract(
       // Give the parent an outlet, then the child publishes.
       await writer.saveComposition(
         parent.id,
-        { name: f.parentName, path: f.parentPath, published: true, tree: layoutTree(), seo: {} },
+        {
+          name: f.parentName,
+          pathSegment: f.parentPath,
+          published: true,
+          tree: layoutTree(),
+          seo: {},
+        },
         parent.version,
         "user-1",
       );
@@ -575,7 +599,6 @@ export function runRouteCompositionWriterContract(
         child.id,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -596,7 +619,6 @@ export function runRouteCompositionWriterContract(
         null,
         {
           name: f.childName,
-          path: f.childPath,
           pathSegment: f.childSegment,
           parentId: parent.id,
           params: [f.param],
@@ -611,7 +633,13 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           parent.id,
-          { name: f.parentName, path: f.parentPath, published: true, tree: heroTree(), seo: {} },
+          {
+            name: f.parentName,
+            pathSegment: f.parentPath,
+            published: true,
+            tree: heroTree(),
+            seo: {},
+          },
           parent.version,
           "user-1",
         );
@@ -627,13 +655,19 @@ export function runRouteCompositionWriterContract(
 
       const plain = await writer.saveComposition(
         null,
-        { name: f.name, path: f.path, published: false, tree: heroTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
         null,
         "user-1",
       );
       const layout = await writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
+        {
+          name: f.parentName,
+          pathSegment: f.parentPath,
+          published: false,
+          tree: layoutTree(),
+          seo: {},
+        },
         null,
         "user-1",
       );
@@ -646,7 +680,7 @@ export function runRouteCompositionWriterContract(
       // Adding an outlet to `plain` flips it.
       await writer.saveComposition(
         plain.id,
-        { name: f.name, path: f.path, published: false, tree: layoutTree(), seo: {} },
+        { name: f.name, pathSegment: f.path, published: false, tree: layoutTree(), seo: {} },
         plain.version,
         "user-1",
       );

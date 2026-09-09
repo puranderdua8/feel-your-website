@@ -27,7 +27,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
       null,
       {
         name: "Pricing",
-        path: "/pricing",
+        pathSegment: "/pricing",
         published: false,
         tree: [
           {
@@ -60,7 +60,13 @@ describe("MemoryContentAdapter route composition read/write", () => {
 
     const published = await adapter.saveComposition(
       saved.id,
-      { name: "Pricing", path: "/pricing", published: true, tree: composition!.tree, seo: {} },
+      {
+        name: "Pricing",
+        pathSegment: "/pricing",
+        published: true,
+        tree: composition!.tree,
+        seo: {},
+      },
       saved.version,
       "user-1",
     );
@@ -89,7 +95,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
 
     const home = await adapter.saveComposition(
       null,
-      { name: "Home", path: "/home", published: true, tree: tree(), seo: {} },
+      { name: "Home", pathSegment: "/home", published: true, tree: tree(), seo: {} },
       null,
       "u",
     );
@@ -97,7 +103,6 @@ describe("MemoryContentAdapter route composition read/write", () => {
       null,
       {
         name: "About",
-        path: "/home/about",
         pathSegment: "about",
         parentId: home.id,
         published: true,
@@ -112,7 +117,7 @@ describe("MemoryContentAdapter route composition read/write", () => {
     // must stay exactly as it was — one save, one route.
     await adapter.saveComposition(
       home.id,
-      { name: "Home", path: "/home", published: true, tree: tree(), seo: {} },
+      { name: "Home", pathSegment: "/home", published: true, tree: tree(), seo: {} },
       home.version,
       "u",
     );
@@ -125,7 +130,6 @@ describe("MemoryContentAdapter route composition read/write", () => {
       about.id,
       {
         name: "About",
-        path: "/home/about",
         pathSegment: "about",
         parentId: home.id,
         published: false,

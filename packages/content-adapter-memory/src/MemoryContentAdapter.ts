@@ -194,7 +194,7 @@ export class MemoryContentAdapter
     const now = new Date().toISOString();
 
     const parentId = input.parentId ?? null;
-    const pathSegment = input.pathSegment ?? input.path;
+    const pathSegment = input.pathSegment;
     const params = [...(input.params ?? [])];
 
     // Parent + cycle checks. These mirror the invariants the Supabase RPC

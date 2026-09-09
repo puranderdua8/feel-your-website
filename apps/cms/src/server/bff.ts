@@ -35,7 +35,7 @@ import {
   getRouteCompositionWriter,
   getSiteSettingsStore,
 } from "./adapters.js";
-import { composeCandidatePath, parseParams, validateRouteInput } from "./route-input.js";
+import { parseParams, validateRouteInput } from "./route-input.js";
 
 /**
  * The BFF — same role as `apps/shell/src/server/bff.ts`: the only code that
@@ -419,19 +419,12 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
       throw new Error(issues.map((issue) => issue.message).join(" "));
     }
 
-    const path = composeCandidatePath({
-      parentId: data.parentId,
-      pathSegment: data.pathSegment,
-      siblings,
-    });
-    // `validateRouteInput` above already confirmed this composes cleanly.
-    if (!path) throw new Error("That path is not valid.");
-
+    // `validateRouteInput` above already confirmed the segment composes
+    // cleanly against the parent; the adapter derives the absolute path.
     return getRouteCompositionWriter().saveComposition(
       data.bundleId,
       {
         name: data.name,
-        path,
         pathSegment: data.pathSegment,
         parentId: data.parentId,
         params: data.params,
