@@ -300,13 +300,14 @@ importers:
         version: 7.4.1
 
   packages/action-core:
+    dependencies:
+      '@feel-your-website/content-core':
+        specifier: workspace:*
+        version: link:../content-core
     devDependencies:
       '@feel-your-website/config':
         specifier: workspace:*
         version: link:../config
-      '@feel-your-website/content-core':
-        specifier: workspace:*
-        version: link:../content-core
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.1
