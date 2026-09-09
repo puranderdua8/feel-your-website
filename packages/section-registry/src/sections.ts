@@ -54,6 +54,25 @@ export const sectionCatalog = defineSections([
     },
   },
   {
+    // Same shape and renderer as `guidance` (`registry.tsx` maps both to
+    // `TitleBodySection`); a distinct key so a support/help block reads as its
+    // own thing in the tree. The memory fixtures' `/help` and `/blog/:slug`
+    // routes use it, so it must be authorable too, not just renderable.
+    key: "help",
+    description: "A help or support block — a heading over a paragraph.",
+    fields: [
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "body", label: "Body", type: "richtext", required: true },
+    ],
+    slots: [],
+    sample: {
+      fields: {
+        title: "Need a hand?",
+        body: "Contact support and we'll help you out.",
+      },
+    },
+  },
+  {
     key: "footer",
     description: "Page footer.",
     fields: [{ name: "text", label: "Text", type: "text" }],

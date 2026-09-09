@@ -105,6 +105,14 @@ export interface RouteCompositionSummary {
   /** Parent route bundle id, or `null` for a top-level route. */
   readonly parentId: string | null;
   readonly published: boolean;
+  /**
+   * Whether this route's section tree carries an `outlet` node — i.e. whether
+   * it is a layout that can host a child route. The editor needs this per
+   * sibling to warn when a child is being nested under a route that cannot
+   * render it. Optional for now: the memory adapter always sets it; the
+   * Supabase reader gains it with `route_bundles.has_outlet` in a follow-up.
+   */
+  readonly hasOutlet?: boolean;
   readonly version: number;
   readonly updatedAt: string;
 }

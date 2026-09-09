@@ -1,17 +1,16 @@
 import {
   buildHref,
-  flattenTree,
   interpolateSeo,
   interpolateTemplate,
   matchRoute,
   normalizeRequestPath,
   parseRoutePattern,
   resolveParentChain,
+  treeHasOutlet,
   type RouteBundle,
   type RouteSectionNode,
   type RouteSeo,
 } from "@feel-your-website/content-core";
-import { OUTLET_SECTION_KEY } from "@feel-your-website/section-registry";
 
 import { isReservedPath } from "@/reserved-paths.js";
 
@@ -139,7 +138,7 @@ export function resolveRoutePage(
   const layers: RouteLayer[] = chainBundles.map((bundle) => ({
     bundleId: bundle.id,
     tree: bundle.tree,
-    hasOutlet: flattenTree(bundle.tree).includes(OUTLET_SECTION_KEY),
+    hasOutlet: treeHasOutlet(bundle.tree),
   }));
 
   const chain: RouteChainEntry[] = chainBundles.map((bundle) => {

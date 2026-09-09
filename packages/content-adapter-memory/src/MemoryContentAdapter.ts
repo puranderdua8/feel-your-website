@@ -7,6 +7,7 @@ import {
   parseRoutePattern,
   RouteCompositionConflictError,
   RouteCompositionError,
+  treeHasOutlet,
   type ContentAdapterError,
   type ContentAdapter,
   type ContentWriter,
@@ -140,6 +141,7 @@ export class MemoryContentAdapter
         pathSegment: bundle.pathSegment,
         parentId: bundle.parentId,
         published: route.published ?? true,
+        hasOutlet: treeHasOutlet(route.tree),
         version: route.version,
         updatedAt: route.updatedAt,
       };
@@ -158,6 +160,7 @@ export class MemoryContentAdapter
       pathSegment: bundle.pathSegment,
       parentId: bundle.parentId,
       published: route.published ?? true,
+      hasOutlet: treeHasOutlet(route.tree),
       version: route.version,
       tree: route.tree,
       seo: route.seo ?? {},
