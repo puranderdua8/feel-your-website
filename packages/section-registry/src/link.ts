@@ -1,4 +1,26 @@
 import { normalizeRequestPath } from "@feel-your-website/content-core";
+import type { ReactNode } from "react";
+
+/** What a host-injected link renderer is handed for one CTA. */
+export interface LinkSpec {
+  readonly href: string;
+  /** True for an in-app route (`classifyHref` → `internal`). */
+  readonly internal: boolean;
+  /** Open in a new tab (`target="_blank" rel="noopener noreferrer"`). */
+  readonly newTab: boolean;
+  readonly label: string;
+  readonly className?: string;
+  readonly children?: ReactNode;
+}
+
+/**
+ * Renders a CTA link. Supplied by the host through `RenderCompositionOptions`
+ * so the shared registry never has to import the router: the shell passes an
+ * implementation that uses a client-side `<Link>` for `internal && !newTab`,
+ * the CMS passes a plain `<a>`, and when it is absent `ButtonSection` falls
+ * back to a plain `<a>` itself.
+ */
+export type RenderLink = (spec: LinkSpec) => ReactNode;
 
 export type HrefKind = "internal" | "external" | "unsafe";
 
