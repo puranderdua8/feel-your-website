@@ -20,7 +20,8 @@ export type SectionFieldType =
   | "number"
   | "boolean"
   | "select" // string constrained to `options`
-  | "icon"; // string: a lucide-react icon name
+  | "icon" // string: a lucide-react icon name
+  | "actionBody"; // a per-input source mapping for a registered action (see @feel-your-website/action-core)
 
 export interface SectionFieldSpec {
   /** Key inside `Content.fields`, e.g. `"title"`. */
@@ -35,6 +36,14 @@ export interface SectionFieldSpec {
   /** Pre-fills a newly created content variant. */
   readonly default?: JsonValue;
   readonly helpText?: string;
+  /**
+   * Editor-only affordance: show this field in the CMS form only when a
+   * sibling field named `field` currently equals `equals` (strict `===`, so
+   * a primitive value). Has no effect on validation or on what a section
+   * receives at render time — it only keeps mutually-exclusive fields (e.g. a
+   * CTA's link config vs its action config) out of view of each other.
+   */
+  readonly showWhen?: { readonly field: string; readonly equals: JsonValue };
 }
 
 export interface SectionSlotSpec {

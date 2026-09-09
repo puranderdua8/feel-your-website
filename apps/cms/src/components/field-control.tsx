@@ -20,14 +20,27 @@ export function FieldControl({
   spec,
   value,
   onChange,
+  siblings,
   idPrefix = "field",
 }: {
   spec: SectionFieldSpec;
   value: JsonValue | undefined;
   onChange: (value: JsonValue) => void;
+  /**
+   * The other fields in the same form, so a `spec.showWhen` predicate can be
+   * evaluated. Omit and every field renders.
+   */
+  siblings?: Readonly<Record<string, JsonValue>>;
   /** Namespaces the control's `id`, so two forms on one page don't collide. */
   idPrefix?: string;
 }) {
+  // `showWhen` is a pure editor affordance: hide a field whose gating sibling
+  // isn't set to the expected value. Nothing about validation or rendering
+  // depends on it.
+  if (spec.showWhen && siblings?.[spec.showWhen.field] !== spec.showWhen.equals) {
+    return null;
+  }
+
   const id = `${idPrefix}-${spec.name}`;
   const str = typeof value === "string" ? value : "";
 
@@ -40,6 +53,18 @@ export function FieldControl({
 
       {spec.type === "richtext" ? (
         <Textarea id={id} value={str} onChange={(event) => onChange(event.target.value)} />
+      ) : spec.type === "actionBody" ? (
+        // Stub control: the request-body mapping is authored as raw JSON text
+        // for now and interpreted at publish time. A dedicated per-input
+        // source picker replaces this later.
+        <Textarea
+          id={id}
+          value={str}
+          rows={6}
+          className="font-mono text-xs"
+          placeholder={'{ "email": { "source": "routeParam", "value": "slug" } }'}
+          onChange={(event) => onChange(event.target.value)}
+        />
       ) : spec.type === "boolean" ? (
         <Switch id={id} checked={value === true} onCheckedChange={(checked) => onChange(checked)} />
       ) : spec.type === "select" ? (
