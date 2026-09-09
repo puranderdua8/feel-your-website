@@ -36,6 +36,11 @@ export function seoToHead(page: RoutePage): {
  * Renders a resolved {@link RoutePage}: folds the render stack innermost-first so
  * each parent layout wraps the next through its `outlet` node, and publishes the
  * route context to every section.
+ *
+ * A parent layer that has no `outlet` node is not a layout — wrapping the inner
+ * content with it would render the parent's page instead of the matched route's
+ * (the child would have nowhere to go). Such a layer is skipped: the matched
+ * route renders standalone, its breadcrumb trail still showing the hierarchy.
  */
 export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element {
   const route: RouteRenderContext = {
@@ -48,7 +53,10 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
 
   let rendered: ReactNode = null;
   for (let i = page.layers.length - 1; i >= 0; i--) {
-    rendered = renderComposition(page.layers[i]!.tree, page.locale, { route, outlet: rendered });
+    const layer = page.layers[i]!;
+    const isLeaf = i === page.layers.length - 1;
+    if (!isLeaf && !layer.hasOutlet) continue;
+    rendered = renderComposition(layer.tree, page.locale, { route, outlet: rendered });
   }
 
   return (

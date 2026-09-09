@@ -78,6 +78,37 @@ describe("resolveRoutePage", () => {
     const page = resolveRoutePage("/tags/react", [...manifest, tags], "en");
     expect(page!.chain.at(-1)!.title).toBe("react");
   });
+
+  it("marks each layer with whether its tree carries an outlet", () => {
+    const home = bundle({
+      id: "home",
+      path: "/home",
+      tree: [
+        { instanceId: "home-hero", sectionKey: "hero", content: {}, slots: {} },
+        { instanceId: "home-outlet", sectionKey: "outlet", content: {}, slots: {} },
+      ],
+    });
+    const homeLayout = bundle({
+      id: "home",
+      path: "/home",
+      tree: [{ instanceId: "home-hero", sectionKey: "hero", content: {}, slots: {} }],
+    });
+    const about = bundle({
+      id: "home-about",
+      path: "/home/about",
+      pathSegment: "about",
+      parentId: "home",
+    });
+
+    const withOutlet = resolveRoutePage("/home/about", [home, about], "en");
+    expect(withOutlet!.layers.map((l) => [l.bundleId, l.hasOutlet])).toEqual([
+      ["home", true],
+      ["home-about", false],
+    ]);
+
+    const noOutlet = resolveRoutePage("/home/about", [homeLayout, about], "en");
+    expect(noOutlet!.layers.map((l) => l.hasOutlet)).toEqual([false, false]);
+  });
 });
 
 describe("sanitizeParam", () => {

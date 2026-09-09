@@ -1,5 +1,6 @@
 import {
   buildHref,
+  flattenTree,
   interpolateSeo,
   interpolateTemplate,
   matchRoute,
@@ -10,14 +11,21 @@ import {
   type RouteSectionNode,
   type RouteSeo,
 } from "@feel-your-website/content-core";
+import { OUTLET_SECTION_KEY } from "@feel-your-website/section-registry";
 
 import { isReservedPath } from "@/reserved-paths.js";
 
 /** One level of a nested route's render stack, outermost (root) first. */
 export interface RouteLayer {
   bundleId: string;
-  /** This layer's section tree; a parent layer carries an `outlet` node. */
+  /** This layer's section tree. */
   tree: readonly RouteSectionNode[];
+  /**
+   * Whether `tree` carries an `outlet` node — i.e. whether this layer can host
+   * a child route inside itself. A parent layer without one is not a layout:
+   * it must not wrap (and so hide) the matched route, so the renderer skips it.
+   */
+  hasOutlet: boolean;
 }
 
 /** One entry in the breadcrumb chain, root-first, current route last. */
@@ -45,8 +53,10 @@ export interface RoutePage {
   /**
    * The render stack, outermost first: a parent layout wraps the next layer via
    * its `outlet` node, down to the matched route. One entry for a top-level
-   * route. Every node carries its own per-locale content — nothing else to
-   * fetch; see `@feel-your-website/section-registry`'s `renderComposition`.
+   * route. A parent layer without an `outlet` (`hasOutlet: false`) is not a
+   * layout — the renderer skips it so the matched route still shows. Every node
+   * carries its own per-locale content — nothing else to fetch; see
+   * `@feel-your-website/section-registry`'s `renderComposition`.
    */
   layers: RouteLayer[];
   /** The matched route's SEO for `locale`, with `{{param}}` already interpolated. `{}` when it has none. */
@@ -129,6 +139,7 @@ export function resolveRoutePage(
   const layers: RouteLayer[] = chainBundles.map((bundle) => ({
     bundleId: bundle.id,
     tree: bundle.tree,
+    hasOutlet: flattenTree(bundle.tree).includes(OUTLET_SECTION_KEY),
   }));
 
   const chain: RouteChainEntry[] = chainBundles.map((bundle) => {
