@@ -1,6 +1,22 @@
 import type { RouteSectionNode } from "@feel-your-website/content-core";
-import { renderComposition } from "@feel-your-website/section-registry";
+import { renderComposition, type LinkSpec } from "@feel-your-website/section-registry";
 import { ThemeProvider } from "@feel-your-website/theme/client";
+
+/**
+ * The preview has no router, so a CTA link is a plain, inert `<a>` — enough to
+ * see the label and target, not to navigate.
+ */
+function renderPreviewLink(spec: LinkSpec) {
+  return (
+    <a
+      href={spec.href}
+      className={spec.className}
+      {...(spec.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {spec.children}
+    </a>
+  );
+}
 
 /**
  * In-process preview: the exact `renderComposition` the shell uses, over the
@@ -24,7 +40,7 @@ export function RoutePreview({
           {tree.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nothing to preview yet.</p>
           ) : (
-            renderComposition(tree, locale)
+            renderComposition(tree, locale, { renderLink: renderPreviewLink })
           )}
         </div>
       </ThemeProvider>
