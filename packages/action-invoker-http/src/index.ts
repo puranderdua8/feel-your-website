@@ -6,3 +6,4 @@ export {
   type HttpActionBinding,
   type HttpActionBindings,
 } from "./bindings.js";
+export { CachingActionInvoker, cacheKey, type CachingActionInvokerOptions } from "./cache.js";
