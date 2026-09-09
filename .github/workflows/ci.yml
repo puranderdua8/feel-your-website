@@ -54,6 +54,20 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Netlify no longer builds PRs (deploys are manual — see
+      # docs/deployment.md), so there is no Deploy Preview to click through.
+      # Uploading each app's publish directory here gives a reviewer the
+      # built output to download from the run summary instead.
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-client
+          path: |
+            apps/shell/dist/client
+            apps/cms/dist/client
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Test
         run: pnpm test
 
