@@ -12,6 +12,14 @@
 # `base = "/"` even so: this is still one pnpm workspace with one lockfile at
 # the repo root, and `base` is what Netlify installs from and resolves this
 # file's own relative paths against — not `apps/shell/`.
+#
+# Automatic deploys are OFF for this site: the Netlify dashboard's "Stop
+# builds" toggle (Site configuration → Build & deploy → Continuous deployment)
+# is set, so nothing here builds on push, on a PR, or on merge. Deploys are
+# manual — see docs/deployment.md. The [build] block below still applies when
+# a deploy is triggered by hand ("Trigger deploy → Deploy site", or `pnpm
+# deploy:shell` + drag-and-drop). Do not re-enable auto-deploy without
+# updating docs/deployment.md.
 
 [build]
   base = "/"

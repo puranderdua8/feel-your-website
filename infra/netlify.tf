@@ -38,6 +38,12 @@ resource "netlify_site_build_settings" "this" {
 
   # This one has no netlify.toml equivalent, so it is the field this
   # resource actually controls.
+  #
+  # Note: automatic deploys are intentionally disabled for this site via the
+  # dashboard's "Stop builds" toggle (see docs/deployment.md). Applying this
+  # file does NOT re-enable them — `production_branch` only names which branch
+  # a *build* would treat as production, it does not turn building on. Deploys
+  # are manual.
   production_branch = "main"
 }
 

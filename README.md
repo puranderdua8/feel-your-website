@@ -584,6 +584,13 @@ deliberately does not manage (creating the Supabase organization or the
 Netlify team, linking the git repository) and why nothing in it has been
 applied yet.
 
+## Deployment
+
+Deploys are **manual** and decoupled from GitHub — Netlify's automatic
+build-on-push / build-on-PR is turned off for both sites, and CI never triggers a
+deploy. Merging a PR ships nothing on its own. Build and publish each site from
+the Netlify dashboard as described in [`docs/deployment.md`](docs/deployment.md).
+
 ## Getting started
 
 Requires Node 22.23.2+ (see `.nvmrc`) and pnpm 11.
