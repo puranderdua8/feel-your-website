@@ -20,6 +20,8 @@
     "format:check": "prettier --check .",
     "changeset": "changeset",
     "version-packages": "changeset version",
+    "deploy:shell": "turbo run build --filter=@feel-your-website/shell... && echo 'Built apps/shell/dist/client — drag that folder onto the Netlify Deploys tab for the shell site (see docs/deployment.md).'",
+    "deploy:cms": "turbo run build --filter=@feel-your-website/cms... && echo 'Built apps/cms/dist/client — drag that folder onto the Netlify Deploys tab for the cms site (see docs/deployment.md).'",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "prettier": "@feel-your-website/config/prettier",
