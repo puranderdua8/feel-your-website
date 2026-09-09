@@ -42,6 +42,7 @@ export function SectionFieldForm({
           spec={spec}
           idPrefix="route-field"
           value={fields[spec.name]}
+          siblings={fields}
           onChange={(value) => onChange({ ...fields, [spec.name]: value })}
         />
       ))}

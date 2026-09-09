@@ -31,6 +31,35 @@ describe("defineSections", () => {
   it("throws on a duplicate key", () => {
     expect(() => defineSections([card, { ...card }])).toThrow(/Duplicate section key/);
   });
+
+  it("accepts an actionBody field and a showWhen predicate", () => {
+    const cta: SectionDefinition = {
+      key: "cta",
+      description: "A CTA.",
+      fields: [
+        { name: "mode", label: "Mode", type: "select", options: ["link", "action"] },
+        {
+          name: "href",
+          label: "Link URL",
+          type: "url",
+          showWhen: { field: "mode", equals: "link" },
+        },
+        {
+          name: "body",
+          label: "Request body",
+          type: "actionBody",
+          showWhen: { field: "mode", equals: "action" },
+        },
+      ],
+      slots: [],
+    };
+    const catalog = defineSections([cta]);
+    expect(catalog.byKey.get("cta")?.fields[2]?.type).toBe("actionBody");
+    expect(catalog.byKey.get("cta")?.fields[1]?.showWhen).toEqual({
+      field: "mode",
+      equals: "link",
+    });
+  });
 });
 
 describe("validateSectionFields", () => {
