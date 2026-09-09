@@ -342,7 +342,7 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path,
+          pathSegment: path,
           published: true,
           tree: [
             {
@@ -429,7 +429,7 @@ if (hasLocalSupabase) {
         created.id,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path,
+          pathSegment: path,
           published: true,
           tree: [
             {
@@ -478,13 +478,13 @@ if (hasLocalSupabase) {
 
       const created = await w.saveComposition(
         null,
-        { name: name(), path, published: false, tree: root("hero"), seo: {} },
+        { name: name(), pathSegment: path, published: false, tree: root("hero"), seo: {} },
         null,
         "x",
       );
       await w.saveComposition(
         created.id,
-        { name: name(), path, published: false, tree: root("footer"), seo: {} },
+        { name: name(), pathSegment: path, published: false, tree: root("footer"), seo: {} },
         created.version,
         "x",
       );
@@ -492,7 +492,7 @@ if (hasLocalSupabase) {
       await expect(
         w.saveComposition(
           created.id,
-          { name: name(), path, published: false, tree: root("hero"), seo: {} },
+          { name: name(), pathSegment: path, published: false, tree: root("hero"), seo: {} },
           created.version,
           "x",
         ),
@@ -506,7 +506,7 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path,
+          pathSegment: path,
           published: true,
           tree: [
             {
@@ -561,7 +561,7 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}`,
+          pathSegment: `/${seg}`,
           published: true,
           tree: layout(), // a published child needs an outlet on the parent
           seo: {},
@@ -574,7 +574,6 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}/:slug`,
           pathSegment: ":slug",
           parentId: parent.id,
           params: [{ name: "slug", label: "Slug" }],
@@ -614,7 +613,7 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}`,
+          pathSegment: `/${seg}`,
           published: false,
           tree: root("hero"),
           seo: {},
@@ -629,7 +628,6 @@ if (hasLocalSupabase) {
           null,
           {
             name: `live-test-rcw-${randomUUID()}`,
-            path: `/${seg}/:slug`,
             pathSegment: ":slug",
             parentId: parent.id,
             params: [{ name: "slug", label: "Slug" }],
@@ -647,7 +645,6 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}/child`,
           pathSegment: "child",
           parentId: parent.id,
           published: false,
@@ -662,7 +659,6 @@ if (hasLocalSupabase) {
           parent.id,
           {
             name: `live-test-rcw-${randomUUID()}`,
-            path: `/${seg}`,
             pathSegment: `/${seg}`,
             parentId: child.id,
             published: false,
@@ -686,7 +682,7 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}`,
+          pathSegment: `/${seg}`,
           published: true,
           tree: root("hero"),
           seo: {},
@@ -703,7 +699,6 @@ if (hasLocalSupabase) {
 
       const childInput = (published: boolean) => ({
         name: `live-test-rcw-${randomUUID()}`,
-        path: `/${seg}/:slug`,
         pathSegment: ":slug",
         parentId: parent.id,
         params: [{ name: "slug", label: "Slug" }],
@@ -724,7 +719,7 @@ if (hasLocalSupabase) {
         parent.id,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}`,
+          pathSegment: `/${seg}`,
           published: true,
           tree: layout(),
           seo: {},
@@ -746,7 +741,7 @@ if (hasLocalSupabase) {
           parent.id,
           {
             name: `live-test-rcw-${randomUUID()}`,
-            path: `/${seg}`,
+            pathSegment: `/${seg}`,
             published: true,
             tree: root("hero"),
             seo: {},
@@ -767,7 +762,7 @@ if (hasLocalSupabase) {
         null,
         {
           name: `live-test-rcw-${randomUUID()}`,
-          path: `/${seg}`,
+          pathSegment: `/${seg}`,
           published: false,
           tree: layout(),
           seo: {},

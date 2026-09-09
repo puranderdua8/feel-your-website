@@ -58,14 +58,10 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
   ): Promise<RouteBundle> {
     void actor; // the RPC derives the writer from auth.uid(), not this string.
 
-    // A caller that only supplies an absolute `path` (and no parent) is
-    // authoring a top-level route, so its segment *is* that path.
-    const pathSegment = input.pathSegment ?? input.path;
-
     const { data, error } = await this.#client.rpc("save_route_composition", {
       p_id: bundleId,
       p_name: input.name,
-      p_path_segment: pathSegment,
+      p_path_segment: input.pathSegment,
       p_published: input.published,
       p_expected_version: expectedVersion,
       p_tree: input.tree,
@@ -79,12 +75,11 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
 
     const row = data as { id: string; version: number; updated_at: string };
 
-    // Read back the persisted hierarchy fields rather than echoing the input.
-    // The RPC composes `path` / `normalized_path` server-side from the parent
-    // chain, and a concurrent parent rename between this caller's sibling read
-    // and this write would make `input.path` stale — the DB row is right, so
-    // return that. `route_bundles_read_authors` RLS lets this `manage:routes`
-    // session read its own just-written (possibly draft) row.
+    // Read the persisted hierarchy fields back: the RPC composes `path` /
+    // `normalized_path` server-side from the parent chain, and a concurrent
+    // parent rename between this caller's sibling read and this write would
+    // make a client-computed path stale. `route_bundles_read_authors` RLS lets
+    // this `manage:routes` session read its own just-written (possibly draft) row.
     const { data: persisted, error: readError } = await this.#client
       .from("route_bundles")
       .select("path, path_segment, parent_bundle_id, param_meta")
