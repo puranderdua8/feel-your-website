@@ -288,6 +288,30 @@ export class MemoryContentAdapter
       );
     }
 
+    // Layout invariants — the in-memory mirror of `save_route_composition`'s
+    // two `has_outlet` checks: a published child must render inside its parent
+    // (so the parent needs an outlet), and a route with a published child
+    // cannot drop its own outlet.
+    if (input.published && parentId !== null) {
+      const parent = routes.find((route) => route.id === parentId);
+      if (parent && !treeHasOutlet(parent.tree)) {
+        throw new RouteCompositionError(
+          "invalid",
+          "The parent route has no outlet — add one to it before publishing this route inside it.",
+        );
+      }
+    }
+    if (
+      !treeHasOutlet(input.tree) &&
+      bundleId !== null &&
+      routes.some((route) => (route.parentId ?? null) === bundleId && route.published !== false)
+    ) {
+      throw new RouteCompositionError(
+        "invalid",
+        "This route has a published child that renders inside it — it must keep its outlet.",
+      );
+    }
+
     const nextSeed = (base: Partial<RouteSeed>): RouteSeed => ({
       id: base.id ?? randomUUID(),
       name: input.name,

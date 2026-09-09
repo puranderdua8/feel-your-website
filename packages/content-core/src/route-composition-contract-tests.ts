@@ -39,6 +39,7 @@ export const ROUTE_COMPOSITION_FIXTURE = {
   rootCard: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   slotIcon: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   rootHero: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  rootOutlet: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
   unknownId: "00000000-0000-4000-8000-000000000000",
 } as const;
 
@@ -70,6 +71,13 @@ export function runRouteCompositionWriterContract(
       content: { en: { title: "Hero" }, hi: { title: "हीरो" } },
       slots: {},
     },
+  ];
+  // A valid layout: shared chrome plus the `outlet` where a child renders. The
+  // hierarchy tests parent published children under this, which
+  // `save_route_composition` now requires the parent to carry.
+  const layoutTree = (): RouteSectionNode[] => [
+    ...heroTree(),
+    { instanceId: f.rootOutlet, sectionKey: "outlet", content: {}, slots: {} },
   ];
   const cardTree = (): RouteSectionNode[] => [
     {
@@ -243,7 +251,7 @@ export function runRouteCompositionWriterContract(
     const savePublishedParent = (writer: RouteCompositionWriter) =>
       writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: true, tree: heroTree(), seo: {} },
+        { name: f.parentName, path: f.parentPath, published: true, tree: layoutTree(), seo: {} },
         null,
         "user-1",
       );
@@ -301,7 +309,7 @@ export function runRouteCompositionWriterContract(
             pathSegment: f.parentPath,
             parentId: b.id,
             published: true,
-            tree: heroTree(),
+            tree: layoutTree(),
             seo: {},
           },
           a.version,
@@ -317,7 +325,7 @@ export function runRouteCompositionWriterContract(
       const writer = await createWriter();
       const parent = await writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: false, tree: heroTree(), seo: {} },
+        { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
         null,
         "user-1",
       );
@@ -366,7 +374,7 @@ export function runRouteCompositionWriterContract(
       try {
         await writer.saveComposition(
           parent.id,
-          { name: f.parentName, path: f.parentPath, published: false, tree: heroTree(), seo: {} },
+          { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
           parent.version,
           "user-1",
         );
@@ -427,7 +435,7 @@ export function runRouteCompositionWriterContract(
       // Gone: the parent path is free to recreate at version 1.
       const recreated = await writer.saveComposition(
         null,
-        { name: f.parentName, path: f.parentPath, published: false, tree: heroTree(), seo: {} },
+        { name: f.parentName, path: f.parentPath, published: false, tree: layoutTree(), seo: {} },
         null,
         "user-1",
       );
@@ -486,7 +494,7 @@ export function runRouteCompositionWriterContract(
               pathSegment: "/renamed",
               parentId: null,
               published: true,
-              tree: heroTree(),
+              tree: layoutTree(),
               seo: {},
             },
             parent.version,
@@ -498,5 +506,110 @@ export function runRouteCompositionWriterContract(
         }
       },
     );
+
+    hierarchyIt("refuses to publish a child under a parent that has no outlet", async () => {
+      const writer = await createWriter();
+      // A published parent that is NOT a layout — `heroTree()`, no outlet.
+      const parent = await writer.saveComposition(
+        null,
+        { name: f.parentName, path: f.parentPath, published: true, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.saveComposition(
+          null,
+          {
+            name: f.childName,
+            path: f.childPath,
+            pathSegment: f.childSegment,
+            parentId: parent.id,
+            params: [f.param],
+            published: true,
+            tree: heroTree(),
+            seo: {},
+          },
+          null,
+          "user-1",
+        );
+        expect.unreachable("publishing under an outlet-less parent should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+
+      // A draft child is fine — it is not live, so nothing is stranded.
+      const child = await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: false,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      // Give the parent an outlet, then the child publishes.
+      await writer.saveComposition(
+        parent.id,
+        { name: f.parentName, path: f.parentPath, published: true, tree: layoutTree(), seo: {} },
+        parent.version,
+        "user-1",
+      );
+      const published = await writer.saveComposition(
+        child.id,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        child.version,
+        "user-1",
+      );
+      expect(published.parentId).toBe(parent.id);
+    });
+
+    hierarchyIt("refuses to drop a route's outlet while it has a published child", async () => {
+      const writer = await createWriter();
+      const parent = await savePublishedParent(writer); // layoutTree — has an outlet
+      await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          path: f.childPath,
+          pathSegment: f.childSegment,
+          parentId: parent.id,
+          params: [f.param],
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.saveComposition(
+          parent.id,
+          { name: f.parentName, path: f.parentPath, published: true, tree: heroTree(), seo: {} },
+          parent.version,
+          "user-1",
+        );
+        expect.unreachable("dropping the outlet under a published child should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
   });
 }

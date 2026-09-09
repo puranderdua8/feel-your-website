@@ -34,6 +34,7 @@ interface RouteBundleMeta {
   published: boolean;
   parent_bundle_id: string | null;
   param_meta: unknown;
+  has_outlet: boolean;
 }
 
 interface HeaderRow {
@@ -95,7 +96,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
     const { data, error } = await this.#client
       .from("config_bundles")
       .select(
-        "id, name, version, updated_at, route_bundles!inner(path, path_segment, published, parent_bundle_id, param_meta)",
+        "id, name, version, updated_at, route_bundles!inner(path, path_segment, published, parent_bundle_id, param_meta, has_outlet)",
       )
       .eq("vocabulary", "template_key")
       .order("name");
@@ -112,6 +113,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
           pathSegment: meta.path_segment,
           parentId: meta.parent_bundle_id ?? null,
           published: meta.published,
+          hasOutlet: meta.has_outlet ?? false,
           version: row.version,
           updatedAt: row.updated_at,
         },
@@ -123,7 +125,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
     const { data: header, error: headerError } = await this.#client
       .from("config_bundles")
       .select(
-        "id, name, version, updated_at, route_bundles(path, path_segment, published, parent_bundle_id, param_meta)",
+        "id, name, version, updated_at, route_bundles(path, path_segment, published, parent_bundle_id, param_meta, has_outlet)",
       )
       .eq("id", bundleId)
       .eq("vocabulary", "template_key")
@@ -176,6 +178,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
       parentId: routeMeta.parent_bundle_id ?? null,
       params: toParamSpecs(routeMeta.param_meta),
       published: routeMeta.published,
+      hasOutlet: routeMeta.has_outlet ?? false,
       version: header.version,
       updatedAt: header.updated_at,
       tree: assembleSectionTree(flat),

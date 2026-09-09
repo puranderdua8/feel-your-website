@@ -107,12 +107,12 @@ export interface RouteCompositionSummary {
   readonly published: boolean;
   /**
    * Whether this route's section tree carries an `outlet` node — i.e. whether
-   * it is a layout that can host a child route. The editor needs this per
-   * sibling to warn when a child is being nested under a route that cannot
-   * render it. Optional for now: the memory adapter always sets it; the
-   * Supabase reader gains it with `route_bundles.has_outlet` in a follow-up.
+   * it is a layout that can host a child route. The editor reads this per
+   * sibling to block (and explain) nesting a route under one that cannot
+   * render it. Memory adapter derives it from the tree; Supabase reads
+   * `route_bundles.has_outlet`.
    */
-  readonly hasOutlet?: boolean;
+  readonly hasOutlet: boolean;
   readonly version: number;
   readonly updatedAt: string;
 }

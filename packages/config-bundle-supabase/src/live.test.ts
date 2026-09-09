@@ -563,7 +563,7 @@ if (hasLocalSupabase) {
           name: `live-test-rcw-${randomUUID()}`,
           path: `/${seg}`,
           published: true,
-          tree: root("hero"),
+          tree: layout(), // a published child needs an outlet on the parent
           seo: {},
         },
         null,
@@ -677,8 +677,121 @@ if (hasLocalSupabase) {
       await w.deleteSubtree(parent.id, parent.version, "x");
     });
 
+    it("enforces the outlet/layout invariants and stores has_outlet", async () => {
+      const w = writer();
+      const seg = `live-test-rcw-${randomUUID()}`;
+
+      // A published parent that is NOT a layout (no outlet node).
+      const parent = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}`,
+          published: true,
+          tree: root("hero"),
+          seo: {},
+        },
+        null,
+        "x",
+      );
+      const { data: parentRow } = await admin
+        .from("route_bundles")
+        .select("has_outlet")
+        .eq("bundle_id", parent.id)
+        .single();
+      expect(parentRow?.has_outlet).toBe(false);
+
+      const childInput = (published: boolean) => ({
+        name: `live-test-rcw-${randomUUID()}`,
+        path: `/${seg}/:slug`,
+        pathSegment: ":slug",
+        parentId: parent.id,
+        params: [{ name: "slug", label: "Slug" }],
+        published,
+        tree: root("help"),
+        seo: {},
+      });
+
+      // Can't publish a child under an outlet-less parent.
+      await expect(w.saveComposition(null, childInput(true), null, "x")).rejects.toMatchObject({
+        code: "invalid",
+      });
+      // Draft child is fine.
+      const child = await w.saveComposition(null, childInput(false), null, "x");
+
+      // Give the parent an outlet: has_outlet flips, and the child can publish.
+      const withOutlet = await w.saveComposition(
+        parent.id,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}`,
+          published: true,
+          tree: layout(),
+          seo: {},
+        },
+        parent.version,
+        "x",
+      );
+      const { data: afterOutlet } = await admin
+        .from("route_bundles")
+        .select("has_outlet")
+        .eq("bundle_id", parent.id)
+        .single();
+      expect(afterOutlet?.has_outlet).toBe(true);
+      await w.saveComposition(child.id, childInput(true), child.version, "x");
+
+      // Now the parent can't drop its outlet — a published child depends on it.
+      await expect(
+        w.saveComposition(
+          parent.id,
+          {
+            name: `live-test-rcw-${randomUUID()}`,
+            path: `/${seg}`,
+            published: true,
+            tree: root("hero"),
+            seo: {},
+          },
+          withOutlet.version,
+          "x",
+        ),
+      ).rejects.toMatchObject({ code: "invalid" });
+
+      // `parent` is at `withOutlet.version` now (the rejected drop bumped nothing).
+      await w.deleteSubtree(parent.id, withOutlet.version, "x");
+    });
+
+    it("round-trips an outlet node through route_section_instances", async () => {
+      const w = writer();
+      const seg = `live-test-rcw-${randomUUID()}`;
+      const saved = await w.saveComposition(
+        null,
+        {
+          name: `live-test-rcw-${randomUUID()}`,
+          path: `/${seg}`,
+          published: false,
+          tree: layout(),
+          seo: {},
+        },
+        null,
+        "x",
+      );
+      const { data: keys } = await admin
+        .from("route_section_instances")
+        .select("section_key")
+        .eq("bundle_id", saved.id);
+      expect((keys ?? []).map((r) => r.section_key).sort()).toEqual(["hero", "outlet"]);
+
+      await w.deleteComposition(saved.id, saved.version, "x");
+    });
+
     function root(key: string) {
       return [{ instanceId: randomUUID(), sectionKey: key, content: {}, slots: {} }];
+    }
+    function layout() {
+      return [
+        { instanceId: randomUUID(), sectionKey: "hero", content: {}, slots: {} },
+        { instanceId: randomUUID(), sectionKey: "outlet", content: {}, slots: {} },
+      ];
     }
   });
 } else {
