@@ -189,6 +189,14 @@ export function validateRouteInput(args: ValidateRouteInputArgs): RouteInputIssu
         message: "Publish the parent route before publishing this one.",
       });
     }
+    // Layout ordering — likewise: a published child must render inside its
+    // parent, so the parent must carry an `outlet` (`route_bundles.has_outlet`).
+    if (published && parent && !parent.hasOutlet) {
+      issues.push({
+        field: "parent",
+        message: `"${parent.name}" has no outlet — add one to it before publishing this route inside it.`,
+      });
+    }
     if (!published && bundleId) {
       const publishedChild = siblings.find((s) => s.parentId === bundleId && s.published);
       if (publishedChild) {

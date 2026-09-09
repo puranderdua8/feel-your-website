@@ -482,7 +482,20 @@ this through `RouteCompositionWriter`; the shell renders it. The pieces:
   back to the built-in home otherwise.
 - **`src/components/route-page.tsx`** — folds `layers` innermost-first: each
   parent layout wraps the next through its reserved `outlet` section node,
-  down to the matched route. `head()` emits the already-interpolated SEO.
+  down to the matched route. A parent layer with **no** `outlet` is skipped
+  (it is not a layout), so the matched route renders standalone rather than
+  being hidden behind the parent's page. `head()` emits the already-
+  interpolated SEO.
+
+A route is a **layout** exactly when its section tree contains an `outlet`
+node. `route_bundles.has_outlet` caches that (derived by
+`save_route_composition` from the rows it writes), and the RPC enforces two
+invariants transactionally, mirrored by `MemoryContentAdapter` and surfaced
+early by `validateRouteInput`: a route cannot be **published** while its parent
+has no outlet, and a route with a **published child** cannot be saved without
+one. Draft children are exempt — the block bites at publish time, like the
+parent-must-be-published rule it sits beside.
+
 - **`@feel-your-website/section-registry`** — maps a section key to the React
   component that renders it, shared by the shell (render) and the CMS
   (in-process preview). `renderComposition(tree, locale, { route, outlet })`
@@ -510,9 +523,16 @@ this through `RouteCompositionWriter`; the shell renders it. The pieces:
   be reparented under its own subtree. **`path-pattern-preview.tsx`** composes
   the candidate absolute pattern, a sample URL, and every live
   `validateRouteInput` issue as you type.
+- The editor blocks a save that would violate either layout invariant (client
+  side via `validateRouteInput`, then the BFF, then the RPC), and guides the
+  fix: an inline warning when the chosen parent has no outlet, with a
+  one-click **"Add an outlet to `<parent>`"** (a normal single-route save of
+  the parent, its `published` state preserved), and a banner on a route that
+  has children but no outlet yet.
 - **`section-tree.tsx`** offers "Add outlet" as its own control — never a
-  `sectionCatalog` entry a generic "add section" list could surface — shown
-  only while the route has children and hidden again once one exists;
+  `sectionCatalog` entry a generic "add section" list could surface — on any
+  route without one (so a route can be made a layout before it has children),
+  emphasised when children already exist, and hidden once an outlet exists;
   `tree-ops.ts` and the server both reject a second one.
 - Deleting a route with children goes through **`deleteRouteSubtree`**, behind
   a confirm dialog that names every descendant it would remove — a plain

@@ -137,6 +137,42 @@ describe("validateRouteInput", () => {
     );
   });
 
+  it("rejects publishing a child under a parent that has no outlet", () => {
+    const siblings = [summary({ id: "parent", path: "/docs", published: true, hasOutlet: false })];
+    const issues = validateRouteInput({
+      ...blank,
+      parentId: "parent",
+      pathSegment: "guide",
+      published: true,
+      siblings,
+    });
+    expect(issues.some((i) => i.field === "parent" && i.message.includes("no outlet"))).toBe(true);
+  });
+
+  it("allows a draft child under an outlet-less parent, and a live child once the parent is a layout", () => {
+    const outletless = [
+      summary({ id: "parent", path: "/docs", published: true, hasOutlet: false }),
+    ];
+    const draft = validateRouteInput({
+      ...blank,
+      parentId: "parent",
+      pathSegment: "guide",
+      published: false,
+      siblings: outletless,
+    });
+    expect(draft.some((i) => i.message.includes("no outlet"))).toBe(false);
+
+    const layout = [summary({ id: "parent", path: "/docs", published: true, hasOutlet: true })];
+    const live = validateRouteInput({
+      ...blank,
+      parentId: "parent",
+      pathSegment: "guide",
+      published: true,
+      siblings: layout,
+    });
+    expect(live.some((i) => i.message.includes("no outlet"))).toBe(false);
+  });
+
   it("rejects unpublishing a route with a published child", () => {
     const siblings = [
       summary({
