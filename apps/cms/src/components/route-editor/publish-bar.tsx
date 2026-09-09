@@ -13,6 +13,8 @@ import { checkRoutePublishReadiness, type PublishReadiness } from "@/server/bff"
 export function PublishBar({
   tree,
   hasChildren,
+  hasPublishedChildren,
+  parentHasOutlet,
   pending,
   onSaveDraft,
   onPublish,
@@ -20,6 +22,10 @@ export function PublishBar({
   tree: readonly RouteSectionNode[];
   /** Whether another route already names this one as its parent. */
   hasChildren: boolean;
+  /** Whether any of those children is itself published. */
+  hasPublishedChildren: boolean;
+  /** Whether this route's parent carries an outlet — `null` when top-level. */
+  parentHasOutlet: boolean | null;
   pending: boolean;
   onSaveDraft: () => void;
   onPublish: () => void;
@@ -31,11 +37,15 @@ export function PublishBar({
   const check = useCallback(async () => {
     setChecking(true);
     try {
-      setReadiness(await checkRoutePublishReadiness({ data: { tree, hasChildren } }));
+      setReadiness(
+        await checkRoutePublishReadiness({
+          data: { tree, hasChildren, hasPublishedChildren, parentHasOutlet },
+        }),
+      );
     } finally {
       setChecking(false);
     }
-  }, [tree, hasChildren]);
+  }, [tree, hasChildren, hasPublishedChildren, parentHasOutlet]);
 
   // Runs automatically whenever the tree or the children set changes, not
   // only when the author happens to press "Check readiness" — leaving that

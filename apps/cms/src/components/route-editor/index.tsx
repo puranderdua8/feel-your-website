@@ -5,8 +5,11 @@ import type {
   RouteSectionNode,
   RouteSeo,
 } from "@feel-your-website/content-core";
-import { parseRoutePattern } from "@feel-your-website/content-core";
-import { OUTLET_SECTION_KEY } from "@feel-your-website/section-registry";
+import {
+  OUTLET_SECTION_KEY,
+  parseRoutePattern,
+  treeHasOutlet,
+} from "@feel-your-website/content-core";
 import { Can } from "@feel-your-website/rbac/react";
 import {
   AlertDialog,
@@ -51,7 +54,7 @@ import { PublishBar } from "./publish-bar.js";
 import { SectionFieldForm } from "./section-field-form.js";
 import { SectionTree } from "./section-tree.js";
 import { SeoPanel } from "./seo-panel.js";
-import { findNode, setNodeContent } from "./tree-ops.js";
+import { findNode, newOutletNode, setNodeContent } from "./tree-ops.js";
 
 /**
  * The Routes surface: a hierarchy on the left, and on the right a route's
@@ -204,10 +207,13 @@ function RouteEditorInner({ actor }: { actor: string }) {
   }
 
   const children = open?.bundleId ? routes.filter((r) => r.parentId === open.bundleId) : [];
+  const hasPublishedChildren = children.some((c) => c.published);
   const descendants = open?.bundleId ? descendantIds(open.bundleId, routes) : new Set<string>();
-  const parentPath = open?.parentId
-    ? (routes.find((r) => r.id === open.parentId)?.path ?? null)
-    : null;
+  const parent = open?.parentId ? (routes.find((r) => r.id === open.parentId) ?? null) : null;
+  const parentPath = parent?.path ?? null;
+  /** `null` when this route is top-level; otherwise whether its parent is a layout. */
+  const parentHasOutlet = open?.parentId ? (parent?.hasOutlet ?? false) : null;
+  const treeHasOutletNow = open ? treeHasOutlet(open.tree) : false;
   const composedPath = open
     ? composeCandidatePath({
         parentId: open.parentId,
@@ -216,6 +222,39 @@ function RouteEditorInner({ actor }: { actor: string }) {
       })
     : null;
   const paramNames = composedPath ? safeParamNames(composedPath) : [];
+
+  async function addOutletToParent(parentId: string) {
+    setError(null);
+    setPending(true);
+    try {
+      const p = await loadRouteComposition({ data: { bundleId: parentId } });
+      if (!p) {
+        setError("Couldn't load the parent route.");
+        return;
+      }
+      if (!treeHasOutlet(p.tree)) {
+        await saveRouteComposition({
+          data: {
+            bundleId: p.id,
+            name: p.name,
+            parentId: p.parentId,
+            pathSegment: p.pathSegment,
+            params: p.params,
+            published: p.published,
+            tree: [...p.tree, newOutletNode()],
+            seo: p.seo,
+            expectedVersion: p.version,
+            actor,
+          },
+        });
+      }
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Couldn't add the outlet.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -286,6 +325,24 @@ function RouteEditorInner({ actor }: { actor: string }) {
                 siblings={routes}
               />
 
+              {parent && parentHasOutlet === false && (
+                <div className="border-destructive/40 bg-destructive/5 text-destructive flex flex-wrap items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-sm">
+                  <span>
+                    <strong>{parent.name}</strong> has no outlet — this route can&rsquo;t be
+                    published inside it until you add one.
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => void addOutletToParent(parent.id)}
+                  >
+                    Add an outlet to {parent.name}
+                  </Button>
+                </div>
+              )}
+
               <ParamEditor
                 paramNames={paramNames}
                 params={open.params}
@@ -354,11 +411,26 @@ function RouteEditorInner({ actor }: { actor: string }) {
               <CardHeader>
                 <CardTitle className="text-base">Sections</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col gap-3">
+                {children.length > 0 && !treeHasOutletNow && (
+                  <p
+                    className={`rounded-[var(--radius)] border px-3 py-2 text-sm ${
+                      hasPublishedChildren
+                        ? "border-destructive/40 bg-destructive/5 text-destructive"
+                        : "border-border bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    This route has {children.length} child route
+                    {children.length === 1 ? "" : "s"} but no outlet.{" "}
+                    {hasPublishedChildren
+                      ? "A published child renders inside it — add an outlet below."
+                      : "Add an outlet below to nest them inside it."}
+                  </p>
+                )}
                 <SectionTree
                   tree={open.tree}
                   selectedId={selectedNodeId}
-                  isLayout={children.length > 0}
+                  hasChildRoutes={children.length > 0}
                   onSelect={setSelectedNodeId}
                   onChange={(tree) => setOpen({ ...open, tree })}
                 />
@@ -413,6 +485,8 @@ function RouteEditorInner({ actor }: { actor: string }) {
           <PublishBar
             tree={open.tree}
             hasChildren={children.length > 0}
+            hasPublishedChildren={hasPublishedChildren}
+            parentHasOutlet={parentHasOutlet}
             pending={pending}
             onSaveDraft={() => void save(false)}
             onPublish={() => void save(true)}

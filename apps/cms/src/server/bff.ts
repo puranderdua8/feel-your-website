@@ -392,20 +392,17 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
 
     const siblings = await getRouteCompositionReader().listCompositions();
 
-    // Computed here, not trusted from the client: `hasChildren` gates a
-    // blocking publish rule below, so it must reflect the real sibling set,
-    // not whatever the editor's local state happened to send.
-    const hasChildren =
-      data.bundleId !== null && siblings.some((s) => s.parentId === data.bundleId);
-    // `checkRoutePublishReadiness` surfaces this same rule to the editor as a
-    // live, non-authoritative hint — but that check is opt-in (a button the
-    // author can simply never press) and never runs on the actual save path.
-    // Publishing a layout with no outlet means its children render as
-    // orphaned standalone pages with no chrome, so this is enforced here too,
-    // unconditionally, the same way the single-outlet rule above already is.
-    if (data.published && hasChildren && outletCount === 0) {
+    // Computed here, not trusted from the client: this gates a blocking publish
+    // rule, so it must reflect the real sibling set. Mirrors
+    // `save_route_composition`'s second `has_outlet` check — a route with a
+    // *published* child cannot save a tree with no outlet, which would strand
+    // that child. (Draft children are fine; they are blocked from publishing
+    // by the parent-outlet rule in `validateRouteInput`.)
+    const hasPublishedChild =
+      data.bundleId !== null && siblings.some((s) => s.parentId === data.bundleId && s.published);
+    if (hasPublishedChild && outletCount === 0) {
       throw new Error(
-        "This route has children but no outlet — add one before publishing, or they will render as standalone pages with no layout.",
+        "This route has a published child that renders inside it — it must keep its outlet.",
       );
     }
 
@@ -506,17 +503,35 @@ export interface PublishReadiness {
 /**
  * Whether a tree can be published: every section instance in it must have
  * complete content — every required field present and well-typed — in every
- * configured site locale — and the tree's `outlet` usage must make sense for
- * whether this route actually has children. The route owns the content, so
- * this walks the tree's nodes directly; there is no separate content store to
- * consult. `hasChildren` is supplied by the caller (the editor already has the
- * full route list loaded) rather than re-fetched here.
+ * configured site locale — and the route's `outlet` usage must make sense for
+ * its place in the hierarchy. The route owns the content, so this walks the
+ * tree's nodes directly. The three hierarchy flags are supplied by the caller
+ * (the editor already has the full route list loaded) rather than re-fetched:
+ * `hasChildren` / `hasPublishedChildren` about this route's own children, and
+ * `parentHasOutlet` (`null` when top-level) about the route it nests under.
  */
 export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
-  .validator((input: unknown): { tree: RouteSectionNode[]; hasChildren: boolean } => {
-    const row = (input ?? {}) as Record<string, unknown>;
-    return { tree: parseTree(row.tree), hasChildren: Boolean(row.hasChildren) };
-  })
+  .validator(
+    (
+      input: unknown,
+    ): {
+      tree: RouteSectionNode[];
+      hasChildren: boolean;
+      hasPublishedChildren: boolean;
+      parentHasOutlet: boolean | null;
+    } => {
+      const row = (input ?? {}) as Record<string, unknown>;
+      return {
+        tree: parseTree(row.tree),
+        hasChildren: Boolean(row.hasChildren),
+        hasPublishedChildren: Boolean(row.hasPublishedChildren),
+        parentHasOutlet:
+          row.parentHasOutlet === null || row.parentHasOutlet === undefined
+            ? null
+            : Boolean(row.parentHasOutlet),
+      };
+    },
+  )
   .handler(async ({ data }): Promise<PublishReadiness> => {
     const locales = await getSiteSettingsStore().getLocales();
     const gaps: PublishGap[] = [];
@@ -565,15 +580,28 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
     const structuralIssues: StructuralIssue[] = [];
     if (outletCount > 1) {
       structuralIssues.push({ message: "A route can carry only one outlet.", blocking: true });
+    } else if (data.hasPublishedChildren && outletCount === 0) {
+      structuralIssues.push({
+        message:
+          "This route has a published child that renders inside it — it must keep an outlet.",
+        blocking: true,
+      });
     } else if (data.hasChildren && outletCount === 0) {
       structuralIssues.push({
-        message: "This route has children but no outlet — they won't render inside it.",
-        blocking: true,
+        message: "This route has child routes but no outlet — add one to nest them inside it.",
+        blocking: false,
       });
     } else if (!data.hasChildren && outletCount === 1) {
       structuralIssues.push({
         message: "This route has an outlet but no children yet.",
         blocking: false,
+      });
+    }
+
+    if (data.parentHasOutlet === false) {
+      structuralIssues.push({
+        message: "The parent route has no outlet — this route can't be published inside it.",
+        blocking: true,
       });
     }
 

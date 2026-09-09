@@ -20,20 +20,21 @@ import {
  *
  * `outlet` — where a layout route's matched child renders — is deliberately
  * not in `sectionCatalog`, so it never appears in the generic "add section"
- * dropdown. It gets its own control here instead, offered only while this
- * route has (or is being set up to have) children, and only once.
+ * dropdown. It gets its own control here, offered for *any* route (a route can
+ * be set up as a layout before it has children) and only once;
+ * `hasChildRoutes` just makes the button prominent when it is actually needed.
  */
 export function SectionTree({
   tree,
   selectedId,
-  isLayout,
+  hasChildRoutes,
   onSelect,
   onChange,
 }: {
   tree: readonly RouteSectionNode[];
   selectedId: string | null;
-  /** Whether this route has children or is meant to — gates the "Add outlet" control. */
-  isLayout: boolean;
+  /** Whether another route already nests under this one — emphasises "Add outlet". */
+  hasChildRoutes: boolean;
   onSelect: (id: string) => void;
   onChange: (tree: readonly RouteSectionNode[]) => void;
 }) {
@@ -67,11 +68,12 @@ export function SectionTree({
           label="Add root section"
           onAdd={(key) => onChange([...tree, newNode(key)])}
         />
-        {isLayout && !hasOutlet(tree) && (
+        {!hasOutlet(tree) && (
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant={hasChildRoutes ? "default" : "outline"}
+            title="An outlet is where this route's matched child renders inside it"
             onClick={() => onChange([...tree, newOutletNode()])}
           >
             + Add outlet

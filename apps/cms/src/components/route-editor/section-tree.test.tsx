@@ -12,22 +12,15 @@ const outletNode: RouteSectionNode = {
 };
 
 describe("SectionTree — outlet control", () => {
-  it("hides 'Add outlet' when the route isn't a layout", () => {
+  it("offers 'Add outlet' on any route without one, children or not", () => {
     render(
       <SectionTree
         tree={[]}
         selectedId={null}
-        isLayout={false}
+        hasChildRoutes={false}
         onSelect={vi.fn()}
         onChange={vi.fn()}
       />,
-    );
-    expect(screen.queryByText("+ Add outlet")).toBeNull();
-  });
-
-  it("offers 'Add outlet' once the route has children", () => {
-    render(
-      <SectionTree tree={[]} selectedId={null} isLayout onSelect={vi.fn()} onChange={vi.fn()} />,
     );
     expect(screen.getByText("+ Add outlet")).toBeTruthy();
   });
@@ -37,7 +30,7 @@ describe("SectionTree — outlet control", () => {
       <SectionTree
         tree={[outletNode]}
         selectedId={null}
-        isLayout
+        hasChildRoutes
         onSelect={vi.fn()}
         onChange={vi.fn()}
       />,
