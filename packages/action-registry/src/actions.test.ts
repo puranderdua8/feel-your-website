@@ -18,6 +18,10 @@ describe("actionCatalog", () => {
     expect(query?.kind === "query" && query.cache?.ttlMs).toBe(60_000);
   });
 
+  it("lets newsletter.subscribe take a form-input value", () => {
+    expect(actionCatalog.byId.get("newsletter.subscribe")?.allowedSources).toContain("formInput");
+  });
+
   it("has unique ids", () => {
     expect(new Set(actionCatalog.values).size).toBe(actionCatalog.values.length);
   });

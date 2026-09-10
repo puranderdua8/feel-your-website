@@ -70,6 +70,10 @@ export function ButtonActionForm({ spec }: { spec: ActionCtaSpec }): React.JSX.E
           path: router.state.location.pathname,
           instanceId: spec.instanceId,
           requestId: newRequestId(),
+          // The values the visitor typed into the enclosing `form`, if any.
+          // The server rebuilds the body from `def.input` and re-validates —
+          // this only supplies the `formInput`-sourced values it can't derive.
+          ...(spec.formInput ? { formInput: spec.formInput } : {}),
         },
       });
 

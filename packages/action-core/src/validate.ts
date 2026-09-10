@@ -64,19 +64,29 @@ export function validateActionInput(
 /**
  * Checks an authored input mapping against an action, without running it:
  * every required input is mapped, every mapped name is a real input, every
- * source is allowed, and every `routeParam` names a param the route actually
- * has. Returns every problem so the editor can show them together;
- * `field` is the input name.
+ * source is allowed, every `routeParam` names a param the route actually has,
+ * and — when `formInputNames` is supplied — every `formInput` names a field
+ * the enclosing form actually has. Returns every problem so the editor can
+ * show them together; `field` is the input name.
+ *
+ * `formInputNames` is optional: the shell (which rebuilds the body from
+ * submitted values, then runs `validateActionInput`) omits it; the CMS passes
+ * the sibling `field` names so a typo'd `formInput` mapping is caught at
+ * publish rather than at click.
  */
 export function validateActionBinding(
   def: ActionDefinition,
   mapping: ActionInputMapping,
-  context: { readonly routeParamNames: readonly string[] },
+  context: {
+    readonly routeParamNames: readonly string[];
+    readonly formInputNames?: readonly string[];
+  },
 ): readonly FieldIssue[] {
   const issues: FieldIssue[] = [];
   const inputNames = new Set(def.input.map((spec) => spec.name));
   const allowed = new Set(def.allowedSources);
   const params = new Set(context.routeParamNames);
+  const formFields = context.formInputNames ? new Set(context.formInputNames) : null;
 
   for (const spec of def.input) {
     if (spec.required && mapping[spec.name] === undefined) {
@@ -106,6 +116,12 @@ export function validateActionBinding(
       issues.push({
         field: name,
         message: `${label} maps to ":${entry.value}", which this route has no param for.`,
+      });
+    }
+    if (entry.source === "formInput" && formFields && !formFields.has(entry.value)) {
+      issues.push({
+        field: name,
+        message: `${label} maps to the form field "${entry.value}", which this form has no field for.`,
       });
     }
   }

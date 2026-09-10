@@ -94,6 +94,39 @@ describe("validateActionBinding", () => {
     );
     expect(issues[0]?.message).toMatch(/route has no param for/);
   });
+
+  const formSubscribe: MutationActionDefinition = {
+    ...subscribe,
+    allowedSources: ["static", "routeParam", "formInput"],
+  };
+
+  it("passes a formInput that names a known form field", () => {
+    const issues = validateActionBinding(
+      formSubscribe,
+      { email: { source: "formInput", value: "email" } },
+      { routeParamNames: [], formInputNames: ["email", "name"] },
+    );
+    expect(issues).toEqual([]);
+  });
+
+  it("flags a formInput that names no form field", () => {
+    const issues = validateActionBinding(
+      formSubscribe,
+      { email: { source: "formInput", value: "e_mail" } },
+      { routeParamNames: [], formInputNames: ["email"] },
+    );
+    expect(issues[0]?.field).toBe("email");
+    expect(issues[0]?.message).toMatch(/form has no field for/);
+  });
+
+  it("skips the form-field check when formInputNames is omitted (the shell path)", () => {
+    const issues = validateActionBinding(
+      formSubscribe,
+      { email: { source: "formInput", value: "anything" } },
+      { routeParamNames: [] },
+    );
+    expect(issues).toEqual([]);
+  });
 });
 
 describe("parseActionInputMapping", () => {

@@ -27,6 +27,7 @@ export interface CollectRouteButtonOptions {
 function actionButtonIssues(
   fields: Readonly<Record<string, JsonValue>>,
   routeParamNames: readonly string[],
+  formInputNames: readonly string[] | undefined,
 ): { message: string; blocking: boolean }[] {
   const actionId = typeof fields.actionId === "string" ? fields.actionId.trim() : "";
   if (actionId === "") return []; // "needs an action" is validateButtonSection's job
@@ -42,9 +43,48 @@ function actionButtonIssues(
   const mapping = parseActionInputMapping(fields.body ?? "");
   if (!mapping) return [{ message: "The request body is not valid.", blocking: true }];
 
-  return validateActionBinding(def, mapping, { routeParamNames: [...routeParamNames] }).map(
-    (issue) => ({ message: `Request body — ${issue.message}`, blocking: true }),
-  );
+  // A `formInput` mapping is only meaningful when the button submits a form.
+  // `formInputNames === undefined` means "not in a form" — reject before the
+  // per-field check, whose "no such field" message would misread.
+  const usesFormInput = Object.values(mapping).some((entry) => entry.source === "formInput");
+  if (usesFormInput && formInputNames === undefined) {
+    return [
+      {
+        message: "Request body — a form-field value needs this button inside a form section.",
+        blocking: true,
+      },
+    ];
+  }
+
+  return validateActionBinding(def, mapping, {
+    routeParamNames: [...routeParamNames],
+    ...(formInputNames ? { formInputNames: [...formInputNames] } : {}),
+  }).map((issue) => ({ message: `Request body — ${issue.message}`, blocking: true }));
+}
+
+/**
+ * The `field` section `name`s in reach of each `form`'s submit button, keyed by
+ * that button's `instanceId`. A `mode: "action"` button in a form's `cta` slot
+ * can only map a `formInput` to one of its form's `fields`; a button outside a
+ * form has no entry (and no `formInput` mapping is valid for it).
+ */
+function formFieldNamesByButton(tree: readonly RouteSectionNode[]): Map<string, readonly string[]> {
+  const out = new Map<string, readonly string[]>();
+  for (const node of flattenNodes(tree)) {
+    if (node.sectionKey !== "form") continue;
+
+    const names = new Set<string>();
+    for (const field of node.slots.fields ?? []) {
+      for (const fields of Object.values(field.content)) {
+        const name = typeof fields.name === "string" ? fields.name.trim() : "";
+        if (name !== "") names.add(name);
+      }
+    }
+    for (const cta of node.slots.cta ?? []) {
+      if (cta.sectionKey === "button") out.set(cta.instanceId, [...names]);
+    }
+  }
+  return out;
 }
 
 /**
@@ -59,6 +99,7 @@ export function collectRouteButtonIssues(
 ): readonly RouteButtonIssue[] {
   const out: RouteButtonIssue[] = [];
   const routeParamNames = options.routeParamNames ?? [];
+  const formFieldsByButton = formFieldNamesByButton(tree);
 
   for (const node of flattenNodes(tree)) {
     if (node.sectionKey !== "button") continue;
@@ -75,7 +116,11 @@ export function collectRouteButtonIssues(
         push(issue.message, issue.blocking);
       }
       if (fields.mode === "action") {
-        for (const issue of actionButtonIssues(fields, routeParamNames)) {
+        for (const issue of actionButtonIssues(
+          fields,
+          routeParamNames,
+          formFieldsByButton.get(node.instanceId),
+        )) {
           push(issue.message, issue.blocking);
         }
       }

@@ -49,7 +49,7 @@ describe("ButtonActionForm", () => {
     expect(invokeAction).toHaveBeenCalledTimes(1); // stays disabled after success
   });
 
-  it("sends only the pathname, instanceId and a requestId", async () => {
+  it("sends only the pathname, instanceId and a requestId when not in a form", async () => {
     invokeAction.mockResolvedValue({ ok: true, data: {} });
     render(<ButtonActionForm spec={spec()} />);
     screen.getByRole("button", { name: "Subscribe" }).click();
@@ -60,6 +60,22 @@ describe("ButtonActionForm", () => {
         path: "/n/hello",
         instanceId: "cta-1",
         requestId: expect.stringMatching(/.+/),
+      },
+    });
+  });
+
+  it("forwards the enclosing form's values as formInput when the spec carries them", async () => {
+    invokeAction.mockResolvedValue({ ok: true, data: {} });
+    render(<ButtonActionForm spec={spec({ formInput: { email: "a@b.com" } })} />);
+    screen.getByRole("button", { name: "Subscribe" }).click();
+    await screen.findByRole("button", { name: "Subscribed" });
+
+    expect(invokeAction).toHaveBeenCalledWith({
+      data: {
+        path: "/n/hello",
+        instanceId: "cta-1",
+        requestId: expect.stringMatching(/.+/),
+        formInput: { email: "a@b.com" },
       },
     });
   });
