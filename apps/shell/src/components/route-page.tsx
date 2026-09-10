@@ -1,6 +1,7 @@
 import { renderComposition, type RouteRenderContext } from "@feel-your-website/section-registry";
 import type { ReactNode } from "react";
 
+import { useSectionView } from "@/analytics/section-view";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { renderActionCta } from "@/components/button-action-form";
 import { renderCtaLink } from "@/components/cta-link";
@@ -45,6 +46,8 @@ export function seoToHead(page: RoutePage): {
  * route renders standalone, its breadcrumb trail still showing the hierarchy.
  */
 export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element {
+  const onSectionInView = useSectionView();
+
   const route: RouteRenderContext = {
     params: page.params,
     pathname: page.pathname,
@@ -64,6 +67,7 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
       renderLink: renderCtaLink,
       renderActionCta,
       sectionData: page.sectionData,
+      onSectionInView,
     });
   }
 
