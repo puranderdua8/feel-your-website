@@ -168,4 +168,43 @@ describe("renderComposition", () => {
     );
     expect(screen.getByText("slug=hello")).toBeTruthy();
   });
+
+  describe("onSectionInView wrapping", () => {
+    const heroTree: RouteSectionNode[] = [
+      node({ instanceId: "h", sectionKey: "hero", content: { en: { title: "Top" } } }),
+    ];
+
+    it("wraps each section in a SectionBoundary when onSectionInView + route are set", () => {
+      const { container } = render(
+        renderComposition(heroTree, "en", { route: ctx(), onSectionInView: () => {} }),
+      );
+      expect(
+        container.querySelector("[data-section-instance='h'][data-section-key='hero']"),
+      ).not.toBeNull();
+    });
+
+    it("does not wrap without onSectionInView", () => {
+      const { container } = render(renderComposition(heroTree, "en", { route: ctx() }));
+      expect(container.querySelector("[data-section-instance]")).toBeNull();
+    });
+
+    it("does not wrap without a route (CMS preview)", () => {
+      const { container } = render(
+        renderComposition(heroTree, "en", { onSectionInView: () => {} }),
+      );
+      expect(container.querySelector("[data-section-instance]")).toBeNull();
+    });
+
+    it("never wraps an outlet node", () => {
+      const { container } = render(
+        renderComposition([node({ instanceId: "o", sectionKey: "outlet" })], "en", {
+          route: ctx(),
+          outlet: <span>CHILD</span>,
+          onSectionInView: () => {},
+        }),
+      );
+      expect(container.querySelector("[data-section-instance]")).toBeNull();
+      expect(screen.getByText("CHILD")).toBeTruthy();
+    });
+  });
 });
