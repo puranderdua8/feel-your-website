@@ -16,6 +16,7 @@ import { SupabaseAuthProvider, type CookieAdapter } from "@feel-your-website/aut
 import { contractSeed, MemoryContentAdapter } from "@feel-your-website/content-adapter-memory";
 import { SupabaseContentAdapter } from "@feel-your-website/content-adapter-supabase";
 import { ConsoleAnalyticsSink, type AnalyticsSink } from "@feel-your-website/analytics-core";
+import { MeasurementProtocolSink } from "@feel-your-website/analytics-sink-ga";
 import type { ContentAdapter } from "@feel-your-website/content-core";
 import { SECTION_QUERY_REGISTRY } from "@feel-your-website/section-registry";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
@@ -223,22 +224,34 @@ export function getActionInvoker(): ActionInvoker {
 
 /**
  * Destination for the first-party analytics collector (`ingestAnalytics`).
- * `console` (default) logs each batch; `ga` — the Measurement Protocol sink —
- * lands in a follow-up. Analytics is non-essential, but a *misconfigured* sink
- * is a deploy error, so an unknown value fails here rather than silently.
+ * `console` (default) logs each batch; `ga` relays it to GA4 over the
+ * Measurement Protocol (the ad-block-resilient path). Analytics is
+ * non-essential, but a *misconfigured* sink is a deploy error, so an unknown
+ * value — or `ga` without its credentials — fails here rather than silently.
  */
 export function getAnalyticsSink(): AnalyticsSink {
   if (analyticsSink) return analyticsSink;
 
   const kind = process.env.ANALYTICS_SINK ?? "console";
-  if (kind !== "console") {
-    throw new Error(
-      `Unknown ANALYTICS_SINK "${kind}". Expected "console" (the Measurement Protocol sink is not wired yet).`,
-    );
+
+  if (kind === "console") {
+    analyticsSink = new ConsoleAnalyticsSink("[analytics:collector]");
+    return analyticsSink;
   }
 
-  analyticsSink = new ConsoleAnalyticsSink("[analytics:collector]");
-  return analyticsSink;
+  if (kind === "ga") {
+    const measurementId = process.env.ANALYTICS_GA_MEASUREMENT_ID?.trim();
+    const apiSecret = process.env.ANALYTICS_MP_API_SECRET?.trim();
+    if (!measurementId || !apiSecret) {
+      throw new Error(
+        'ANALYTICS_SINK="ga" needs ANALYTICS_GA_MEASUREMENT_ID and ANALYTICS_MP_API_SECRET.',
+      );
+    }
+    analyticsSink = new MeasurementProtocolSink({ measurementId, apiSecret });
+    return analyticsSink;
+  }
+
+  throw new Error(`Unknown ANALYTICS_SINK "${kind}". Expected "console" or "ga".`);
 }
 
 /** Test seam: forces the next call to rebuild from current env. */

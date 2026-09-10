@@ -35,6 +35,7 @@ const CONCRETE_BACKENDS = [
   "@feel-your-website/content-adapter-supabase",
   "@feel-your-website/auth-supabase",
   "@feel-your-website/action-invoker-http",
+  "@feel-your-website/analytics-sink-ga",
 ];
 
 describe("the adapter seam", () => {
