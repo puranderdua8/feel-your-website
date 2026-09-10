@@ -25,6 +25,13 @@ export interface ActionCtaSpec {
    * from published content and never trusts this.
    */
   readonly body: JsonValue;
+  /**
+   * The enclosing `form` section's current input values, keyed by field name —
+   * present only when the button is inside a `form`. The host form component
+   * forwards these as `formInput` on submit; the server still validates them
+   * against the action's declared inputs.
+   */
+  readonly formInput?: Readonly<Record<string, JsonValue>>;
   /** The CTA class the link renderer also uses, so both modes look identical. */
   readonly className: string;
 }

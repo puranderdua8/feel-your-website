@@ -1,7 +1,9 @@
 import type { JsonValue } from "@feel-your-website/content-core";
+import { useMemo, useState } from "react";
 
 import type { ActionCtaSpec, RenderActionCta } from "./action-cta.js";
 import type { RouteRenderContext } from "./context.js";
+import { FormProvider, useFormContext, type FormContextValue } from "./form-context.js";
 import { classifyHref, type LinkSpec, type RenderLink } from "./link.js";
 import { parseReleases } from "./section-data.js";
 
@@ -153,6 +155,7 @@ function DisabledCta({ label }: { label: string }): React.JSX.Element {
  * placeholder too.
  */
 const ButtonSection: SectionComponent = ({ fields, renderLink, renderActionCta, instanceId }) => {
+  const form = useFormContext();
   const label = text(fields, "label");
   const mode = text(fields, "mode") || "link";
 
@@ -167,6 +170,7 @@ const ButtonSection: SectionComponent = ({ fields, renderLink, renderActionCta, 
       label,
       successLabel: text(fields, "successLabel") || undefined,
       body: fields.body ?? null,
+      ...(form ? { formInput: form.values } : {}),
       className: CTA_CLASS,
     };
     return <>{renderActionCta(spec)}</>;
@@ -252,6 +256,71 @@ const CardSection: SectionComponent = ({ fields, slots }) => (
   </section>
 );
 
+const FIELD_CLASS = "border-border rounded-[var(--radius)] border bg-background px-2 py-1 text-sm";
+
+/**
+ * One controlled input inside a `form`. It reads and writes the enclosing
+ * form's state via {@link useFormContext} — its `name` field is the key an
+ * action CTA's `formInput` mapping later references. Outside a `form` there is
+ * no context, so it renders an uncontrolled input that leads nowhere: authors
+ * see the field, but nothing collects it.
+ */
+const FieldSection: SectionComponent = ({ fields }) => {
+  const form = useFormContext();
+  const name = text(fields, "name");
+  const label = text(fields, "label");
+  const type = text(fields, "type") || "text";
+  const placeholder = text(fields, "placeholder");
+  const required = fields.required === true;
+  const raw = form?.values[name];
+  const value = typeof raw === "string" ? raw : "";
+
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="font-medium">{label || name}</span>
+      <input
+        type={type}
+        name={name || undefined}
+        value={value}
+        placeholder={placeholder || undefined}
+        required={required}
+        onChange={(event) => form?.setValue(name, event.target.value)}
+        className={FIELD_CLASS}
+      />
+    </label>
+  );
+};
+
+/**
+ * A `<form>` wrapper: its `fields` slot holds `field` sections and its `cta`
+ * slot a single `mode: "action"` button. It owns the input state and hands it
+ * to descendants through {@link FormProvider}, so the button can read the
+ * current values as `formInput` when it fires. Submission itself is the CTA's
+ * job — this element just prevents the native navigation.
+ */
+const FormSection: SectionComponent = ({ fields, slots }) => {
+  const [values, setValues] = useState<Record<string, JsonValue>>({});
+  const ctx = useMemo<FormContextValue>(
+    () => ({
+      values,
+      setValue: (name, value) => setValues((prev) => ({ ...prev, [name]: value })),
+    }),
+    [values],
+  );
+
+  return (
+    <FormProvider value={ctx}>
+      <form className="flex flex-col gap-3" onSubmit={(event) => event.preventDefault()}>
+        {text(fields, "heading") && (
+          <h2 className="text-xl font-medium">{text(fields, "heading")}</h2>
+        )}
+        {slots.fields}
+        {slots.cta}
+      </form>
+    </FormProvider>
+  );
+};
+
 export const SECTION_REGISTRY: Readonly<Record<string, SectionComponent>> = {
   hero: HeroSection,
   guidance: TitleBodySection,
@@ -262,6 +331,8 @@ export const SECTION_REGISTRY: Readonly<Record<string, SectionComponent>> = {
   image: ImageSection,
   button: ButtonSection,
   card: CardSection,
+  field: FieldSection,
+  form: FormSection,
   "release-feed": ReleaseFeedSection,
 };
 
