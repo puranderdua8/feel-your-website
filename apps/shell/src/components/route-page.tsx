@@ -1,11 +1,20 @@
-import { renderComposition, type RouteRenderContext } from "@feel-your-website/section-registry";
-import type { ReactNode } from "react";
+import {
+  renderComposition,
+  type RouteRenderContext,
+  type SectionDataEntry,
+} from "@feel-your-website/section-registry";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useSectionView } from "@/analytics/section-view";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { renderActionCta } from "@/components/button-action-form";
 import { renderCtaLink } from "@/components/cta-link";
-import type { RoutePage } from "@/server/bff";
+import { loadSectionData, type RoutePage } from "@/server/bff";
+
+/** Marks every id as failed — the client-refetch pass errored, so those sections fall back. */
+function allFailed(ids: readonly string[]): Record<string, SectionDataEntry> {
+  return Object.fromEntries(ids.map((id) => [id, { ok: false, error: { code: "unavailable" } }]));
+}
 
 /** Turns a resolved page's (already param-interpolated) SEO into `head()` meta / links. */
 export function seoToHead(page: RoutePage): {
@@ -48,6 +57,35 @@ export function seoToHead(page: RoutePage): {
 export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element {
   const onSectionInView = useSectionView();
 
+  // Data for non-blocking sections, fetched after mount. Reset per route.
+  const [deferredData, setDeferredData] = useState<Record<string, SectionDataEntry>>({});
+
+  useEffect(() => {
+    setDeferredData({});
+    if ((page.deferredSections?.length ?? 0) === 0) return;
+
+    let cancelled = false;
+    void loadSectionData({ data: { path: page.pathname } })
+      .then((result) => {
+        if (!cancelled) setDeferredData(result);
+      })
+      .catch(() => {
+        if (!cancelled) setDeferredData(allFailed(page.deferredSections ?? []));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [page.pathname, page.deferredSections]);
+
+  const sectionData = useMemo(
+    () => ({ ...page.sectionData, ...deferredData }),
+    [page.sectionData, deferredData],
+  );
+  const pendingSections = useMemo(
+    () => new Set((page.deferredSections ?? []).filter((id) => !(id in deferredData))),
+    [page.deferredSections, deferredData],
+  );
+
   const route: RouteRenderContext = {
     params: page.params,
     pathname: page.pathname,
@@ -66,7 +104,8 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
       outlet: rendered,
       renderLink: renderCtaLink,
       renderActionCta,
-      sectionData: page.sectionData,
+      sectionData,
+      pendingSections,
       onSectionInView,
     });
   }

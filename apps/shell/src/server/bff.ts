@@ -4,6 +4,7 @@ import { CONSENT_COOKIE_NAME, type ConsentStatus } from "@feel-your-website/cons
 import { isContentAdapterError, type JsonValue } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
+import type { SectionDataEntry } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookies } from "@tanstack/react-start/server";
 
@@ -21,7 +22,7 @@ import { assertSameOrigin } from "./http-guards.js";
 import { resolveAndInvokeAction, type InvokeActionInput } from "./invoke-action.js";
 import { buildNav, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
-import { loadRouteSectionData } from "./route-page-data.js";
+import { deferredSectionIds, loadRouteSectionData } from "./route-page-data.js";
 
 /**
  * The BFF.
@@ -207,7 +208,32 @@ export const loadRoutePage = createServerFn({ method: "GET" })
     if (!page) return null;
 
     const sectionData = await loadRouteSectionData(page, getActionInvoker());
-    return Object.keys(sectionData).length > 0 ? { ...page, sectionData } : page;
+    const deferredSections = deferredSectionIds(page);
+
+    const withData = Object.keys(sectionData).length > 0 ? { ...page, sectionData } : page;
+    return deferredSections.length > 0 ? { ...withData, deferredSections } : withData;
+  });
+
+/**
+ * The client-refetch pass for a route's non-blocking sections. `RoutePageView`
+ * calls this after mount for every id in {@link RoutePage.deferredSections};
+ * the route is re-resolved from published content — the request carries only
+ * the pathname.
+ */
+export const loadSectionData = createServerFn({ method: "GET" })
+  .validator((input: unknown): { path: string } => {
+    const path = (input as { path?: unknown })?.path;
+    if (typeof path !== "string" || path.trim() === "") {
+      throw new Error("path is required.");
+    }
+    return { path };
+  })
+  .handler(async ({ data }): Promise<Record<string, SectionDataEntry>> => {
+    const locale = resolveLocale();
+    const manifest = await getContentAdapter().getRouteManifest(locale);
+    const page = resolveRoutePage(data.path, manifest, locale);
+    if (!page) return {};
+    return loadRouteSectionData(page, getActionInvoker(), { phase: "deferred" });
   });
 
 /**
