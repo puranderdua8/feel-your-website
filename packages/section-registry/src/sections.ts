@@ -196,4 +196,55 @@ export const sectionCatalog = defineSections([
       },
     },
   },
+  {
+    // One input inside a `form`. Its `name` is what a `mode: "action"` button's
+    // `formInput` mapping references; the value is collected at submit time.
+    key: "field",
+    description: "A form input — used inside a form, referenced by an action CTA's body mapping.",
+    fields: [
+      { name: "name", label: "Field name", type: "text", required: true },
+      { name: "label", label: "Label", type: "text", required: true },
+      {
+        name: "type",
+        label: "Input type",
+        type: "select",
+        options: ["text", "email", "number", "tel", "url"],
+        default: "text",
+      },
+      { name: "placeholder", label: "Placeholder", type: "text" },
+      { name: "required", label: "Required", type: "boolean", default: false },
+    ],
+    slots: [],
+    sample: { fields: { name: "email", label: "Email", type: "email" } },
+  },
+  {
+    // A `<form>` wrapper. Its `fields` slot holds `field`s; its `cta` slot a
+    // single `mode: "action"` button, which reads the fields' values as
+    // `formInput` when it fires.
+    key: "form",
+    description: "A form: a set of fields plus one action CTA that submits them.",
+    fields: [{ name: "heading", label: "Heading", type: "text" }],
+    slots: [
+      { name: "fields", label: "Fields", accepts: ["field"], arity: "list" },
+      { name: "cta", label: "Submit button", accepts: ["button"], arity: "single" },
+    ],
+    sample: {
+      fields: { heading: "Subscribe" },
+      slots: {
+        fields: [{ sectionKey: "field", fields: { name: "email", label: "Email", type: "email" } }],
+        cta: [
+          {
+            sectionKey: "button",
+            fields: {
+              label: "Subscribe",
+              mode: "action",
+              actionId: "newsletter.subscribe",
+              body: JSON.stringify({ email: { source: "formInput", value: "email" } }),
+              successLabel: "Subscribed",
+            },
+          },
+        ],
+      },
+    },
+  },
 ]);
