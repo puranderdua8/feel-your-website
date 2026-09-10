@@ -19,6 +19,7 @@
     "@feel-your-website/action-registry": "workspace:*",
     "@feel-your-website/analytics-core": "workspace:*",
     "@feel-your-website/analytics-ga": "workspace:*",
+    "@feel-your-website/analytics-sink-ga": "workspace:*",
     "@feel-your-website/auth": "workspace:*",
     "@feel-your-website/auth-supabase": "workspace:*",
     "@feel-your-website/config-schema": "workspace:*",
