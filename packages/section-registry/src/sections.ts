@@ -138,6 +138,26 @@ export const sectionCatalog = defineSections([
     sample: { fields: { label: "Get started", mode: "link", href: "#" } },
   },
   {
+    // The one data-backed example section: it renders nothing of its own, its
+    // list comes from the `feed.releases` registered query (see
+    // `SECTION_QUERY_REGISTRY` in `section-data.ts`). A real project's
+    // data sections look like this — a heading plus knobs, no content.
+    key: "release-feed",
+    description: "A list of recent releases, pulled from an external feed at render time.",
+    fields: [
+      { name: "heading", label: "Heading", type: "text" },
+      {
+        name: "count",
+        label: "How many to show",
+        type: "number",
+        default: 5,
+        helpText: "1–20. Passed to the feed as its limit.",
+      },
+    ],
+    slots: [],
+    sample: { fields: { heading: "Latest releases", count: 5 } },
+  },
+  {
     key: "card",
     description: "A card with an icon slot and a body slot.",
     fields: [{ name: "heading", label: "Heading", type: "text" }],
