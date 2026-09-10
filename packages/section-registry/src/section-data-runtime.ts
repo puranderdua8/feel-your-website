@@ -182,7 +182,10 @@ export async function runQueries(
     }
 
     const spec = registry[plan.sectionKeyByInstance.get(instanceId) ?? ""];
-    const projected = spec?.project ? spec.project(base.data as JsonValue) : base.data;
+    // `project` narrows to the section's own render shape; it stays inside the
+    // JSON boundary, so treat its output as `JsonValue`.
+    const projected = (spec?.project ? spec.project(base.data) : base.data) as
+      JsonValue | null | undefined;
     if (projected === null || projected === undefined) {
       out[instanceId] = { ok: false, error: { code: "invalid_response" } };
       continue;

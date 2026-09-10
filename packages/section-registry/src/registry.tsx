@@ -11,9 +11,13 @@ export type SectionFields = Readonly<Record<string, JsonValue>> | null;
  * already-parsed payload, or a normalised failure. The BFF aggregates these
  * (see the query registry); a section renders a fallback for a failure or an
  * absent entry.
+ *
+ * `data` is typed `JsonValue`, not `unknown`: it has crossed the BFF→client
+ * JSON boundary as part of `RoutePage`, so it must be serialisable. A section
+ * still narrows it to its own shape (its `project` already did the real work).
  */
 export type SectionDataEntry =
-  | { readonly ok: true; readonly data: unknown }
+  | { readonly ok: true; readonly data: JsonValue }
   | { readonly ok: false; readonly error: { readonly code: string } };
 
 /**

@@ -61,6 +61,7 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
       route,
       outlet: rendered,
       renderLink: renderCtaLink,
+      sectionData: page.sectionData,
     });
   }
 

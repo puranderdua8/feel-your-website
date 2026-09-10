@@ -5,10 +5,11 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
-import { getAuthProvider, getContentAdapter } from "./adapters.js";
+import { getActionInvoker, getAuthProvider, getContentAdapter } from "./adapters.js";
 import { assertSameOrigin } from "./http-guards.js";
 import { buildNav, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
+import { loadRouteSectionData } from "./route-page-data.js";
 
 /**
  * The BFF.
@@ -148,6 +149,12 @@ export const setLocale = createServerFn({ method: "POST" })
  *
  * Returns `null` for no match, a reserved path, or a hostile param — all of
  * which are `notFound()` at the route layer, not BFF errors to throw.
+ *
+ * When a section on the matched page references a query action, its external
+ * data is fetched here — one fan-out under a shared budget — and attached as
+ * {@link RoutePage.sectionData}, so the first paint carries it and no client
+ * waterfall follows. A fan-out failure degrades to no `sectionData`, never a
+ * 500: each such section renders its own fallback.
  */
 export const loadRoutePage = createServerFn({ method: "GET" })
   .validator((input: unknown): { path: string } => {
@@ -162,5 +169,9 @@ export const loadRoutePage = createServerFn({ method: "GET" })
     // `getRouteManifest` ignores its own locale argument — route structure is
     // shared across locales and every node ships content for all of them.
     const manifest = await getContentAdapter().getRouteManifest(locale);
-    return resolveRoutePage(data.path, manifest, locale);
+    const page = resolveRoutePage(data.path, manifest, locale);
+    if (!page) return null;
+
+    const sectionData = await loadRouteSectionData(page, getActionInvoker());
+    return Object.keys(sectionData).length > 0 ? { ...page, sectionData } : page;
   });

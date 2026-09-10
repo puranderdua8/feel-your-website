@@ -11,6 +11,7 @@ import {
   type RouteSectionNode,
   type RouteSeo,
 } from "@feel-your-website/content-core";
+import type { SectionDataEntry } from "@feel-your-website/section-registry";
 
 import { isReservedPath } from "@/reserved-paths.js";
 
@@ -60,6 +61,13 @@ export interface RoutePage {
   layers: RouteLayer[];
   /** The matched route's SEO for `locale`, with `{{param}}` already interpolated. `{}` when it has none. */
   seo: RouteSeo;
+  /**
+   * External data per section instance, keyed by `instanceId`. Populated by the
+   * BFF after {@link resolveRoutePage} returns (this pure resolver never fetches)
+   * and only when a section on the page references a query action — absent
+   * otherwise. Threaded to each section as its `data` prop by `RoutePageView`.
+   */
+  sectionData?: Readonly<Record<string, SectionDataEntry>>;
 }
 
 /**
