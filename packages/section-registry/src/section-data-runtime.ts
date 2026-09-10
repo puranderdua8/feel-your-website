@@ -199,3 +199,39 @@ export async function runQueries(
 
   return out;
 }
+
+/**
+ * The CMS preview's stand-in for {@link runQueries}: no invoker, no network.
+ * Each data-backed section on the page gets its spec's `previewSample`, run
+ * through the same `project` the shell uses — so the editor shows real-shaped
+ * data. A spec with no `previewSample` (or one whose `project` rejects it)
+ * yields an error entry, so the preview shows that section's real fallback.
+ *
+ * Synchronous by design: it is called from the preview's render on every draft
+ * edit, and `previewSample` is static per section type. The route context is
+ * usually absent in the preview, so a spec whose `deriveInvocation` needs one
+ * is simply skipped (it renders its fallback), same as at request time.
+ */
+export function derivePreviewSectionData(
+  trees: readonly (readonly RouteSectionNode[])[],
+  locale: string,
+  route: RouteRenderContext | undefined = undefined,
+  registry: Readonly<Record<string, SectionQuerySpec>> = SECTION_QUERY_REGISTRY,
+): Record<string, SectionDataEntry> {
+  const out: Record<string, SectionDataEntry> = {};
+
+  for (const { instanceId, sectionKey } of collectInvocations(trees, locale, route, registry)) {
+    const spec = registry[sectionKey]!;
+    if (spec.previewSample === undefined) {
+      out[instanceId] = { ok: false, error: { code: "unavailable" } };
+      continue;
+    }
+    const projected = spec.project ? spec.project(spec.previewSample) : spec.previewSample;
+    out[instanceId] =
+      projected === null || projected === undefined
+        ? { ok: false, error: { code: "invalid_response" } }
+        : { ok: true, data: projected as JsonValue };
+  }
+
+  return out;
+}

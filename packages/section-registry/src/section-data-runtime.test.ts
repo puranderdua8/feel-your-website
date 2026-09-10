@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   collectInvocations,
+  derivePreviewSectionData,
   planInvocations,
   runQueries,
   type CollectedInvocation,
@@ -174,5 +175,64 @@ describe("runQueries", () => {
     const out = await promise;
     vi.useRealTimers();
     expect(out.a).toEqual({ ok: false, error: { code: "timeout" } });
+  });
+});
+
+describe("derivePreviewSectionData", () => {
+  const previewRegistry: Record<string, SectionQuerySpec> = {
+    "release-feed": {
+      deriveInvocation: (fields) =>
+        typeof fields.source === "string" ? { actionId: fields.source, body: {} } : null,
+      project: (result) => (Array.isArray(result) ? result.slice(0, 2) : null),
+      previewSample: [{ n: 1 }, { n: 2 }, { n: 3 }],
+    },
+    "no-sample": {
+      deriveInvocation: () => ({ actionId: "x", body: {} }),
+    },
+    "bad-sample": {
+      deriveInvocation: () => ({ actionId: "y", body: {} }),
+      project: () => null,
+      previewSample: 42,
+    },
+  };
+
+  it("projects each specced section's previewSample, keyed by instanceId", () => {
+    const out = derivePreviewSectionData(
+      [[node("a", "release-feed", { source: "feed.releases" }), node("x", "hero")]],
+      "en",
+      undefined,
+      previewRegistry,
+    );
+    expect(out).toEqual({ a: { ok: true, data: [{ n: 1 }, { n: 2 }] } });
+  });
+
+  it("gives a section with no previewSample an error entry (renders its fallback)", () => {
+    const out = derivePreviewSectionData(
+      [[node("a", "no-sample")]],
+      "en",
+      undefined,
+      previewRegistry,
+    );
+    expect(out.a).toEqual({ ok: false, error: { code: "unavailable" } });
+  });
+
+  it("gives an error entry when project rejects the sample", () => {
+    const out = derivePreviewSectionData(
+      [[node("a", "bad-sample")]],
+      "en",
+      undefined,
+      previewRegistry,
+    );
+    expect(out.a).toEqual({ ok: false, error: { code: "invalid_response" } });
+  });
+
+  it("skips a section whose deriveInvocation needs data it lacks", () => {
+    const out = derivePreviewSectionData(
+      [[node("a", "release-feed", {})]], // no `source`
+      "en",
+      undefined,
+      previewRegistry,
+    );
+    expect(out).toEqual({});
   });
 });
