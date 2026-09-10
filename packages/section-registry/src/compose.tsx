@@ -3,7 +3,7 @@ import { Fragment } from "react";
 
 import { OUTLET_SECTION_KEY, RouteRenderProvider, type RouteRenderContext } from "./context.js";
 import type { RenderLink } from "./link.js";
-import { renderSection } from "./registry.js";
+import { renderSection, type SectionDataEntry } from "./registry.js";
 
 export interface RenderCompositionOptions {
   /**
@@ -25,6 +25,12 @@ export interface RenderCompositionOptions {
    * `<a>`; omitted, `ButtonSection` falls back to a plain `<a>` itself.
    */
   readonly renderLink?: RenderLink;
+  /**
+   * External data per section instance, keyed by `instanceId` — aggregated by
+   * the BFF and handed to each section as its `data` prop. Omit outside a
+   * route (the CMS preview) and for sections that need no external data.
+   */
+  readonly sectionData?: Readonly<Record<string, SectionDataEntry>>;
 }
 
 /**
@@ -78,6 +84,7 @@ function renderNode(
     slots,
     options?.route,
     options?.renderLink,
+    options?.sectionData?.[node.instanceId],
   );
 }
 
