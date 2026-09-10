@@ -33,4 +33,53 @@ describe("renderSection", () => {
 
     expect(screen.getByText(/has no content yet/)).toBeTruthy();
   });
+
+  it("renders an action-mode button as a disabled placeholder without a host renderer", () => {
+    render(
+      renderSection("button", {
+        label: "Subscribe",
+        mode: "action",
+        actionId: "newsletter.subscribe",
+      }),
+    );
+
+    const cta = screen.getByText("Subscribe");
+    expect(cta.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("hands an action-mode button to renderActionCta with the instance id and authored body", () => {
+    const seen: unknown[] = [];
+    render(
+      renderSection(
+        "button",
+        {
+          label: "Subscribe",
+          mode: "action",
+          actionId: "newsletter.subscribe",
+          successLabel: "Done",
+          body: { email: { source: "routeParam", value: "slug" } },
+        },
+        {},
+        {
+          instanceId: "cta-1",
+          renderActionCta: (spec) => {
+            seen.push(spec);
+            return <button type="button">{spec.label}</button>;
+          },
+        },
+      ),
+    );
+
+    expect(screen.getByRole("button", { name: "Subscribe" })).toBeTruthy();
+    expect(seen).toEqual([
+      {
+        instanceId: "cta-1",
+        actionId: "newsletter.subscribe",
+        label: "Subscribe",
+        successLabel: "Done",
+        body: { email: { source: "routeParam", value: "slug" } },
+        className: expect.any(String),
+      },
+    ]);
+  });
 });

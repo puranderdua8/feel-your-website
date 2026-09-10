@@ -67,8 +67,18 @@ describe("collectRouteButtonIssues", () => {
     ).toEqual([]);
   });
 
-  it("ignores non-button nodes and action-mode buttons", () => {
-    const tree = [button("a", { en: { mode: "action" } }), card("c", [])];
+  it("ignores non-button nodes and a well-formed action-mode button", () => {
+    const tree = [
+      button("a", { en: { mode: "action", actionId: "newsletter.subscribe" } }),
+      card("c", []),
+    ];
     expect(collectRouteButtonIssues(tree)).toEqual([]);
+  });
+
+  it("flags an action-mode button that names no action", () => {
+    const issues = collectRouteButtonIssues([button("a", { en: { mode: "action" } })]);
+    expect(issues).toEqual([
+      { instanceId: "a", message: "An action CTA needs an action.", blocking: true },
+    ]);
   });
 });

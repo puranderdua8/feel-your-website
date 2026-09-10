@@ -1,5 +1,6 @@
 import type { JsonValue } from "@feel-your-website/content-core";
 
+import type { ActionCtaSpec, RenderActionCta } from "./action-cta.js";
 import type { RouteRenderContext } from "./context.js";
 import { classifyHref, type LinkSpec, type RenderLink } from "./link.js";
 import { parseReleases } from "./section-data.js";
@@ -56,6 +57,18 @@ export interface SectionComponentProps {
    * to a plain `<a>`.
    */
   renderLink?: RenderLink;
+  /**
+   * Host-injected renderer for a `mode: "action"` CTA (see
+   * {@link RenderActionCta}). Absent in the CMS preview and until the shell
+   * wires it — `ButtonSection` then renders the disabled placeholder.
+   */
+  renderActionCta?: RenderActionCta;
+  /**
+   * This section's instance id from the route tree. Passed so an action CTA
+   * can tell the server which node fired. Absent when a section is rendered
+   * outside a composition (the CMS section gallery, a unit test).
+   */
+  instanceId?: string;
   /**
    * External data for this section instance, aggregated by the BFF. Absent
    * for a section that declares no data need, in the CMS preview, or while a
@@ -120,7 +133,7 @@ const ImageSection: SectionComponent = ({ fields }) =>
 const CTA_CLASS =
   "bg-primary text-primary-foreground inline-flex w-fit items-center rounded-[var(--radius)] px-3 py-1.5 text-sm font-medium";
 
-/** A CTA that can't render as a link (unsafe href, or `action` mode before it is wired). */
+/** A CTA that can't render interactively (unsafe href, or `action` mode with no host renderer). */
 function DisabledCta({ label }: { label: string }): React.JSX.Element {
   return (
     <span className={`${CTA_CLASS} cursor-not-allowed opacity-50`} aria-disabled="true">
@@ -131,13 +144,31 @@ function DisabledCta({ label }: { label: string }): React.JSX.Element {
 
 /**
  * A call-to-action. `mode: "link"` (the default) renders an internal or
- * external link; `mode: "action"` is wired later and renders a disabled
- * placeholder until then. An unsafe href renders the placeholder too.
+ * external link. `mode: "action"` renders the host-injected
+ * {@link RenderActionCta} — an interactive form that fires a registered
+ * mutation — or the disabled placeholder when no host renderer is present
+ * (the CMS preview, the section gallery). An unsafe href renders the
+ * placeholder too.
  */
-const ButtonSection: SectionComponent = ({ fields, renderLink }) => {
+const ButtonSection: SectionComponent = ({ fields, renderLink, renderActionCta, instanceId }) => {
   const label = text(fields, "label");
   const mode = text(fields, "mode") || "link";
-  if (mode !== "link") return <DisabledCta label={label} />;
+
+  if (mode === "action") {
+    const actionId = text(fields, "actionId");
+    if (!renderActionCta || instanceId === undefined || actionId === "") {
+      return <DisabledCta label={label} />;
+    }
+    const spec: ActionCtaSpec = {
+      instanceId,
+      actionId,
+      label,
+      successLabel: text(fields, "successLabel") || undefined,
+      body: fields.body ?? null,
+      className: CTA_CLASS,
+    };
+    return <>{renderActionCta(spec)}</>;
+  }
 
   const { kind, href } = classifyHref(text(fields, "href"));
   if (kind === "unsafe") return <DisabledCta label={label} />;
@@ -240,13 +271,20 @@ function Placeholder({ children }: { children: React.ReactNode }): React.JSX.Ele
  * children — so an instance with anything slotted into it always renders,
  * `fields` defaulting to an empty bag.
  */
+/** Everything past `slots` a section may be rendered with — all host-injected, all optional. */
+export interface RenderSectionExtras {
+  readonly route?: RouteRenderContext;
+  readonly renderLink?: RenderLink;
+  readonly renderActionCta?: RenderActionCta;
+  readonly data?: SectionDataEntry;
+  readonly instanceId?: string;
+}
+
 export function renderSection(
   sectionKey: string,
   fields: SectionFields,
   slots: Readonly<Record<string, React.ReactNode>> = {},
-  route?: RouteRenderContext,
-  renderLink?: RenderLink,
-  data?: SectionDataEntry,
+  extras: RenderSectionExtras = {},
 ): React.JSX.Element {
   const Component = SECTION_REGISTRY[sectionKey];
   if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
@@ -261,9 +299,11 @@ export function renderSection(
     <Component
       fields={fields ?? {}}
       slots={slots}
-      route={route}
-      renderLink={renderLink}
-      data={data}
+      route={extras.route}
+      renderLink={extras.renderLink}
+      renderActionCta={extras.renderActionCta}
+      instanceId={extras.instanceId}
+      data={extras.data}
     />
   );
 }

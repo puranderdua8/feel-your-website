@@ -29,11 +29,13 @@ function matchesKnownRoute(pathname: string, patterns: readonly string[]): boole
 
 /**
  * Publish-time checks for a `button` section that `validateSectionFields`
- * cannot express: the href is only required in `link` mode, and it must be a
- * usable link. Returns blocking issues and non-blocking warnings together, so
- * a caller can gate publish on the blocking ones and surface the rest.
+ * cannot express: fields are gated by `mode`, and each mode's target must be
+ * usable. Returns blocking issues and non-blocking warnings together, so a
+ * caller can gate publish on the blocking ones and surface the rest.
  *
- * `mode: "action"` checks are added when that mode is wired.
+ * `mode: "action"` here only checks that an action is named — that the id is a
+ * known mutation, and that its body mapping type-checks, needs the action
+ * catalog and is done by the CMS (which can import it).
  */
 export function validateButtonSection(
   fields: Readonly<Record<string, JsonValue>>,
@@ -42,7 +44,11 @@ export function validateButtonSection(
   const issues: ButtonIssue[] = [];
   const mode = str(fields, "mode") || "link";
 
-  if (mode === "link") {
+  if (mode === "action") {
+    if (str(fields, "actionId").trim() === "") {
+      issues.push({ field: "actionId", message: "An action CTA needs an action.", blocking: true });
+    }
+  } else if (mode === "link") {
     const raw = str(fields, "href");
     if (raw.trim() === "") {
       issues.push({ field: "href", message: "A link needs a URL.", blocking: true });

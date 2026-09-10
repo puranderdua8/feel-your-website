@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 /**
  * `renderComposition` hands each node its own `sectionData` entry, keyed by
  * `instanceId`, and `undefined` when there is no entry. Mock `renderSection`
- * to record its 6th argument (`data`).
+ * to record `extras.data` (its 4th argument is the extras object).
  */
 const dataArgs: unknown[] = [];
 vi.mock("./registry.js", () => ({
   renderSection: (...args: unknown[]) => {
-    dataArgs.push(args[5]);
+    dataArgs.push((args[3] as { data?: unknown } | undefined)?.data);
     return null;
   },
 }));
