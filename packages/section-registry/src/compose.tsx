@@ -41,6 +41,13 @@ export interface RenderCompositionOptions {
    */
   readonly sectionData?: Readonly<Record<string, SectionDataEntry>>;
   /**
+   * Instance ids of non-blocking sections whose data the client is still
+   * fetching. Any such id with no `sectionData` entry gets `{ pending: true }`
+   * as its `data` prop, so the section can render a skeleton. Emptied by the
+   * host once the deferred fetch resolves.
+   */
+  readonly pendingSections?: ReadonlySet<string>;
+  /**
    * Host-injected callback fired once per top-level section the first time it
    * scrolls into view. When set (and a `route` is present) `renderComposition`
    * wraps each section in a `<SectionBoundary>`. Omitted, sections render
@@ -107,12 +114,16 @@ function renderNode(
     ));
   }
 
+  const entry =
+    options?.sectionData?.[node.instanceId] ??
+    (options?.pendingSections?.has(node.instanceId) ? ({ pending: true } as const) : undefined);
+
   return renderSection(node.sectionKey, node.content[locale] ?? null, slots, {
     route: options?.route,
     renderLink: options?.renderLink,
     renderActionCta: options?.renderActionCta,
     instanceId: node.instanceId,
-    data: options?.sectionData?.[node.instanceId],
+    data: entry,
   });
 }
 

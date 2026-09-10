@@ -36,7 +36,7 @@ describe("release-feed end-to-end", () => {
     const data = await loadRouteSectionData(await resolveReleasesPage(), getActionInvoker());
 
     const entry = data["releases-feed"];
-    expect(entry?.ok).toBe(true);
+    expect(entry && "ok" in entry && entry.ok).toBe(true);
     const list = (entry as { ok: true; data: unknown }).data;
     expect(Array.isArray(list)).toBe(true);
     expect((list as unknown[]).length).toBeGreaterThan(0);
