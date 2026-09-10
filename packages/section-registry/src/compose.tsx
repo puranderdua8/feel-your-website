@@ -5,6 +5,7 @@ import type { RenderActionCta } from "./action-cta.js";
 import { OUTLET_SECTION_KEY, RouteRenderProvider, type RouteRenderContext } from "./context.js";
 import type { RenderLink } from "./link.js";
 import { renderSection, type SectionDataEntry } from "./registry.js";
+import { SectionBoundary, type OnSectionInView } from "./section-boundary.js";
 
 export interface RenderCompositionOptions {
   /**
@@ -39,6 +40,13 @@ export interface RenderCompositionOptions {
    * route (the CMS preview) and for sections that need no external data.
    */
   readonly sectionData?: Readonly<Record<string, SectionDataEntry>>;
+  /**
+   * Host-injected callback fired once per top-level section the first time it
+   * scrolls into view. When set (and a `route` is present) `renderComposition`
+   * wraps each section in a `<SectionBoundary>`. Omitted, sections render
+   * unwrapped — no extra DOM.
+   */
+  readonly onSectionInView?: OnSectionInView;
 }
 
 /**
@@ -55,10 +63,23 @@ export function renderComposition(
   locale: Locale,
   options?: RenderCompositionOptions,
 ): React.JSX.Element {
+  const wrapInView = Boolean(options?.onSectionInView && options?.route);
   const body = (
     <>
       {tree.map((node) => (
-        <Fragment key={node.instanceId}>{renderNode(node, locale, options)}</Fragment>
+        <Fragment key={node.instanceId}>
+          {wrapInView && node.sectionKey !== OUTLET_SECTION_KEY ? (
+            <SectionBoundary
+              instanceId={node.instanceId}
+              sectionKey={node.sectionKey}
+              onInView={options!.onSectionInView}
+            >
+              {renderNode(node, locale, options)}
+            </SectionBoundary>
+          ) : (
+            renderNode(node, locale, options)
+          )}
+        </Fragment>
       ))}
     </>
   );

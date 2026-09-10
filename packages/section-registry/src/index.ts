@@ -13,3 +13,4 @@ export * from "./action-cta.js";
 export * from "./validate-button.js";
 export * from "./section-data.js";
 export * from "./section-data-runtime.js";
+export * from "./section-boundary.js";
