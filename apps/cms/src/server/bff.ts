@@ -35,6 +35,7 @@ import {
   getRouteCompositionWriter,
   getSiteSettingsStore,
 } from "./adapters.js";
+import { collectRouteButtonIssues, firstUnsafeButtonHref } from "./route-buttons.js";
 import { parseParams, validateRouteInput } from "./route-input.js";
 
 /**
@@ -390,6 +391,14 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
       throw new Error("A route can carry only one outlet.");
     }
 
+    // A CTA that would render `javascript:` / `data:` / a protocol-relative
+    // URL is a security problem, never a work-in-progress — reject it on any
+    // save, draft or not, the same way an unknown section key is rejected.
+    const unsafeHref = firstUnsafeButtonHref(data.tree);
+    if (unsafeHref !== null) {
+      throw new Error(`A button links to “${unsafeHref}”, which is not a usable link.`);
+    }
+
     const siblings = await getRouteCompositionReader().listCompositions();
 
     // Computed here, not trusted from the client: this gates a blocking publish
@@ -596,6 +605,20 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
         message: "The parent route has no outlet — this route can't be published inside it.",
         blocking: true,
       });
+    }
+
+    // Per-button link checks that `validateSectionFields` can't express: a
+    // `link` needs a usable href, and an internal href that matches no
+    // published route is worth warning about. `knownRoutePatterns` are the
+    // published routes' path patterns, so `/blog/hello` matches `/blog/:slug`.
+    const publishedRoutePatterns = (await getRouteCompositionReader().listCompositions())
+      .filter((route) => route.published)
+      .map((route) => route.path);
+
+    for (const issue of collectRouteButtonIssues(data.tree, {
+      knownRoutePatterns: publishedRoutePatterns,
+    })) {
+      structuralIssues.push({ message: `Button: ${issue.message}`, blocking: issue.blocking });
     }
 
     return {
