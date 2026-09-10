@@ -15,6 +15,7 @@ import { SupabaseAuthProvider, type CookieAdapter } from "@feel-your-website/aut
 import { contractSeed, MemoryContentAdapter } from "@feel-your-website/content-adapter-memory";
 import { SupabaseContentAdapter } from "@feel-your-website/content-adapter-supabase";
 import type { ContentAdapter } from "@feel-your-website/content-core";
+import { SECTION_QUERY_REGISTRY } from "@feel-your-website/section-registry";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
 
 import { loadActionConfig } from "./config/action.js";
@@ -175,7 +176,24 @@ export function getActionInvoker(): ActionInvoker {
   if (config.kind === "none") {
     actionInvoker = new NullActionInvoker();
   } else if (config.kind === "memory") {
-    actionInvoker = new MemoryActionInvoker({ echoUnseeded: true });
+    // Local-work invoker: seed the example `feed.releases` query from the
+    // `release-feed` section's own `previewSample` (one source of stand-in
+    // data), honouring the requested `limit`; every other id still echoes its
+    // body so a mutation CTA round-trips.
+    const sample = SECTION_QUERY_REGISTRY["release-feed"]?.previewSample;
+    const releases = Array.isArray(sample) ? sample : [];
+    actionInvoker = new MemoryActionInvoker({
+      echoUnseeded: true,
+      seed: releases.length
+        ? {
+            "feed.releases": (body) =>
+              releases.slice(
+                0,
+                Math.max(0, typeof body.limit === "number" ? body.limit : releases.length),
+              ),
+          }
+        : {},
+    });
   } else {
     if (config.cache === "blobs") {
       throw new Error('ACTION_CACHE="blobs" is not implemented yet — use "memory".');
