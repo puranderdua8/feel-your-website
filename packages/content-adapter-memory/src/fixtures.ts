@@ -59,6 +59,42 @@ export const contractSeed: MemoryContentSeed = {
       version: 1,
       updatedAt: "2026-01-01T00:00:00.000Z",
     },
+    // A data-backed route: the `release-feed` section renders no content of its
+    // own — its list comes from the `feed.releases` registered query, fetched
+    // by the shell's `loadRoutePage` fan-out. With `ACTION_INVOKER=memory` the
+    // shell seeds that query from the section's `previewSample`; with `none`
+    // (the default) the section shows its "unavailable" fallback and the page
+    // still renders.
+    {
+      id: "route-releases",
+      path: "/releases",
+      tree: [
+        {
+          instanceId: "releases-hero",
+          sectionKey: "hero",
+          content: {
+            en: { title: "Releases", subtitle: "What shipped recently." },
+            hi: { title: "रिलीज़", subtitle: "हाल ही में क्या जारी हुआ।" },
+          },
+          slots: {},
+        },
+        {
+          instanceId: "releases-feed",
+          sectionKey: "release-feed",
+          content: {
+            en: { heading: "Recent releases", count: 5 },
+            hi: { heading: "हाल के रिलीज़", count: 5 },
+          },
+          slots: {},
+        },
+      ],
+      seo: {
+        en: { title: "Releases — feel-your-website", description: "Recent product releases." },
+        hi: { title: "रिलीज़ — feel-your-website", description: "हाल के उत्पाद रिलीज़।" },
+      },
+      version: 1,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
     // A parent/child pair: `/blog` is the top-level section, `/blog/:slug` its
     // nested, parameterised child. The child names its own segment (`:slug`)
     // and points at the parent; its absolute pattern is composed from the two.
