@@ -112,8 +112,10 @@ export function AnalyticsProvider({
   const sampleRateRef = useRef(sampleRate);
   sampleRateRef.current = sampleRate;
 
-  // One-time session setup, then (re)init the adapter whenever consent changes.
-  useEffect(() => {
+  // Idempotent — first caller wins. A child tracker's mount effect can fire
+  // before this provider's, so `emit` must be able to bootstrap the session
+  // itself rather than drop the first event.
+  const ensureSession = useCallback((): SessionState => {
     if (!sessionRef.current) {
       const session = deriveSession({
         previous: loadSession(),
@@ -124,8 +126,14 @@ export function AnalyticsProvider({
       saveSession(session);
       sampledRef.current = isSampled(session.id, sampleRateRef.current);
     }
+    return sessionRef.current;
+  }, []);
+
+  // Session first, then (re)init the adapter whenever consent changes.
+  useEffect(() => {
+    ensureSession();
     void Promise.resolve(adapterRef.current.init({ consentGranted }));
-  }, [consentGranted]);
+  }, [consentGranted, ensureSession]);
 
   const flush = useCallback(
     (viaBeacon: boolean) => {
@@ -175,8 +183,7 @@ export function AnalyticsProvider({
   const api = useMemo<AnalyticsApi>(
     () => ({
       emit(body: AnalyticsEventBody): void {
-        const previous = sessionRef.current;
-        if (!previous) return;
+        const previous = ensureSession();
         // The one consent gate.
         if (!consentRef.current || !sampledRef.current) return;
 
@@ -219,7 +226,7 @@ export function AnalyticsProvider({
         }
       },
     }),
-    [collectorUrl],
+    [collectorUrl, ensureSession],
   );
 
   return <AnalyticsContext.Provider value={api}>{children}</AnalyticsContext.Provider>;
@@ -230,4 +237,32 @@ export function useAnalytics(): AnalyticsApi {
   const ctx = useContext(AnalyticsContext);
   if (!ctx) throw new Error("useAnalytics must be used within an <AnalyticsProvider>.");
   return ctx;
+}
+
+/**
+ * Emits a `page` event whenever `path` changes — once on mount for a non-null
+ * path, then on every distinct value. A re-render with the same path emits
+ * nothing (dedupe). `document.referrer` rides on the first page of the session
+ * only.
+ *
+ * The host supplies `path` from its own router (e.g. a `useRouterState`
+ * selector), so this package stays router-agnostic.
+ */
+export function usePageview(path: string | null): void {
+  const { emit } = useAnalytics();
+  const lastPath = useRef<string | null>(null);
+  const isFirst = useRef(true);
+
+  useEffect(() => {
+    if (path === null || path === lastPath.current) return;
+    lastPath.current = path;
+
+    const referrer =
+      isFirst.current && typeof document !== "undefined" && document.referrer
+        ? document.referrer
+        : undefined;
+    isFirst.current = false;
+
+    emit(referrer ? { type: "page", referrer } : { type: "page" });
+  }, [path, emit]);
 }

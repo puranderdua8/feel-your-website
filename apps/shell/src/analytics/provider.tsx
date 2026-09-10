@@ -4,13 +4,15 @@ import { useConsent } from "@feel-your-website/consent-core/react";
 import { useMemo, type ReactNode } from "react";
 
 import { createAnalyticsAdapter } from "@/analytics/adapter";
+import { PageviewTracker } from "@/analytics/pageview";
 import type { BootstrapPayload } from "@/server/bff";
 
 /**
  * Bridges consent into the analytics provider: reads `useConsent()` (so it must
  * sit inside `<ConsentProvider>`), builds the adapter once from bootstrap
- * config, and hands both to `<AnalyticsProvider>`. The adapter is Noop until a
- * provider is configured, so this is inert today.
+ * config, hands both to `<AnalyticsProvider>`, and mounts the journey trackers
+ * inside it. With no provider configured the adapter is Noop, and every emit is
+ * gated on consent regardless — so this stays inert until GA lands.
  */
 export function AppAnalyticsProvider({
   config,
@@ -29,6 +31,7 @@ export function AppAnalyticsProvider({
       collectorUrl={config.collectorPath || undefined}
       sampleRate={config.sampleRate}
     >
+      <PageviewTracker />
       {children}
     </AnalyticsProvider>
   );
