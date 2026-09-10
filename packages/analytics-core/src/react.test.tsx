@@ -30,7 +30,7 @@ function setup(over: Partial<AnalyticsProviderProps> = {}) {
     <AnalyticsProvider
       adapter={adapter}
       consentGranted={over.consentGranted ?? true}
-      collectorUrl={over.collectorUrl}
+      sendBatch={over.sendBatch}
       sampleRate={over.sampleRate}
       flushIntervalMs={over.flushIntervalMs}
       now={now}
@@ -106,44 +106,52 @@ describe("AnalyticsProvider / useAnalytics", () => {
     expect(second.adapter.tracked[0]?.sessionId).toBe("session-1");
   });
 
-  it("POSTs a batch to the collector on the flush interval", () => {
+  it("calls sendBatch with the queued events on the flush interval", () => {
     vi.useFakeTimers();
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
+    const sendBatch = vi.fn();
 
-    const { result } = setup({ collectorUrl: "/ingest", flushIntervalMs: 5000 });
+    const { result } = setup({ sendBatch, flushIntervalMs: 5000 });
     act(() => result.current.emit({ type: "page" }));
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendBatch).not.toHaveBeenCalled();
 
     act(() => vi.advanceTimersByTime(5000));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const call = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(call[0]).toBe("/ingest");
-    expect(JSON.parse(call[1].body as string).events).toHaveLength(1);
+    expect(sendBatch).toHaveBeenCalledTimes(1);
+    expect(sendBatch.mock.calls[0]![0]).toHaveLength(1);
+    expect(sendBatch.mock.calls[0]![0][0]).toMatchObject({ type: "page", seq: 1 });
   });
 
-  it("flushes via sendBeacon on pagehide", () => {
-    const beacon = vi.fn().mockReturnValue(true);
-    vi.stubGlobal("navigator", { ...navigator, sendBeacon: beacon });
+  it("flushes on pagehide and on visibilitychange to hidden", () => {
+    const sendBatch = vi.fn();
+    const { result } = setup({ sendBatch });
 
-    const { result } = setup({ collectorUrl: "/ingest" });
+    act(() => result.current.emit({ type: "page" }));
+    act(() => window.dispatchEvent(new Event("pagehide")));
+    expect(sendBatch).toHaveBeenCalledTimes(1);
+
     act(() => result.current.emit({ type: "page" }));
     act(() => {
-      window.dispatchEvent(new Event("pagehide"));
+      Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect(beacon).toHaveBeenCalledTimes(1);
-    expect(beacon.mock.calls[0]?.[0]).toBe("/ingest");
+    expect(sendBatch).toHaveBeenCalledTimes(2);
   });
 
-  it("does not queue for the collector when none is configured", () => {
-    const beacon = vi.fn().mockReturnValue(true);
-    vi.stubGlobal("navigator", { ...navigator, sendBeacon: beacon });
-    const { result } = setup();
+  it("does not queue for the collector when no sendBatch is given", () => {
+    const { result, adapter } = setup();
     act(() => result.current.emit({ type: "page" }));
-    act(() => {
-      window.dispatchEvent(new Event("pagehide"));
+    act(() => window.dispatchEvent(new Event("pagehide")));
+    // Nothing to assert on a missing collector — just prove the adapter path
+    // still worked and nothing threw.
+    expect(adapter.tracked).toHaveLength(1);
+  });
+
+  it("swallows a throwing sendBatch", () => {
+    const sendBatch = vi.fn(() => {
+      throw new Error("boom");
     });
-    expect(beacon).not.toHaveBeenCalled();
+    const { result } = setup({ sendBatch });
+    act(() => result.current.emit({ type: "page" }));
+    expect(() => act(() => window.dispatchEvent(new Event("pagehide")))).not.toThrow();
   });
 });
 

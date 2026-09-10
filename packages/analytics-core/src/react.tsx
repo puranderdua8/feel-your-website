@@ -24,8 +24,6 @@ import type {
 
 const SESSION_STORAGE_KEY = "fyw.analytics.session";
 const DEFAULT_FLUSH_MS = 15_000;
-/** Comfortably under the ~64 KB `sendBeacon` limit; a bigger batch uses `fetch(keepalive)`. */
-const BEACON_MAX_BYTES = 60_000;
 /** Cap the collector queue so a dead endpoint can't grow it without bound. */
 const MAX_QUEUE = 200;
 
@@ -81,8 +79,13 @@ export interface AnalyticsProviderProps {
   adapter: AnalyticsAdapter;
   /** Whether the visitor has granted consent. Re-`init`s the adapter when it changes. */
   consentGranted: boolean;
-  /** First-party collector endpoint. Batches also POST here when set. */
-  collectorUrl?: string;
+  /**
+   * Host-supplied transport for the first-party collector. When set, every
+   * emitted event is also queued and this is called with a batch on the flush
+   * timer, on `visibilitychange` → hidden, and on `pagehide`. The host owns
+   * how the batch is sent (a server fn, `fetch`, `sendBeacon`, …).
+   */
+  sendBatch?: (events: readonly AnalyticsEvent[]) => void;
   /** `0..1`; a session outside the sample emits nothing. Default `1`. */
   sampleRate?: number;
   /** Flush the collector queue this often while the page is visible. Default 15s. */
@@ -96,7 +99,7 @@ export function AnalyticsProvider({
   children,
   adapter,
   consentGranted,
-  collectorUrl,
+  sendBatch,
   sampleRate = 1,
   flushIntervalMs = DEFAULT_FLUSH_MS,
   now = Date.now,
@@ -118,6 +121,8 @@ export function AnalyticsProvider({
   newIdRef.current = newId;
   const sampleRateRef = useRef(sampleRate);
   sampleRateRef.current = sampleRate;
+  const sendBatchRef = useRef(sendBatch);
+  sendBatchRef.current = sendBatch;
 
   // Idempotent — first caller wins. A child tracker's mount effect can fire
   // before this provider's, so `emit` must be able to bootstrap the session
@@ -142,40 +147,23 @@ export function AnalyticsProvider({
     void Promise.resolve(adapterRef.current.init({ consentGranted }));
   }, [consentGranted, ensureSession]);
 
-  const flush = useCallback(
-    (viaBeacon: boolean) => {
-      const events = queueRef.current;
-      queueRef.current = [];
-      if (events.length === 0 || !collectorUrl) return;
-
-      const payload = JSON.stringify({ events });
-      if (
-        viaBeacon &&
-        typeof navigator !== "undefined" &&
-        typeof navigator.sendBeacon === "function" &&
-        payload.length <= BEACON_MAX_BYTES
-      ) {
-        navigator.sendBeacon(collectorUrl, new Blob([payload], { type: "application/json" }));
-        return;
-      }
-      void fetch(collectorUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: payload,
-        keepalive: true,
-      }).catch(() => {
-        // A dropped batch is acceptable — the adapter path is the primary one.
-      });
-    },
-    [collectorUrl],
-  );
+  const flush = useCallback(() => {
+    const events = queueRef.current;
+    queueRef.current = [];
+    if (events.length === 0 || !sendBatchRef.current) return;
+    try {
+      sendBatchRef.current(events);
+    } catch {
+      // A dropped batch is acceptable — the adapter path is the primary one.
+    }
+  }, []);
 
   // Periodic flush + flush on the page going away.
   useEffect(() => {
-    const timer = setInterval(() => flush(false), flushIntervalMs);
-    const onPageHide = (): void => flush(true);
+    const timer = setInterval(flush, flushIntervalMs);
+    const onPageHide = (): void => flush();
     const onVisibility = (): void => {
-      if (document.visibilityState === "hidden") flush(true);
+      if (document.visibilityState === "hidden") flush();
     };
     window.addEventListener("pagehide", onPageHide);
     document.addEventListener("visibilitychange", onVisibility);
@@ -183,7 +171,7 @@ export function AnalyticsProvider({
       clearInterval(timer);
       window.removeEventListener("pagehide", onPageHide);
       document.removeEventListener("visibilitychange", onVisibility);
-      flush(true);
+      flush();
     };
   }, [flush, flushIntervalMs]);
 
@@ -220,7 +208,7 @@ export function AnalyticsProvider({
           // An adapter must never break the page; if it does, drop the event.
         }
 
-        if (collectorUrl) {
+        if (sendBatchRef.current) {
           if (queueRef.current.length >= MAX_QUEUE) queueRef.current.shift();
           queueRef.current.push(event);
         }
@@ -233,7 +221,7 @@ export function AnalyticsProvider({
         }
       },
     }),
-    [collectorUrl, ensureSession],
+    [ensureSession],
   );
 
   return <AnalyticsContext.Provider value={api}>{children}</AnalyticsContext.Provider>;

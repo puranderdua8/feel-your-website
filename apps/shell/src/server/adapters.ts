@@ -14,6 +14,7 @@ import { MockAuthProvider, type AuthProvider } from "@feel-your-website/auth";
 import { SupabaseAuthProvider, type CookieAdapter } from "@feel-your-website/auth-supabase";
 import { contractSeed, MemoryContentAdapter } from "@feel-your-website/content-adapter-memory";
 import { SupabaseContentAdapter } from "@feel-your-website/content-adapter-supabase";
+import { ConsoleAnalyticsSink, type AnalyticsSink } from "@feel-your-website/analytics-core";
 import type { ContentAdapter } from "@feel-your-website/content-core";
 import { SECTION_QUERY_REGISTRY } from "@feel-your-website/section-registry";
 import { getCookies, setCookie, setResponseHeader } from "@tanstack/react-start/server";
@@ -108,6 +109,7 @@ class NullActionInvoker implements ActionInvoker {
 let contentAdapter: ContentAdapter | null = null;
 let authProvider: AuthProvider | null = null;
 let actionInvoker: ActionInvoker | null = null;
+let analyticsSink: AnalyticsSink | null = null;
 
 export function getContentAdapter(): ContentAdapter {
   if (contentAdapter) return contentAdapter;
@@ -213,9 +215,30 @@ export function getActionInvoker(): ActionInvoker {
   return actionInvoker;
 }
 
+/**
+ * Destination for the first-party analytics collector (`ingestAnalytics`).
+ * `console` (default) logs each batch; `ga` — the Measurement Protocol sink —
+ * lands in a follow-up. Analytics is non-essential, but a *misconfigured* sink
+ * is a deploy error, so an unknown value fails here rather than silently.
+ */
+export function getAnalyticsSink(): AnalyticsSink {
+  if (analyticsSink) return analyticsSink;
+
+  const kind = process.env.ANALYTICS_SINK ?? "console";
+  if (kind !== "console") {
+    throw new Error(
+      `Unknown ANALYTICS_SINK "${kind}". Expected "console" (the Measurement Protocol sink is not wired yet).`,
+    );
+  }
+
+  analyticsSink = new ConsoleAnalyticsSink("[analytics:collector]");
+  return analyticsSink;
+}
+
 /** Test seam: forces the next call to rebuild from current env. */
 export function resetAdapters(): void {
   contentAdapter = null;
   authProvider = null;
   actionInvoker = null;
+  analyticsSink = null;
 }

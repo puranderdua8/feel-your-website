@@ -1,4 +1,5 @@
 import type { ActionResult } from "@feel-your-website/action-core";
+import type { AnalyticsEvent } from "@feel-your-website/analytics-core";
 import { CONSENT_COOKIE_NAME, type ConsentStatus } from "@feel-your-website/consent-core";
 import { isContentAdapterError, type JsonValue } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
@@ -8,7 +9,13 @@ import { getCookies } from "@tanstack/react-start/server";
 
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
-import { getActionInvoker, getAuthProvider, getContentAdapter } from "./adapters.js";
+import {
+  getActionInvoker,
+  getAnalyticsSink,
+  getAuthProvider,
+  getContentAdapter,
+} from "./adapters.js";
+import { parseAnalyticsBatch } from "./analytics-ingest.js";
 import { loadAnalyticsConfig, type AnalyticsConfig } from "./config/analytics.js";
 import { assertSameOrigin } from "./http-guards.js";
 import { resolveAndInvokeAction, type InvokeActionInput } from "./invoke-action.js";
@@ -254,4 +261,27 @@ export const invokeAction = createServerFn({ method: "POST" })
       invoker: getActionInvoker(),
       replayCache: invokeReplayCache,
     });
+  });
+
+/**
+ * The first-party analytics collector. The client's `<AnalyticsProvider>` fans
+ * its batched queue here as well as to the vendor adapter, so events still land
+ * when an ad-blocker eats the vendor script.
+ *
+ * Lenient by design: a malformed batch yields `{ accepted: 0 }`, never a throw.
+ * The events are structurally validated (`parseAnalyticsBatch`) and handed to
+ * the configured {@link getAnalyticsSink}.
+ */
+export const ingestAnalytics = createServerFn({ method: "POST" })
+  .validator((input: unknown): { events: AnalyticsEvent[] } => ({
+    events: parseAnalyticsBatch(input),
+  }))
+  .handler(async ({ data }): Promise<{ accepted: number }> => {
+    assertSameOrigin();
+    if (data.events.length === 0) return { accepted: 0 };
+
+    const delivered = await getAnalyticsSink()
+      .deliver(data.events)
+      .catch(() => false);
+    return { accepted: delivered ? data.events.length : 0 };
   });
