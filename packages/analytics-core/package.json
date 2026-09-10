@@ -14,6 +14,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./contract-tests": {
+      "types": "./dist/contract-tests.d.ts",
+      "import": "./dist/contract-tests.js",
+      "require": "./dist/contract-tests.cjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -25,6 +30,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:contracts": "vitest run",
     "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
