@@ -487,6 +487,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
             hasChildren={children.length > 0}
             hasPublishedChildren={hasPublishedChildren}
             parentHasOutlet={parentHasOutlet}
+            paramNames={open.params.map((param) => param.name)}
             pending={pending}
             onSaveDraft={() => void save(false)}
             onPublish={() => void save(true)}

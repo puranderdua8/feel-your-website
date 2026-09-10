@@ -15,6 +15,7 @@ export function PublishBar({
   hasChildren,
   hasPublishedChildren,
   parentHasOutlet,
+  paramNames,
   pending,
   onSaveDraft,
   onPublish,
@@ -26,6 +27,8 @@ export function PublishBar({
   hasPublishedChildren: boolean;
   /** Whether this route's parent carries an outlet — `null` when top-level. */
   parentHasOutlet: boolean | null;
+  /** This route's param names, for validating a `mode: "action"` button's body mapping. */
+  paramNames: readonly string[];
   pending: boolean;
   onSaveDraft: () => void;
   onPublish: () => void;
@@ -39,13 +42,19 @@ export function PublishBar({
     try {
       setReadiness(
         await checkRoutePublishReadiness({
-          data: { tree, hasChildren, hasPublishedChildren, parentHasOutlet },
+          data: {
+            tree,
+            hasChildren,
+            hasPublishedChildren,
+            parentHasOutlet,
+            paramNames: [...paramNames],
+          },
         }),
       );
     } finally {
       setChecking(false);
     }
-  }, [tree, hasChildren, hasPublishedChildren, parentHasOutlet]);
+  }, [tree, hasChildren, hasPublishedChildren, parentHasOutlet, paramNames]);
 
   // Runs automatically whenever the tree or the children set changes, not
   // only when the author happens to press "Check readiness" — leaving that

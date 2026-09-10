@@ -14,6 +14,8 @@
     "clean": "rm -rf .output dist .turbo"
   },
   "dependencies": {
+    "@feel-your-website/action-core": "workspace:*",
+    "@feel-your-website/action-registry": "workspace:*",
     "@feel-your-website/auth": "workspace:*",
     "@feel-your-website/auth-supabase": "workspace:*",
     "@feel-your-website/config-bundle-supabase": "workspace:*",

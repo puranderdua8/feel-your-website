@@ -4,12 +4,12 @@ import type {
   ActionResult,
   MutationActionDefinition,
 } from "@feel-your-website/action-core";
-import { validateActionInput } from "@feel-your-website/action-core";
+import { parseActionInputMapping, validateActionInput } from "@feel-your-website/action-core";
 import { actionCatalog } from "@feel-your-website/action-registry";
 import type { JsonValue, RouteBundle, RouteSectionNode } from "@feel-your-website/content-core";
 import { flattenNodes } from "@feel-your-website/content-core";
 
-import { buildActionBody, parseActionInputMapping } from "./build-action-body.js";
+import { buildActionBody } from "./build-action-body.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 
 /** What a CTA click posts. `path` + `instanceId` let the server re-derive everything itself. */

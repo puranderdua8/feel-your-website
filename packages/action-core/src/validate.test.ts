@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { MutationActionDefinition } from "./types.js";
-import { validateActionBinding, validateActionInput } from "./validate.js";
+import { parseActionInputMapping, validateActionBinding, validateActionInput } from "./validate.js";
 
 const subscribe: MutationActionDefinition = {
   id: "newsletter.subscribe",
@@ -93,5 +93,46 @@ describe("validateActionBinding", () => {
       ctx,
     );
     expect(issues[0]?.message).toMatch(/route has no param for/);
+  });
+});
+
+describe("parseActionInputMapping", () => {
+  it("parses a JSON-string mapping", () => {
+    const raw = JSON.stringify({ email: { source: "routeParam", value: "slug" } });
+    expect(parseActionInputMapping(raw)).toEqual({
+      email: { source: "routeParam", value: "slug" },
+    });
+  });
+
+  it("accepts an already-parsed object", () => {
+    expect(parseActionInputMapping({ a: { source: "static", value: "1" } })).toEqual({
+      a: { source: "static", value: "1" },
+    });
+  });
+
+  it("treats an empty or whitespace string as an empty mapping", () => {
+    expect(parseActionInputMapping("")).toEqual({});
+    expect(parseActionInputMapping("   ")).toEqual({});
+  });
+
+  it("returns null for malformed JSON", () => {
+    expect(parseActionInputMapping("{ not json")).toBeNull();
+  });
+
+  it("returns null for a non-object top level", () => {
+    expect(parseActionInputMapping("[1,2]")).toBeNull();
+    expect(parseActionInputMapping("42")).toBeNull();
+    expect(parseActionInputMapping(null)).toBeNull();
+  });
+
+  it("returns null when an entry is not a {source,value} record", () => {
+    expect(parseActionInputMapping(JSON.stringify({ a: "x" }))).toBeNull();
+    expect(parseActionInputMapping(JSON.stringify({ a: { source: "static" } }))).toBeNull();
+    expect(
+      parseActionInputMapping(JSON.stringify({ a: { source: "nope", value: "x" } })),
+    ).toBeNull();
+    expect(
+      parseActionInputMapping(JSON.stringify({ a: { source: "static", value: 1 } })),
+    ).toBeNull();
   });
 });

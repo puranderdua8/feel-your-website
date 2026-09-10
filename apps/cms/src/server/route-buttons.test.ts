@@ -69,7 +69,13 @@ describe("collectRouteButtonIssues", () => {
 
   it("ignores non-button nodes and a well-formed action-mode button", () => {
     const tree = [
-      button("a", { en: { mode: "action", actionId: "newsletter.subscribe" } }),
+      button("a", {
+        en: {
+          mode: "action",
+          actionId: "newsletter.subscribe",
+          body: JSON.stringify({ email: { source: "static", value: "x@y.z" } }),
+        },
+      }),
       card("c", []),
     ];
     expect(collectRouteButtonIssues(tree)).toEqual([]);
@@ -80,5 +86,70 @@ describe("collectRouteButtonIssues", () => {
     expect(issues).toEqual([
       { instanceId: "a", message: "An action CTA needs an action.", blocking: true },
     ]);
+  });
+
+  it("flags an action id that is not registered", () => {
+    const issues = collectRouteButtonIssues([
+      button("a", { en: { mode: "action", actionId: "does.not.exist" } }),
+    ]);
+    expect(issues).toEqual([
+      { instanceId: "a", message: '"does.not.exist" is not a registered action.', blocking: true },
+    ]);
+  });
+
+  it("flags an action id that names a query, not a mutation", () => {
+    const issues = collectRouteButtonIssues([
+      button("a", { en: { mode: "action", actionId: "feed.releases" } }),
+    ]);
+    expect(issues[0]).toMatchObject({
+      instanceId: "a",
+      message: expect.stringContaining("data action"),
+      blocking: true,
+    });
+  });
+
+  it("flags a body mapping that is not valid JSON", () => {
+    const issues = collectRouteButtonIssues([
+      button("a", { en: { mode: "action", actionId: "newsletter.subscribe", body: "{ oops" } }),
+    ]);
+    expect(issues).toEqual([
+      { instanceId: "a", message: "The request body is not valid.", blocking: true },
+    ]);
+  });
+
+  it("surfaces validateActionBinding issues — an unmapped required input, a bad routeParam", () => {
+    const unmapped = collectRouteButtonIssues([
+      button("a", { en: { mode: "action", actionId: "newsletter.subscribe", body: "{}" } }),
+    ]);
+    expect(unmapped[0]?.message).toMatch(/^Request body — .*required/);
+    expect(unmapped[0]?.blocking).toBe(true);
+
+    const badParam = collectRouteButtonIssues(
+      [
+        button("a", {
+          en: {
+            mode: "action",
+            actionId: "newsletter.subscribe",
+            body: JSON.stringify({ email: { source: "routeParam", value: "slug" } }),
+          },
+        }),
+      ],
+      { routeParamNames: ["id"] }, // route has :id, not :slug
+    );
+    expect(badParam[0]?.message).toMatch(/Request body — .*no param for/);
+
+    const okParam = collectRouteButtonIssues(
+      [
+        button("a", {
+          en: {
+            mode: "action",
+            actionId: "newsletter.subscribe",
+            body: JSON.stringify({ email: { source: "routeParam", value: "slug" } }),
+          },
+        }),
+      ],
+      { routeParamNames: ["slug"] },
+    );
+    expect(okParam).toEqual([]);
   });
 });

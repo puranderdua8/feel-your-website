@@ -521,6 +521,7 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
       hasChildren: boolean;
       hasPublishedChildren: boolean;
       parentHasOutlet: boolean | null;
+      paramNames: string[];
     } => {
       const row = (input ?? {}) as Record<string, unknown>;
       return {
@@ -531,6 +532,9 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
           row.parentHasOutlet === null || row.parentHasOutlet === undefined
             ? null
             : Boolean(row.parentHasOutlet),
+        paramNames: Array.isArray(row.paramNames)
+          ? row.paramNames.filter((name): name is string => typeof name === "string")
+          : [],
       };
     },
   )
@@ -617,6 +621,7 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
 
     for (const issue of collectRouteButtonIssues(data.tree, {
       knownRoutePatterns: publishedRoutePatterns,
+      routeParamNames: data.paramNames,
     })) {
       structuralIssues.push({ message: `Button: ${issue.message}`, blocking: issue.blocking });
     }
