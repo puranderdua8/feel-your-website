@@ -5,8 +5,10 @@ import { MemoryAnalyticsAdapter } from "./memory-adapter.js";
 import {
   AnalyticsProvider,
   useAnalytics,
+  useClickTracking,
   usePageview,
   type AnalyticsProviderProps,
+  type ClickTrackingOptions,
 } from "./react.js";
 
 let clock = 1_000;
@@ -188,6 +190,77 @@ describe("usePageview", () => {
   it("emits nothing for a null path", () => {
     const adapter = new MemoryAnalyticsAdapter();
     render(<Harness path={null} adapter={adapter} />);
+    expect(adapter.tracked).toHaveLength(0);
+  });
+});
+
+describe("useClickTracking", () => {
+  function Harness({
+    adapter,
+    options,
+  }: {
+    adapter: MemoryAnalyticsAdapter;
+    options?: ClickTrackingOptions;
+  }) {
+    return (
+      <AnalyticsProvider adapter={adapter} consentGranted now={now} newId={newId}>
+        <Tracker options={options} />
+        <a href="/about" id="link">
+          About
+        </a>
+        <button id="btn" type="button">
+          Save
+        </button>
+        <p id="prose">just text</p>
+      </AnalyticsProvider>
+    );
+  }
+  function Tracker({ options }: { options?: ClickTrackingOptions }) {
+    useClickTracking(options);
+    return null;
+  }
+
+  it("emits a click for a button, ignoring inert page text", () => {
+    const adapter = new MemoryAnalyticsAdapter();
+    render(<Harness adapter={adapter} />);
+
+    document.getElementById("prose")!.click();
+    expect(adapter.tracked).toHaveLength(0);
+
+    document.getElementById("btn")!.click();
+    expect(adapter.tracked).toHaveLength(1);
+    expect(adapter.tracked[0]).toMatchObject({
+      type: "click",
+      target: { tag: "button", text: "Save" },
+    });
+  });
+
+  it("classifies a link's href via the injected classifier", () => {
+    const adapter = new MemoryAnalyticsAdapter();
+    render(<Harness adapter={adapter} options={{ classifyHref: () => "internal" }} />);
+
+    document.getElementById("link")!.click();
+    expect(adapter.tracked[0]).toMatchObject({
+      type: "click",
+      linkKind: "internal",
+      target: { tag: "a", href: "/about" },
+    });
+  });
+
+  it("ignores a non-primary-button click", () => {
+    const adapter = new MemoryAnalyticsAdapter();
+    render(<Harness adapter={adapter} />);
+    document
+      .getElementById("btn")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true, button: 2 }));
+    expect(adapter.tracked).toHaveLength(0);
+  });
+
+  it("removes the listener on unmount", () => {
+    const adapter = new MemoryAnalyticsAdapter();
+    const { unmount } = render(<Harness adapter={adapter} />);
+    unmount();
+    document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(adapter.tracked).toHaveLength(0);
   });
 });
