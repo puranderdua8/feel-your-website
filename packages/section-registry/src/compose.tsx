@@ -1,6 +1,7 @@
 import type { Locale, RouteSectionNode } from "@feel-your-website/content-core";
 import { Fragment } from "react";
 
+import type { RenderActionCta } from "./action-cta.js";
 import { OUTLET_SECTION_KEY, RouteRenderProvider, type RouteRenderContext } from "./context.js";
 import type { RenderLink } from "./link.js";
 import { renderSection, type SectionDataEntry } from "./registry.js";
@@ -25,6 +26,13 @@ export interface RenderCompositionOptions {
    * `<a>`; omitted, `ButtonSection` falls back to a plain `<a>` itself.
    */
   readonly renderLink?: RenderLink;
+  /**
+   * Host-injected renderer for a `mode: "action"` CTA, threaded to every
+   * `button` section. The shell passes a client form that fires a registered
+   * mutation; omitted (the CMS preview), `ButtonSection` renders the disabled
+   * placeholder.
+   */
+  readonly renderActionCta?: RenderActionCta;
   /**
    * External data per section instance, keyed by `instanceId` — aggregated by
    * the BFF and handed to each section as its `data` prop. Omit outside a
@@ -78,14 +86,13 @@ function renderNode(
     ));
   }
 
-  return renderSection(
-    node.sectionKey,
-    node.content[locale] ?? null,
-    slots,
-    options?.route,
-    options?.renderLink,
-    options?.sectionData?.[node.instanceId],
-  );
+  return renderSection(node.sectionKey, node.content[locale] ?? null, slots, {
+    route: options?.route,
+    renderLink: options?.renderLink,
+    renderActionCta: options?.renderActionCta,
+    instanceId: node.instanceId,
+    data: options?.sectionData?.[node.instanceId],
+  });
 }
 
 /** Stand-in shown where a child route would render — CMS preview, or a leaf route carrying an outlet by mistake. */

@@ -43,7 +43,14 @@ describe("validateButtonSection", () => {
   });
 
   it("does not check the href in action mode", () => {
-    expect(validateButtonSection({ mode: "action" })).toEqual([]);
+    expect(validateButtonSection({ mode: "action", actionId: "newsletter.subscribe" })).toEqual([]);
+  });
+
+  it("blocks an action CTA that names no action", () => {
+    expect(validateButtonSection({ mode: "action" })).toEqual([
+      { field: "actionId", message: "An action CTA needs an action.", blocking: true },
+    ]);
+    expect(validateButtonSection({ mode: "action", actionId: "   " })[0]?.blocking).toBe(true);
   });
 
   it("treats an absent mode as link mode", () => {
