@@ -210,6 +210,9 @@ importers:
       '@feel-your-website/action-registry':
         specifier: workspace:*
         version: link:../../packages/action-registry
+      '@feel-your-website/analytics-core':
+        specifier: workspace:*
+        version: link:../../packages/analytics-core
       '@feel-your-website/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -219,6 +222,9 @@ importers:
       '@feel-your-website/config-schema':
         specifier: workspace:*
         version: link:../../packages/config-schema
+      '@feel-your-website/consent-core':
+        specifier: workspace:*
+        version: link:../../packages/consent-core
       '@feel-your-website/content-adapter-memory':
         specifier: workspace:*
         version: link:../../packages/content-adapter-memory
