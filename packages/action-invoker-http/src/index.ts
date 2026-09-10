@@ -7,3 +7,8 @@ export {
   type HttpActionBindings,
 } from "./bindings.js";
 export { CachingActionInvoker, cacheKey, type CachingActionInvokerOptions } from "./cache.js";
+export {
+  NetlifyBlobsActionCacheStore,
+  type BlobStoreLike,
+  type NetlifyBlobsActionCacheStoreOptions,
+} from "./NetlifyBlobsActionCacheStore.js";

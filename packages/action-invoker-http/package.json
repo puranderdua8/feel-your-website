@@ -30,7 +30,8 @@
   },
   "dependencies": {
     "@feel-your-website/action-core": "workspace:*",
-    "@feel-your-website/content-core": "workspace:*"
+    "@feel-your-website/content-core": "workspace:*",
+    "@netlify/blobs": "^11.0.0"
   },
   "devDependencies": {
     "@feel-your-website/action-registry": "workspace:*",
