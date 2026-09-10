@@ -7,6 +7,7 @@ import {
 import {
   CachingActionInvoker,
   HttpActionInvoker,
+  NetlifyBlobsActionCacheStore,
   parseHttpActionBindings,
 } from "@feel-your-website/action-invoker-http";
 import { actionCatalog } from "@feel-your-website/action-registry";
@@ -197,9 +198,14 @@ export function getActionInvoker(): ActionInvoker {
         : {},
     });
   } else {
-    if (config.cache === "blobs") {
-      throw new Error('ACTION_CACHE="blobs" is not implemented yet — use "memory".');
-    }
+    // `blobs` — a fleet-wide cache (Netlify Blobs), so a cached query response
+    // is a hit on every instance including a cold one; `memory` — per warm
+    // instance. Both are best-effort; the invoker degrades a store outage to
+    // the no-cache path.
+    const store =
+      config.cache === "blobs"
+        ? new NetlifyBlobsActionCacheStore()
+        : new InMemoryActionCacheStore();
     actionInvoker = new CachingActionInvoker({
       inner: new HttpActionInvoker({
         catalog: actionCatalog,
@@ -208,7 +214,7 @@ export function getActionInvoker(): ActionInvoker {
         firstPartyHosts: config.firstPartyHosts,
       }),
       catalog: actionCatalog,
-      store: new InMemoryActionCacheStore(),
+      store,
     });
   }
 

@@ -60,13 +60,16 @@ describe("getActionInvoker", () => {
     expect(() => getActionInvoker()).toThrow(/has no binding/);
   });
 
-  it("refuses the blobs cache until it is implemented", () => {
+  it("uses the Netlify Blobs store for ACTION_CACHE=blobs", () => {
     withEnv({
       ACTION_INVOKER: "http",
       ACTION_CACHE: "blobs",
       ACTION_CONFIG: "{}",
       ACTION_HOST_ALLOWLIST: "api.example.com",
     });
-    expect(() => getActionInvoker()).toThrow(/blobs/);
+    // No longer short-circuits with "not implemented" — it now constructs a
+    // real Blobs-backed cache, which outside a Netlify runtime fails at
+    // `getStore()`.
+    expect(() => getActionInvoker()).toThrow(/Netlify Blobs/i);
   });
 });
