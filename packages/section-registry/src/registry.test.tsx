@@ -82,4 +82,18 @@ describe("renderSection", () => {
       },
     ]);
   });
+
+  it("renders a skeleton for release-feed while its data is `{ pending: true }`", () => {
+    const { container } = render(
+      renderSection("release-feed", { heading: "Latest" }, {}, { data: { pending: true } }),
+    );
+    // Skeleton bars, no fallback line, no list of releases.
+    expect(container.querySelectorAll(".bg-muted").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/unavailable right now/)).toBeNull();
+  });
+
+  it("renders the release-feed fallback for an absent entry", () => {
+    render(renderSection("release-feed", { heading: "Latest" }));
+    expect(screen.getByText(/unavailable right now/)).toBeTruthy();
+  });
 });

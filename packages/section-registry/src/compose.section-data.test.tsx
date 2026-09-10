@@ -34,4 +34,16 @@ describe("renderComposition sectionData threading", () => {
 
     expect(dataArgs).toEqual([{ ok: true, data: { hello: 1 } }, undefined]);
   });
+
+  it("gives a pending-section id `{ pending: true }` only when it has no real entry", () => {
+    dataArgs.length = 0;
+
+    renderComposition([node("a"), node("b"), node("c")], "en", {
+      sectionData: { a: { ok: true, data: 1 } },
+      pendingSections: new Set(["a", "b"]),
+    });
+
+    // `a` has a real entry (wins); `b` is pending; `c` is neither.
+    expect(dataArgs).toEqual([{ ok: true, data: 1 }, { pending: true }, undefined]);
+  });
 });

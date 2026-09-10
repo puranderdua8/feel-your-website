@@ -10,9 +10,10 @@ export type SectionFields = Readonly<Record<string, JsonValue>> | null;
 
 /**
  * What a section that pulls external data receives for its instance: the
- * already-parsed payload, or a normalised failure. The BFF aggregates these
- * (see the query registry); a section renders a fallback for a failure or an
- * absent entry.
+ * already-parsed payload, a normalised failure, or `pending` while a
+ * non-blocking section's data is still being fetched on the client. The BFF
+ * aggregates the first two (see the query registry); a section renders a
+ * fallback for a failure or an absent entry and a skeleton for `pending`.
  *
  * `data` is typed `JsonValue`, not `unknown`: it has crossed the BFF→client
  * JSON boundary as part of `RoutePage`, so it must be serialisable. A section
@@ -20,7 +21,8 @@ export type SectionFields = Readonly<Record<string, JsonValue>> | null;
  */
 export type SectionDataEntry =
   | { readonly ok: true; readonly data: JsonValue }
-  | { readonly ok: false; readonly error: { readonly code: string } };
+  | { readonly ok: false; readonly error: { readonly code: string } }
+  | { readonly pending: true };
 
 /**
  * Maps a section key to the React component that renders it — the one
@@ -202,17 +204,29 @@ const ButtonSection: SectionComponent = ({ fields, renderLink, renderActionCta, 
  * it in `data`, not anything from its own `fields` (bar a heading). The BFF
  * ran its query (`feed.releases`) during `loadRoutePage` and already narrowed
  * the payload via the section's `project`; `data` re-parses defensively since
- * the prop is typed `JsonValue`. An absent entry, `{ ok: false }`, or an
- * unparseable payload all fall back to a single line — the page still renders.
+ * the prop is typed `JsonValue`. `{ pending: true }` (a non-blocking fetch
+ * still in flight) renders a fixed-height skeleton so the layout doesn't
+ * shift; an absent entry, `{ ok: false }`, or an unparseable payload all fall
+ * back to a single line — the page still renders.
  */
 const ReleaseFeedSection: SectionComponent = ({ fields, data }) => {
   const heading = text(fields, "heading");
-  const releases = data?.ok ? parseReleases(data.data) : null;
+  const releases = data && "ok" in data && data.ok ? parseReleases(data.data) : null;
+  const pending = Boolean(data && "pending" in data);
 
   return (
     <section className="flex flex-col gap-3">
       {heading && <h2 className="text-xl font-medium">{heading}</h2>}
-      {releases && releases.length > 0 ? (
+      {pending ? (
+        <ul className="flex flex-col gap-2" aria-hidden="true">
+          {[0, 1, 2].map((row) => (
+            <li key={row} className="flex flex-col gap-1">
+              <span className="bg-muted h-4 w-2/3 rounded" />
+              <span className="bg-muted h-3 w-24 rounded" />
+            </li>
+          ))}
+        </ul>
+      ) : releases && releases.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {releases.map((release) => (
             <li key={release.url} className="flex flex-col">

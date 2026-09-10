@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   collectInvocations,
   derivePreviewSectionData,
+  partitionInvocations,
   planInvocations,
   runQueries,
   type CollectedInvocation,
@@ -45,6 +46,26 @@ describe("collectInvocations", () => {
   it("skips a section whose deriveInvocation returns null", () => {
     const trees = [[node("a", "release-feed", {})]]; // no `source`
     expect(collectInvocations(trees, "en", undefined, registry)).toEqual([]);
+  });
+});
+
+describe("partitionInvocations", () => {
+  const item = (instanceId: string, blocking: boolean): CollectedInvocation => ({
+    instanceId,
+    sectionKey: "release-feed",
+    invocation: { actionId: "x", body: {} },
+    blocking,
+  });
+
+  it("splits by the blocking flag, preserving order", () => {
+    const { blocking, deferred } = partitionInvocations([
+      item("a", true),
+      item("b", false),
+      item("c", true),
+      item("d", false),
+    ]);
+    expect(blocking.map((i) => i.instanceId)).toEqual(["a", "c"]);
+    expect(deferred.map((i) => i.instanceId)).toEqual(["b", "d"]);
   });
 });
 

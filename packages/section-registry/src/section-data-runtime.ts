@@ -63,6 +63,22 @@ export function collectInvocations(
   return out;
 }
 
+/**
+ * Splits collected invocations by their spec's `blocking` flag. The BFF runs
+ * the `blocking` set during SSR (the page waits for them); the `deferred` set
+ * is handed to the client, which fetches them after paint and shows a skeleton
+ * meanwhile.
+ */
+export function partitionInvocations(collected: readonly CollectedInvocation[]): {
+  blocking: CollectedInvocation[];
+  deferred: CollectedInvocation[];
+} {
+  const blocking: CollectedInvocation[] = [];
+  const deferred: CollectedInvocation[] = [];
+  for (const item of collected) (item.blocking ? blocking : deferred).push(item);
+  return { blocking, deferred };
+}
+
 export interface FetchPlan {
   /** One entry per distinct `actionId` + body. */
   readonly unique: readonly QueryInvocation[];
@@ -159,8 +175,13 @@ export async function runQueries(
     if (timer !== undefined) clearTimeout(timer);
   }
 
-  // One resolved-or-error value per unique invocation.
-  const uniqueEntries: SectionDataEntry[] = settled.map((result, index) => {
+  // One resolved-or-error value per unique invocation. `pending` never occurs
+  // here — the BFF has finished the call — so the local type is the narrower
+  // two-member union, which keeps `.ok` narrowing working below.
+  type ResolvedEntry =
+    | { readonly ok: true; readonly data: JsonValue }
+    | { readonly ok: false; readonly error: { readonly code: string } };
+  const uniqueEntries: ResolvedEntry[] = settled.map((result, index) => {
     if (result.status === "rejected") {
       return { ok: false, error: { code: controller.signal.aborted ? "timeout" : "unavailable" } };
     }
