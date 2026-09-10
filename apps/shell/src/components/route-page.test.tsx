@@ -2,12 +2,17 @@ import { MemoryAnalyticsAdapter } from "@feel-your-website/analytics-core";
 import { AnalyticsProvider } from "@feel-your-website/analytics-core/react";
 import type { RouteSectionNode } from "@feel-your-website/content-core";
 import { resetSectionObserver } from "@feel-your-website/section-registry";
-import { act, render, screen, type RenderResult } from "@testing-library/react";
+import { act, render, screen, waitFor, type RenderResult } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RouteLayer, RoutePage } from "@/server/resolve-route-page";
 
-import { RoutePageView } from "./route-page";
+const loadSectionData = vi.fn().mockResolvedValue({});
+vi.mock("@/server/bff", () => ({
+  loadSectionData: (arg: unknown) => loadSectionData(arg) as Promise<Record<string, unknown>>,
+}));
+
+const { RoutePageView } = await import("./route-page");
 
 /** RoutePageView calls `useSectionView()`, so it must render under an AnalyticsProvider. */
 function renderView(
@@ -26,6 +31,8 @@ function renderView(
 afterEach(() => {
   resetSectionObserver();
   vi.unstubAllGlobals();
+  loadSectionData.mockClear();
+  loadSectionData.mockResolvedValue({});
 });
 
 const hero = (id: string, title: string): RouteSectionNode => ({
@@ -39,6 +46,13 @@ const outlet = (id: string): RouteSectionNode => ({
   instanceId: id,
   sectionKey: "outlet",
   content: {},
+  slots: {},
+});
+
+const feed = (id: string): RouteSectionNode => ({
+  instanceId: id,
+  sectionKey: "release-feed",
+  content: { en: { heading: "Latest" } },
   slots: {},
 });
 
@@ -85,6 +99,39 @@ describe("RoutePageView", () => {
     renderView(page([{ bundleId: "about", tree: [hero("a", "About page")], hasOutlet: false }]));
 
     expect(screen.getByRole("heading", { name: "About page" })).toBeTruthy();
+  });
+
+  describe("deferred (non-blocking) sections", () => {
+    it("shows a skeleton, then the data once the client fetch resolves", async () => {
+      loadSectionData.mockResolvedValue({
+        f: { ok: true, data: [{ title: "v1", url: "https://x/1", date: "2026-01-01" }] },
+      });
+      const p = page([{ bundleId: "r", tree: [feed("f")], hasOutlet: false }]);
+      p.deferredSections = ["f"];
+
+      renderView(p);
+
+      expect(document.querySelectorAll(".bg-muted").length).toBeGreaterThan(0);
+      expect(screen.queryByText(/unavailable right now/)).toBeNull();
+      expect(loadSectionData).toHaveBeenCalledWith({ data: { path: "/home/about" } });
+
+      await waitFor(() => expect(screen.getByRole("link", { name: "v1" })).toBeTruthy());
+      expect(document.querySelectorAll(".bg-muted").length).toBe(0);
+    });
+
+    it("falls back to the section's own error state when the deferred fetch throws", async () => {
+      loadSectionData.mockRejectedValue(new Error("boom"));
+      const p = page([{ bundleId: "r", tree: [feed("f")], hasOutlet: false }]);
+      p.deferredSections = ["f"];
+
+      renderView(p);
+      await waitFor(() => expect(screen.getByText(/unavailable right now/)).toBeTruthy());
+    });
+
+    it("does not fetch when there are no deferred sections", () => {
+      renderView(page([{ bundleId: "r", tree: [feed("f")], hasOutlet: false }]));
+      expect(loadSectionData).not.toHaveBeenCalled();
+    });
   });
 
   it("emits an ordered section_view per section as it scrolls into view", () => {

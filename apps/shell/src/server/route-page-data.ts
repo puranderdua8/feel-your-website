@@ -1,8 +1,10 @@
 import {
   collectInvocations,
+  partitionInvocations,
   planInvocations,
   runQueries,
   SECTION_QUERY_REGISTRY,
+  type CollectedInvocation,
   type QueryInvoker,
   type RouteRenderContext,
   type SectionDataEntry,
@@ -34,18 +36,43 @@ interface LoadOptions {
   readonly registry?: Readonly<Record<string, SectionQuerySpec>>;
   /** Clock injection for tests. */
   readonly now?: () => number;
+  /**
+   * Which sections to run: `"blocking"` (the default — the SSR pass; a
+   * `blocking: false` spec is left for the client), `"deferred"` (the
+   * client-refetch pass), or `"all"`.
+   */
+  readonly phase?: "blocking" | "deferred" | "all";
+}
+
+function collectFor(
+  page: RoutePage,
+  registry: Readonly<Record<string, SectionQuerySpec>>,
+): CollectedInvocation[] {
+  return collectInvocations(
+    page.layers.map((layer) => layer.tree),
+    page.locale,
+    routeRenderContext(page),
+    registry,
+  );
+}
+
+/** Instance ids of the page's non-blocking sections — the client fetches these after paint. */
+export function deferredSectionIds(
+  page: RoutePage,
+  registry: Readonly<Record<string, SectionQuerySpec>> = SECTION_QUERY_REGISTRY,
+): string[] {
+  return partitionInvocations(collectFor(page, registry)).deferred.map((i) => i.instanceId);
 }
 
 /**
- * Runs every data-backed section's query for a resolved page, all under one
- * shared abort budget, and returns a {@link SectionDataEntry} per section
- * instance.
+ * Runs a data-backed section's query for a resolved page (see `phase`), all
+ * under one shared abort budget, and returns a {@link SectionDataEntry} per
+ * section instance.
  *
- * Returns `{}` when no section on the page references a query action — the
- * common case while `SECTION_QUERY_REGISTRY` is empty — without touching the
- * invoker. Never throws: `runQueries` already turns a failed call into an
- * error entry, and an unexpected throw here degrades the whole fan-out to `{}`
- * so the page still renders.
+ * Returns `{}` when nothing in that phase needs running — the common case
+ * while `SECTION_QUERY_REGISTRY` is empty — without touching the invoker.
+ * Never throws: `runQueries` already turns a failed call into an error entry,
+ * and an unexpected throw here degrades to `{}` so the page still renders.
  */
 export async function loadRouteSectionData(
   page: RoutePage,
@@ -54,13 +81,11 @@ export async function loadRouteSectionData(
 ): Promise<Record<string, SectionDataEntry>> {
   const registry = options.registry ?? SECTION_QUERY_REGISTRY;
   const now = options.now ?? Date.now;
+  const phase = options.phase ?? "blocking";
 
-  const collected = collectInvocations(
-    page.layers.map((layer) => layer.tree),
-    page.locale,
-    routeRenderContext(page),
-    registry,
-  );
+  const all = collectFor(page, registry);
+  const split = partitionInvocations(all);
+  const collected = phase === "all" ? all : phase === "deferred" ? split.deferred : split.blocking;
   if (collected.length === 0) return {};
 
   const plan = planInvocations(collected);

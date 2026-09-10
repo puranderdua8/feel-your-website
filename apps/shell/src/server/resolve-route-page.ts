@@ -68,6 +68,12 @@ export interface RoutePage {
    * otherwise. Threaded to each section as its `data` prop by `RoutePageView`.
    */
   sectionData?: Readonly<Record<string, SectionDataEntry>>;
+  /**
+   * Instance ids of non-blocking (`blocking: false`) sections. The SSR pass
+   * skips their queries; `RoutePageView` fetches them after mount and shows a
+   * skeleton meanwhile. Absent when there are none.
+   */
+  deferredSections?: string[];
 }
 
 /**

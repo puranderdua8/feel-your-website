@@ -3,7 +3,7 @@ import type { QueryInvoker, SectionQuerySpec } from "@feel-your-website/section-
 import { describe, expect, it, vi } from "vitest";
 
 import type { RoutePage } from "./resolve-route-page.js";
-import { loadRouteSectionData, routeRenderContext } from "./route-page-data.js";
+import { deferredSectionIds, loadRouteSectionData, routeRenderContext } from "./route-page-data.js";
 
 const node = (
   instanceId: string,
@@ -91,5 +91,43 @@ describe("loadRouteSectionData", () => {
       { registry },
     );
     expect(out.a).toEqual({ ok: false, error: { code: "unavailable" } });
+  });
+
+  describe("blocking / deferred phases", () => {
+    const blockingReg = { "release-feed": feedSpec };
+    const deferredReg = { "release-feed": { ...feedSpec, blocking: false } };
+    const tree = () => [[node("a", "release-feed", { source: "feed.releases" })]];
+
+    it("deferredSectionIds lists only the non-blocking sections", () => {
+      expect(deferredSectionIds(page(tree()), blockingReg)).toEqual([]);
+      expect(deferredSectionIds(page(tree()), deferredReg)).toEqual(["a"]);
+    });
+
+    it("the default (blocking) phase skips a non-blocking section", async () => {
+      const invoke = vi.fn();
+      const out = await loadRouteSectionData(page(tree()), { invoke } as QueryInvoker, {
+        registry: deferredReg,
+      });
+      expect(out).toEqual({});
+      expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("phase 'deferred' runs a non-blocking section and skips a blocking one", async () => {
+      const invoke = vi.fn().mockResolvedValue({ ok: true, data: [1] });
+
+      const deferred = await loadRouteSectionData(page(tree()), { invoke } as QueryInvoker, {
+        registry: deferredReg,
+        phase: "deferred",
+      });
+      expect(deferred.a).toEqual({ ok: true, data: [1] });
+
+      invoke.mockClear();
+      const blocking = await loadRouteSectionData(page(tree()), { invoke } as QueryInvoker, {
+        registry: blockingReg,
+        phase: "deferred",
+      });
+      expect(blocking).toEqual({});
+      expect(invoke).not.toHaveBeenCalled();
+    });
   });
 });
