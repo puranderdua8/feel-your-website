@@ -1,0 +1,39 @@
+{
+  "name": "@feel-your-website/analytics-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Analytics vocabulary: a closed event union + envelope, the AnalyticsAdapter/AnalyticsSink seams, and no-op implementations.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo"
+  },
+  "devDependencies": {
+    "@feel-your-website/config": "workspace:*",
+    "@types/node": "^22.10.5",
+    "eslint": "catalog:",
+    "jsdom": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
