@@ -29,7 +29,11 @@ export const actionCatalog = defineActions([
       { name: "email", label: "Email", type: "text", required: true },
       { name: "source", label: "Source tag", type: "text" },
     ],
-    allowedSources: ["static", "routeParam"],
+    // `email` is what a visitor types into a `form`, so this mutation accepts a
+    // `formInput` mapping (as well as a `static`/`routeParam` one for a
+    // context-fixed subscribe). `buildActionBody` still only reads declared
+    // inputs and `validateActionInput` still runs.
+    allowedSources: ["static", "routeParam", "formInput"],
     idempotent: true,
   },
   {

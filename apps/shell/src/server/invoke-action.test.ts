@@ -69,6 +69,28 @@ describe("resolveAndInvokeAction", () => {
     expect(result).toEqual({ ok: true, data: { email: "hello" } });
   });
 
+  it("fills a formInput-mapped input from the submitted values (newsletter.subscribe allows it)", async () => {
+    const manifest = routeWith(
+      actionButton({ body: JSON.stringify({ email: { source: "formInput", value: "email" } }) }),
+    );
+    const result = await resolveAndInvokeAction(
+      input({ formInput: { email: "typed@in.form" } }),
+      deps({ manifest }),
+    );
+    expect(result).toEqual({ ok: true, data: { email: "typed@in.form" } });
+  });
+
+  it("drops a formInput value the client sent for an input the action does not declare", async () => {
+    const manifest = routeWith(
+      actionButton({ body: JSON.stringify({ email: { source: "formInput", value: "email" } }) }),
+    );
+    const result = await resolveAndInvokeAction(
+      input({ formInput: { email: "ok@x.io", secret: "nope" } }),
+      deps({ manifest }),
+    );
+    expect(result).toEqual({ ok: true, data: { email: "ok@x.io" } });
+  });
+
   it("returns not_found for an unmatched path", async () => {
     const result = await resolveAndInvokeAction(input({ path: "/nope" }), deps({}));
     expect(result).toEqual({ ok: false, code: "not_found" });

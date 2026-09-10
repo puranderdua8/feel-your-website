@@ -14,6 +14,28 @@ function card(instanceId: string, body: RouteSectionNode[]): RouteSectionNode {
   return { instanceId, sectionKey: "card", content: {}, slots: { body } } as RouteSectionNode;
 }
 
+function field(instanceId: string, name: string): RouteSectionNode {
+  return {
+    instanceId,
+    sectionKey: "field",
+    content: { en: { name, label: name } },
+    slots: {},
+  } as RouteSectionNode;
+}
+
+function form(
+  instanceId: string,
+  fields: RouteSectionNode[],
+  cta: RouteSectionNode,
+): RouteSectionNode {
+  return {
+    instanceId,
+    sectionKey: "form",
+    content: {},
+    slots: { fields, cta: [cta] },
+  } as RouteSectionNode;
+}
+
 describe("firstUnsafeButtonHref", () => {
   it("finds an unsafe href anywhere in the tree, including in a slot", () => {
     const tree = [
@@ -151,5 +173,45 @@ describe("collectRouteButtonIssues", () => {
       { routeParamNames: ["slug"] },
     );
     expect(okParam).toEqual([]);
+  });
+
+  it("passes a formInput mapping that names a sibling field of the same form", () => {
+    const cta = button("cta", {
+      en: {
+        mode: "action",
+        actionId: "newsletter.subscribe",
+        body: JSON.stringify({ email: { source: "formInput", value: "email" } }),
+      },
+    });
+    const tree = [form("f", [field("f1", "email")], cta)];
+    expect(collectRouteButtonIssues(tree)).toEqual([]);
+  });
+
+  it("flags a formInput mapping that names no field of its form", () => {
+    const cta = button("cta", {
+      en: {
+        mode: "action",
+        actionId: "newsletter.subscribe",
+        body: JSON.stringify({ email: { source: "formInput", value: "e_mail" } }),
+      },
+    });
+    const tree = [form("f", [field("f1", "email")], cta)];
+    const issues = collectRouteButtonIssues(tree);
+    expect(issues[0]).toMatchObject({ instanceId: "cta", blocking: true });
+    expect(issues[0]?.message).toMatch(/form has no field for/);
+  });
+
+  it("flags a formInput mapping on a button that is not inside a form", () => {
+    const issues = collectRouteButtonIssues([
+      button("a", {
+        en: {
+          mode: "action",
+          actionId: "newsletter.subscribe",
+          body: JSON.stringify({ email: { source: "formInput", value: "email" } }),
+        },
+      }),
+    ]);
+    expect(issues[0]).toMatchObject({ instanceId: "a", blocking: true });
+    expect(issues[0]?.message).toMatch(/inside a form section/);
   });
 });
