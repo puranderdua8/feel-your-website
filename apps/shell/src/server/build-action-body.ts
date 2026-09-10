@@ -1,47 +1,7 @@
-import type {
-  ActionInputMapping,
-  ActionInputSource,
-  MutationActionDefinition,
-} from "@feel-your-website/action-core";
+import type { ActionInputMapping, MutationActionDefinition } from "@feel-your-website/action-core";
 import type { JsonValue, SectionFieldSpec } from "@feel-your-website/content-core";
 
 import { sanitizeParam } from "./resolve-route-page.js";
-
-const INPUT_SOURCES = new Set<ActionInputSource>(["static", "routeParam", "formInput"]);
-
-/**
- * Parses the `actionBody` field's stored value — authored in the CMS as a JSON
- * string — into an {@link ActionInputMapping}, or `null` if it is not one. An
- * empty string is an empty mapping; an already-parsed object is accepted too
- * (forward-compatible with a structured control).
- */
-export function parseActionInputMapping(raw: JsonValue): ActionInputMapping | null {
-  let value: unknown = raw;
-  if (typeof raw === "string") {
-    if (raw.trim() === "") return {};
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-
-  const out: Record<string, { source: ActionInputSource; value: string }> = {};
-  for (const [name, entry] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return null;
-    const record = entry as Record<string, unknown>;
-    if (
-      typeof record.source !== "string" ||
-      !INPUT_SOURCES.has(record.source as ActionInputSource)
-    ) {
-      return null;
-    }
-    if (typeof record.value !== "string") return null;
-    out[name] = { source: record.source as ActionInputSource, value: record.value };
-  }
-  return out;
-}
 
 /** What the builder is allowed to draw a mapped value from. */
 export interface BuildActionBodyContext {
