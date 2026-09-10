@@ -1,6 +1,11 @@
 import type { RouteSectionNode } from "@feel-your-website/content-core";
-import { renderComposition, type LinkSpec } from "@feel-your-website/section-registry";
+import {
+  derivePreviewSectionData,
+  renderComposition,
+  type LinkSpec,
+} from "@feel-your-website/section-registry";
 import { ThemeProvider } from "@feel-your-website/theme/client";
+import { useMemo } from "react";
 
 /**
  * The preview has no router, so a CTA link is a plain, inert `<a>` — enough to
@@ -30,6 +35,11 @@ export function RoutePreview({
   tree: readonly RouteSectionNode[];
   locale: string;
 }) {
+  // Stand-in external data for any data-backed section (e.g. `release-feed`):
+  // its spec's `previewSample`, shaped by the same `project` the shell runs.
+  // No network — recomputed synchronously as the draft changes.
+  const sectionData = useMemo(() => derivePreviewSectionData([tree], locale), [tree, locale]);
+
   return (
     <div className="border-border overflow-hidden rounded-[var(--radius)] border">
       <p className="bg-muted text-muted-foreground border-border border-b px-3 py-1.5 text-xs">
@@ -40,7 +50,7 @@ export function RoutePreview({
           {tree.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nothing to preview yet.</p>
           ) : (
-            renderComposition(tree, locale, { renderLink: renderPreviewLink })
+            renderComposition(tree, locale, { renderLink: renderPreviewLink, sectionData })
           )}
         </div>
       </ThemeProvider>
