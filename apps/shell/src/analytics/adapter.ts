@@ -1,4 +1,5 @@
 import { NoopAnalyticsAdapter, type AnalyticsAdapter } from "@feel-your-website/analytics-core";
+import { GaAnalyticsAdapter } from "@feel-your-website/analytics-ga";
 
 import type { BootstrapPayload } from "@/server/bff";
 
@@ -8,14 +9,12 @@ import type { BootstrapPayload } from "@/server/bff";
  * backend seams.
  *
  * `provider: "none"` (the default) → {@link NoopAnalyticsAdapter}: the provider
- * tree still mounts, but nothing is sent. `"ga"` also returns Noop until the
- * GA adapter lands (B11).
+ * tree still mounts, but nothing is sent. `"ga"` with a measurement id →
+ * {@link GaAnalyticsAdapter}.
  */
 export function createAnalyticsAdapter(config: BootstrapPayload["analytics"]): AnalyticsAdapter {
-  switch (config.provider) {
-    case "ga":
-    case "none":
-    default:
-      return new NoopAnalyticsAdapter();
+  if (config.provider === "ga" && config.measurementId) {
+    return new GaAnalyticsAdapter({ measurementId: config.measurementId });
   }
+  return new NoopAnalyticsAdapter();
 }
