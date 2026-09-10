@@ -12,8 +12,15 @@ import {
 
 import { createJourneyCounter } from "./journey.js";
 import { redactPath } from "./redact.js";
+import { resolveClickTarget } from "./resolve-click-target.js";
 import { deriveSession, isSampled, type SessionState } from "./session.js";
-import type { AnalyticsAdapter, AnalyticsEvent, AnalyticsEventBody } from "./types.js";
+import type {
+  AnalyticsAdapter,
+  AnalyticsEvent,
+  AnalyticsEventBody,
+  ClickTarget,
+  LinkKind,
+} from "./types.js";
 
 const SESSION_STORAGE_KEY = "fyw.analytics.session";
 const DEFAULT_FLUSH_MS = 15_000;
@@ -265,4 +272,45 @@ export function usePageview(path: string | null): void {
 
     emit(referrer ? { type: "page", referrer } : { type: "page" });
   }, [path, emit]);
+}
+
+const INTERACTIVE_TAGS = new Set(["a", "button", "input", "select", "textarea", "summary"]);
+
+/** A click is worth an event only when it landed on something interactive. */
+function isTrackable(target: ClickTarget): boolean {
+  return (
+    target.href !== undefined ||
+    target.role !== undefined ||
+    target.analyticsId !== undefined ||
+    INTERACTIVE_TAGS.has(target.tag)
+  );
+}
+
+export interface ClickTrackingOptions {
+  /** Classifies a link's `href` into a {@link LinkKind}. Omitted, `linkKind` is left off. */
+  readonly classifyHref?: (href: string) => LinkKind;
+}
+
+/**
+ * Installs a single capture-phase listener on `document` and emits a `click`
+ * event for every primary-button click that lands on something interactive
+ * (a link, a button, a `[role]`, a `[data-analytics-id]`, a form control).
+ * Clicks on inert page chrome are ignored. One listener for the whole page —
+ * the section registry never has to know analytics exists.
+ */
+export function useClickTracking(options: ClickTrackingOptions = {}): void {
+  const { emit } = useAnalytics();
+  const classifyRef = useRef(options.classifyHref);
+  classifyRef.current = options.classifyHref;
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent): void => {
+      if (event.button !== 0) return;
+      const body = resolveClickTarget(event.target, { classifyHref: classifyRef.current });
+      if (body && isTrackable(body.target)) emit({ type: "click", ...body });
+    };
+
+    document.addEventListener("click", onClick, { capture: true, passive: true });
+    return () => document.removeEventListener("click", onClick, { capture: true });
+  }, [emit]);
 }

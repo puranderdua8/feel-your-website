@@ -4,6 +4,7 @@ import { useConsent } from "@feel-your-website/consent-core/react";
 import { useMemo, type ReactNode } from "react";
 
 import { createAnalyticsAdapter } from "@/analytics/adapter";
+import { ClickTracker } from "@/analytics/click";
 import { PageviewTracker } from "@/analytics/pageview";
 import type { BootstrapPayload } from "@/server/bff";
 
@@ -32,6 +33,7 @@ export function AppAnalyticsProvider({
       sampleRate={config.sampleRate}
     >
       <PageviewTracker />
+      <ClickTracker />
       {children}
     </AnalyticsProvider>
   );
