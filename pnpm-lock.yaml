@@ -735,6 +735,9 @@ importers:
       '@feel-your-website/content-core':
         specifier: workspace:*
         version: link:../content-core
+      '@feel-your-website/json-guards':
+        specifier: workspace:*
+        version: link:../json-guards
     devDependencies:
       '@feel-your-website/config':
         specifier: workspace:*

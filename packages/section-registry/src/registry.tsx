@@ -2,6 +2,7 @@ import type { JsonValue } from "@feel-your-website/content-core";
 
 import type { RouteRenderContext } from "./context.js";
 import { classifyHref, type LinkSpec, type RenderLink } from "./link.js";
+import { parseReleases } from "./section-data.js";
 
 /** A section's rendered content: a plain field bag, or `null` when unfilled. */
 export type SectionFields = Readonly<Record<string, JsonValue>> | null;
@@ -165,6 +166,39 @@ const ButtonSection: SectionComponent = ({ fields, renderLink }) => {
   );
 };
 
+/**
+ * The worked example of a data-backed section: it renders the list handed to
+ * it in `data`, not anything from its own `fields` (bar a heading). The BFF
+ * ran its query (`feed.releases`) during `loadRoutePage` and already narrowed
+ * the payload via the section's `project`; `data` re-parses defensively since
+ * the prop is typed `JsonValue`. An absent entry, `{ ok: false }`, or an
+ * unparseable payload all fall back to a single line — the page still renders.
+ */
+const ReleaseFeedSection: SectionComponent = ({ fields, data }) => {
+  const heading = text(fields, "heading");
+  const releases = data?.ok ? parseReleases(data.data) : null;
+
+  return (
+    <section className="flex flex-col gap-3">
+      {heading && <h2 className="text-xl font-medium">{heading}</h2>}
+      {releases && releases.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {releases.map((release) => (
+            <li key={release.url} className="flex flex-col">
+              <a href={release.url} className="font-medium underline">
+                {release.title}
+              </a>
+              <span className="text-muted-foreground text-sm">{release.date}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground text-sm">Release notes are unavailable right now.</p>
+      )}
+    </section>
+  );
+};
+
 const CardSection: SectionComponent = ({ fields, slots }) => (
   <section className="border-border flex flex-col gap-3 rounded-[var(--radius)] border p-4">
     {slots.icon}
@@ -183,6 +217,7 @@ export const SECTION_REGISTRY: Readonly<Record<string, SectionComponent>> = {
   image: ImageSection,
   button: ButtonSection,
   card: CardSection,
+  "release-feed": ReleaseFeedSection,
 };
 
 function Placeholder({ children }: { children: React.ReactNode }): React.JSX.Element {
