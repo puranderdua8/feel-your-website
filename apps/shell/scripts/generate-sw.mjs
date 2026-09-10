@@ -15,6 +15,15 @@ import { dirname, join } from "node:path";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const clientDir = join(root, "dist", "client");
 
+// Analytics must never be served from cache: a cached `gtag.js` or a cached
+// collect beacon would double-count or replay stale events, and a cached
+// ingest response is meaningless. These are `NetworkOnly`.
+const ANALYTICS_ORIGINS = new Set([
+  "https://www.googletagmanager.com",
+  "https://www.google-analytics.com",
+  "https://analytics.google.com",
+]);
+
 const { count, size, warnings } = await generateSW({
   globDirectory: clientDir,
   // Only fingerprinted client assets are precached. Server-rendered HTML is
@@ -29,6 +38,18 @@ const { count, size, warnings } = await generateSW({
   cleanupOutdatedCaches: true,
 
   runtimeCaching: [
+    {
+      // Google Analytics / Tag Manager — never cached.
+      urlPattern: ({ url }) => ANALYTICS_ORIGINS.has(url.origin),
+      handler: "NetworkOnly",
+    },
+    {
+      // Any mutating server fn (invokeAction, setLocale, ingestAnalytics) —
+      // never cached, and never a fallback response for a failed POST.
+      urlPattern: ({ url }) => url.pathname.startsWith("/_serverFn/"),
+      method: "POST",
+      handler: "NetworkOnly",
+    },
     {
       // Navigations: network first, falling back to the last good response
       // for that URL. Network-first matters because content is CMS-driven and

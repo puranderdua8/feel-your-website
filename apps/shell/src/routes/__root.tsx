@@ -6,6 +6,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import type { ReactNode } from "react";
 
 import { AppAnalyticsProvider } from "@/analytics/provider";
+import { ConsentBanner } from "@/components/consent-banner";
 import { ServiceWorkerNotice } from "@/components/service-worker";
 import { SiteNav } from "@/components/site-nav";
 import { loadBootstrap, type BootstrapPayload } from "@/server/bff";
@@ -75,6 +76,7 @@ function RootComponent() {
             </PermissionsProvider>
           </I18nProvider>
         </AppAnalyticsProvider>
+        <ConsentBanner />
       </ConsentProvider>
     </RootDocument>
   );
