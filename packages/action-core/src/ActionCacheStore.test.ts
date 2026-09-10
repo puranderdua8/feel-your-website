@@ -8,40 +8,40 @@ function entry(value: unknown): CacheEntry {
 }
 
 describe("InMemoryActionCacheStore", () => {
-  it("misses an unknown key", () => {
-    expect(new InMemoryActionCacheStore().get("nope")).toBeUndefined();
+  it("misses an unknown key", async () => {
+    expect(await new InMemoryActionCacheStore().get("nope")).toBeUndefined();
   });
 
-  it("round-trips an entry by reference", () => {
+  it("round-trips an entry by reference", async () => {
     const store = new InMemoryActionCacheStore();
     const e = entry({ a: 1 });
-    store.set("k", e);
-    expect(store.get("k")).toBe(e);
+    await store.set("k", e);
+    expect(await store.get("k")).toBe(e);
   });
 
-  it("overwrites and deletes", () => {
+  it("overwrites and deletes", async () => {
     const store = new InMemoryActionCacheStore();
-    store.set("k", entry(1));
-    store.set("k", entry(2));
-    expect(store.get("k")?.value).toBe(2);
+    await store.set("k", entry(1));
+    await store.set("k", entry(2));
+    expect((await store.get("k"))?.value).toBe(2);
 
-    store.delete("k");
-    expect(store.get("k")).toBeUndefined();
+    await store.delete("k");
+    expect(await store.get("k")).toBeUndefined();
   });
 
-  it("keeps keys independent", () => {
+  it("keeps keys independent", async () => {
     const store = new InMemoryActionCacheStore();
-    store.set("a", entry("A"));
-    store.set("b", entry("B"));
-    expect(store.get("a")?.value).toBe("A");
-    expect(store.get("b")?.value).toBe("B");
+    await store.set("a", entry("A"));
+    await store.set("b", entry("B"));
+    expect((await store.get("a"))?.value).toBe("A");
+    expect((await store.get("b"))?.value).toBe("B");
   });
 
-  it("does not apply any freshness policy of its own", () => {
+  it("does not apply any freshness policy of its own", async () => {
     const store = new InMemoryActionCacheStore();
     const stale: CacheEntry = { value: 1, expiresAt: 0, staleUntil: 0 };
-    store.set("k", stale);
+    await store.set("k", stale);
     // The store returns whatever it holds; the caller decides if it is usable.
-    expect(store.get("k")).toBe(stale);
+    expect(await store.get("k")).toBe(stale);
   });
 });

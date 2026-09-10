@@ -68,7 +68,7 @@ export class CachingActionInvoker implements ActionInvoker {
     this.#now = options.now ?? Date.now;
   }
 
-  invoke(actionId: string, body: JsonBody, context: ActionContext): Promise<ActionResult> {
+  async invoke(actionId: string, body: JsonBody, context: ActionContext): Promise<ActionResult> {
     const def = this.#catalog.byId.get(actionId);
     if (!def || def.kind !== "query" || !def.cache) {
       return this.#inner.invoke(actionId, body, context);
@@ -77,15 +77,19 @@ export class CachingActionInvoker implements ActionInvoker {
     const cache: CacheConfig = def.cache;
     const key = cacheKey(actionId, body);
     const now = this.#now();
-    const hit = this.#store.get(key);
+    // A shared store may be briefly unavailable — treat that exactly like a miss.
+    const hit = await this.#store.get(key).catch(() => undefined);
 
     if (hit) {
-      if (now < hit.expiresAt) return Promise.resolve(hit.value as ActionResult);
+      const cached = hit.value as ActionResult;
+      if (now < hit.expiresAt) return cached;
       if (cache.swr && now < hit.staleUntil) {
         void this.#load(key, actionId, body, context, cache).catch(() => undefined);
-        return Promise.resolve({ ...(hit.value as ActionResult & object), stale: true });
+        // Only an `ok` result is ever kept past its ttl (failures are not
+        // served stale), so the `stale` marker only lands on a success.
+        return cached.ok ? { ...cached, stale: true } : cached;
       }
-      this.#store.delete(key);
+      void this.#store.delete(key).catch(() => undefined);
     }
 
     return this.#load(key, actionId, body, context, cache);
@@ -118,19 +122,24 @@ export class CachingActionInvoker implements ActionInvoker {
   #persist(key: string, result: ActionResult, cache: CacheConfig): void {
     const now = this.#now();
 
+    // Fire-and-forget: the caller must not wait on a cache write, and a lost
+    // write is just a miss next time (the store's contract).
+    const write = (entry: CacheEntry): void => {
+      void this.#store.set(key, entry).catch(() => undefined);
+    };
+
     if (result.ok) {
       // Store the result without any `stale` marker; the read path adds one.
-      const entry: CacheEntry = {
+      write({
         value: { ok: true, data: result.data },
         expiresAt: now + cache.ttlMs,
         staleUntil: now + cache.ttlMs + (cache.swr ? cache.ttlMs : 0),
-      };
-      this.#store.set(key, entry);
+      });
       return;
     }
 
     if (cache.negativeTtlMs && cache.negativeTtlMs > 0) {
-      this.#store.set(key, {
+      write({
         value: result,
         expiresAt: now + cache.negativeTtlMs,
         staleUntil: now + cache.negativeTtlMs,
