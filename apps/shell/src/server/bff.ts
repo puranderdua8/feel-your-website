@@ -1,4 +1,5 @@
-import { isContentAdapterError } from "@feel-your-website/content-core";
+import type { ActionResult } from "@feel-your-website/action-core";
+import { isContentAdapterError, type JsonValue } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import { createServerFn } from "@tanstack/react-start";
@@ -7,6 +8,7 @@ import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy
 
 import { getActionInvoker, getAuthProvider, getContentAdapter } from "./adapters.js";
 import { assertSameOrigin } from "./http-guards.js";
+import { resolveAndInvokeAction, type InvokeActionInput } from "./invoke-action.js";
 import { buildNav, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 import { loadRouteSectionData } from "./route-page-data.js";
@@ -43,6 +45,42 @@ export type { NavNode } from "./nav.js";
 export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-page.js";
 
 /**
+ * The signed-in user's id and their permissions, resolved against the code
+ * catalog — a token can name a permission the code has since removed, and
+ * granting one that no longer exists is the wrong direction to fail in.
+ * Returns an empty set for an anonymous or failed session.
+ */
+async function resolveSessionPermissions(): Promise<{
+  userId: string | null;
+  permissions: ReadonlySet<string>;
+}> {
+  const session = await getAuthProvider()
+    .getSession()
+    .catch(() => null);
+
+  const { permissions, unknown } = resolvePermissions(
+    session
+      ? [
+          {
+            id: "from-claims",
+            name: "from-claims",
+            permissions: session.permissions as never,
+            createdAt: session.issuedAt,
+            updatedAt: session.issuedAt,
+          },
+        ]
+      : [],
+    platformCatalog,
+  );
+
+  if (unknown.length > 0) {
+    console.warn("[rbac] token carried unknown permissions:", unknown);
+  }
+
+  return { userId: session?.userId ?? null, permissions };
+}
+
+/**
  * Everything the shell needs to render its first frame: negotiated locale,
  * messages, and the resolved permission set.
  *
@@ -51,33 +89,7 @@ export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-pag
 export const loadBootstrap = createServerFn({ method: "GET" }).handler(
   async (): Promise<BootstrapPayload> => {
     const locale = resolveLocale();
-
-    const session = await getAuthProvider()
-      .getSession()
-      .catch(() => null);
-
-    // Claims are only claims. They are resolved against the code catalog
-    // before use, because a token can name a permission the code has since
-    // removed — and granting one that no longer exists is the wrong
-    // direction to fail in.
-    const { permissions, unknown } = resolvePermissions(
-      session
-        ? [
-            {
-              id: "from-claims",
-              name: "from-claims",
-              permissions: session.permissions as never,
-              createdAt: session.issuedAt,
-              updatedAt: session.issuedAt,
-            },
-          ]
-        : [],
-      platformCatalog,
-    );
-
-    if (unknown.length > 0) {
-      console.warn("[rbac] token carried unknown permissions:", unknown);
-    }
+    const { userId, permissions } = await resolveSessionPermissions();
 
     let messages: Record<string, string> = { ...BOOTSTRAP_MESSAGES };
     let nav: NavNode[] = [];
@@ -107,7 +119,7 @@ export const loadBootstrap = createServerFn({ method: "GET" }).handler(
       locale,
       messages,
       permissions: [...permissions],
-      userId: session?.userId ?? null,
+      userId,
       degraded,
       nav,
     };
@@ -174,4 +186,57 @@ export const loadRoutePage = createServerFn({ method: "GET" })
 
     const sectionData = await loadRouteSectionData(page, getActionInvoker());
     return Object.keys(sectionData).length > 0 ? { ...page, sectionData } : page;
+  });
+
+/**
+ * Idempotency replay for {@link invokeAction}: a completed invoke of an
+ * `idempotent` action, keyed by `actionId\0requestId`. Process-local, so it
+ * covers a double-click and an in-flight retry on the same instance, not a
+ * fleet — a money/state action still needs an upstream `Idempotency-Key`.
+ */
+const invokeReplayCache = new Map<string, Promise<ActionResult>>();
+
+/**
+ * Fires the registered mutation a `mode: "action"` CTA points at.
+ *
+ * The client sends only the pathname, the firing node's `instanceId` and a
+ * per-submit `requestId`. The server re-resolves the route from published
+ * content, reads the action id / input mapping / permission off that node, and
+ * rebuilds the request body from re-sanitised route params — nothing about the
+ * call is taken from the request. See {@link resolveAndInvokeAction}.
+ */
+export const invokeAction = createServerFn({ method: "POST" })
+  .validator((input: unknown): InvokeActionInput => {
+    const raw = (input ?? {}) as Record<string, unknown>;
+    const requireString = (key: "path" | "instanceId" | "requestId"): string => {
+      const value = raw[key];
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(`${key} is required.`);
+      }
+      return value;
+    };
+    const formInput =
+      typeof raw.formInput === "object" && raw.formInput !== null && !Array.isArray(raw.formInput)
+        ? (raw.formInput as Record<string, JsonValue>)
+        : undefined;
+    return {
+      path: requireString("path"),
+      instanceId: requireString("instanceId"),
+      requestId: requireString("requestId"),
+      formInput,
+    };
+  })
+  .handler(async ({ data }): Promise<ActionResult> => {
+    assertSameOrigin();
+
+    const locale = resolveLocale();
+    const manifest = await getContentAdapter().getRouteManifest(locale);
+
+    return resolveAndInvokeAction(data, {
+      manifest,
+      locale,
+      session: await resolveSessionPermissions(),
+      invoker: getActionInvoker(),
+      replayCache: invokeReplayCache,
+    });
   });
