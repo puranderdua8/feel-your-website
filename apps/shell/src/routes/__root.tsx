@@ -1,9 +1,11 @@
 import { ThemeProvider } from "@feel-your-website/theme/client";
+import { ConsentProvider } from "@feel-your-website/consent-core/react";
 import { I18nProvider } from "@feel-your-website/i18n-core/react";
 import { PermissionsProvider } from "@feel-your-website/rbac/react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { AppAnalyticsProvider } from "@/analytics/provider";
 import { ServiceWorkerNotice } from "@/components/service-worker";
 import { SiteNav } from "@/components/site-nav";
 import { loadBootstrap, type BootstrapPayload } from "@/server/bff";
@@ -51,20 +53,29 @@ function RootComponent() {
 
   return (
     <RootDocument locale={bootstrap.locale}>
-      <I18nProvider locale={bootstrap.locale} messages={bootstrap.messages}>
-        {/*
-          Permissions are resolved on the server and passed down. The client
-          never derives them from roles — a client-side decision is a display
-          decision, and every one of these is also enforced server-side.
-        */}
-        <PermissionsProvider permissions={new Set(bootstrap.permissions)}>
-          <ThemeProvider theme="base">
-            <ServiceWorkerNotice />
-            <SiteNav nav={bootstrap.nav} />
-            <Outlet />
-          </ThemeProvider>
-        </PermissionsProvider>
-      </I18nProvider>
+      {/*
+        Consent wraps analytics: `AppAnalyticsProvider` reads `useConsent()` to
+        gate every emit. Both are mounted unconditionally — with no
+        `ANALYTICS_PROVIDER` set the adapter is a no-op and nothing is sent.
+      */}
+      <ConsentProvider initial={bootstrap.consent}>
+        <AppAnalyticsProvider config={bootstrap.analytics}>
+          <I18nProvider locale={bootstrap.locale} messages={bootstrap.messages}>
+            {/*
+              Permissions are resolved on the server and passed down. The client
+              never derives them from roles — a client-side decision is a display
+              decision, and every one of these is also enforced server-side.
+            */}
+            <PermissionsProvider permissions={new Set(bootstrap.permissions)}>
+              <ThemeProvider theme="base">
+                <ServiceWorkerNotice />
+                <SiteNav nav={bootstrap.nav} />
+                <Outlet />
+              </ThemeProvider>
+            </PermissionsProvider>
+          </I18nProvider>
+        </AppAnalyticsProvider>
+      </ConsentProvider>
     </RootDocument>
   );
 }

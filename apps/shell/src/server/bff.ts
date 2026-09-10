@@ -1,12 +1,15 @@
 import type { ActionResult } from "@feel-your-website/action-core";
+import { CONSENT_COOKIE_NAME, type ConsentStatus } from "@feel-your-website/consent-core";
 import { isContentAdapterError, type JsonValue } from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import { createServerFn } from "@tanstack/react-start";
+import { getCookies } from "@tanstack/react-start/server";
 
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
 import { getActionInvoker, getAuthProvider, getContentAdapter } from "./adapters.js";
+import { loadAnalyticsConfig, type AnalyticsConfig } from "./config/analytics.js";
 import { assertSameOrigin } from "./http-guards.js";
 import { resolveAndInvokeAction, type InvokeActionInput } from "./invoke-action.js";
 import { buildNav, type NavNode } from "./nav.js";
@@ -39,6 +42,10 @@ export interface BootstrapPayload {
   degraded: boolean;
   /** The published-route forest for the site nav — param routes excluded. `[]` on a CMS outage. */
   nav: NavNode[];
+  /** Client analytics config (all fields are browser-safe). `provider: "none"` unless configured. */
+  analytics: AnalyticsConfig;
+  /** The visitor's consent, read from the cookie server-side so the first client render matches. */
+  consent: ConsentStatus;
 }
 
 export type { NavNode } from "./nav.js";
@@ -122,9 +129,17 @@ export const loadBootstrap = createServerFn({ method: "GET" }).handler(
       userId,
       degraded,
       nav,
+      analytics: loadAnalyticsConfig(),
+      consent: readConsentFromCookie(),
     };
   },
 );
+
+/** The consent choice stored in the cookie, or `"unknown"` — read on the server so SSR agrees. */
+function readConsentFromCookie(): ConsentStatus {
+  const value = getCookies()[CONSENT_COOKIE_NAME];
+  return value === "granted" || value === "denied" ? value : "unknown";
+}
 
 /**
  * Persists the user's language choice.
