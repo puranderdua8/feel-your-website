@@ -2,6 +2,7 @@ import { renderComposition, type RouteRenderContext } from "@feel-your-website/s
 import type { ReactNode } from "react";
 
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { renderActionCta } from "@/components/button-action-form";
 import { renderCtaLink } from "@/components/cta-link";
 import type { RoutePage } from "@/server/bff";
 
@@ -61,6 +62,7 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
       route,
       outlet: rendered,
       renderLink: renderCtaLink,
+      renderActionCta,
       sectionData: page.sectionData,
     });
   }
