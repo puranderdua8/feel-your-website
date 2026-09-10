@@ -1,8 +1,13 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryAnalyticsAdapter } from "./memory-adapter.js";
-import { AnalyticsProvider, useAnalytics, type AnalyticsProviderProps } from "./react.js";
+import {
+  AnalyticsProvider,
+  useAnalytics,
+  usePageview,
+  type AnalyticsProviderProps,
+} from "./react.js";
 
 let clock = 1_000;
 const now = () => clock;
@@ -137,5 +142,52 @@ describe("AnalyticsProvider / useAnalytics", () => {
       window.dispatchEvent(new Event("pagehide"));
     });
     expect(beacon).not.toHaveBeenCalled();
+  });
+});
+
+describe("usePageview", () => {
+  function Harness({ path, adapter }: { path: string | null; adapter: MemoryAnalyticsAdapter }) {
+    return (
+      <AnalyticsProvider adapter={adapter} consentGranted now={now} newId={newId}>
+        <PathEmitter path={path} />
+      </AnalyticsProvider>
+    );
+  }
+  function PathEmitter({ path }: { path: string | null }) {
+    usePageview(path);
+    return null;
+  }
+
+  it("emits a page event on mount for a non-null path, with the referrer", () => {
+    vi.spyOn(document, "referrer", "get").mockReturnValue("https://ref.test/");
+    const adapter = new MemoryAnalyticsAdapter();
+    render(<Harness path="/a" adapter={adapter} />);
+
+    expect(adapter.tracked).toHaveLength(1);
+    expect(adapter.tracked[0]).toMatchObject({
+      type: "page",
+      seq: 1,
+      referrer: "https://ref.test/",
+    });
+  });
+
+  it("emits again on a path change, without the referrer, and dedupes a repeat", () => {
+    vi.spyOn(document, "referrer", "get").mockReturnValue("https://ref.test/");
+    const adapter = new MemoryAnalyticsAdapter();
+    const { rerender } = render(<Harness path="/a" adapter={adapter} />);
+
+    rerender(<Harness path="/a" adapter={adapter} />); // same path — no emit
+    rerender(<Harness path="/b" adapter={adapter} />); // changed — emit
+
+    expect(adapter.tracked.map((e) => [e.type, e.seq, "referrer" in e])).toEqual([
+      ["page", 1, true],
+      ["page", 2, false],
+    ]);
+  });
+
+  it("emits nothing for a null path", () => {
+    const adapter = new MemoryAnalyticsAdapter();
+    render(<Harness path={null} adapter={adapter} />);
+    expect(adapter.tracked).toHaveLength(0);
   });
 });
