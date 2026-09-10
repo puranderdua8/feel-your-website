@@ -7,6 +7,16 @@ import { classifyHref, type LinkSpec, type RenderLink } from "./link.js";
 export type SectionFields = Readonly<Record<string, JsonValue>> | null;
 
 /**
+ * What a section that pulls external data receives for its instance: the
+ * already-parsed payload, or a normalised failure. The BFF aggregates these
+ * (see the query registry); a section renders a fallback for a failure or an
+ * absent entry.
+ */
+export type SectionDataEntry =
+  | { readonly ok: true; readonly data: unknown }
+  | { readonly ok: false; readonly error: { readonly code: string } };
+
+/**
  * Maps a section key to the React component that renders it — the one
  * registry the shell (rendering published routes) and the CMS (previewing
  * them) both use.
@@ -41,6 +51,13 @@ export interface SectionComponentProps {
    * to a plain `<a>`.
    */
   renderLink?: RenderLink;
+  /**
+   * External data for this section instance, aggregated by the BFF. Absent
+   * for a section that declares no data need, in the CMS preview, or while a
+   * non-blocking fetch is still in flight — the section renders a fallback in
+   * those cases and for `{ ok: false }`.
+   */
+  data?: SectionDataEntry;
 }
 
 export type SectionComponent = (props: SectionComponentProps) => React.JSX.Element;
@@ -190,6 +207,7 @@ export function renderSection(
   slots: Readonly<Record<string, React.ReactNode>> = {},
   route?: RouteRenderContext,
   renderLink?: RenderLink,
+  data?: SectionDataEntry,
 ): React.JSX.Element {
   const Component = SECTION_REGISTRY[sectionKey];
   if (!Component) return <Placeholder>No section registered for “{sectionKey}”.</Placeholder>;
@@ -200,5 +218,13 @@ export function renderSection(
   if (!fields && !hasSlotChildren) {
     return <Placeholder>“{sectionKey}” has no content yet.</Placeholder>;
   }
-  return <Component fields={fields ?? {}} slots={slots} route={route} renderLink={renderLink} />;
+  return (
+    <Component
+      fields={fields ?? {}}
+      slots={slots}
+      route={route}
+      renderLink={renderLink}
+      data={data}
+    />
+  );
 }
