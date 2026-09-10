@@ -2,6 +2,7 @@ import { renderComposition, type RouteRenderContext } from "@feel-your-website/s
 import type { ReactNode } from "react";
 
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { renderCtaLink } from "@/components/cta-link";
 import type { RoutePage } from "@/server/bff";
 
 /** Turns a resolved page's (already param-interpolated) SEO into `head()` meta / links. */
@@ -56,7 +57,11 @@ export function RoutePageView({ page }: { page: RoutePage }): React.JSX.Element 
     const layer = page.layers[i]!;
     const isLeaf = i === page.layers.length - 1;
     if (!isLeaf && !layer.hasOutlet) continue;
-    rendered = renderComposition(layer.tree, page.locale, { route, outlet: rendered });
+    rendered = renderComposition(layer.tree, page.locale, {
+      route,
+      outlet: rendered,
+      renderLink: renderCtaLink,
+    });
   }
 
   return (
