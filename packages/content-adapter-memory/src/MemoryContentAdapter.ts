@@ -139,7 +139,8 @@ export class MemoryContentAdapter
   async getRouteByKey(key: string): Promise<RouteBundle | undefined> {
     this.#guard();
     const route = this.#publishedRoutes().find(
-      (candidate) => (candidate.routeKey ?? routeKeyFromPath(this.#absolutePath(candidate))) === key,
+      (candidate) =>
+        (candidate.routeKey ?? routeKeyFromPath(this.#absolutePath(candidate))) === key,
     );
     return route ? this.#toBundle(route) : undefined;
   }
@@ -248,7 +249,12 @@ export class MemoryContentAdapter
     // in-memory mirror of that unique index firing.
     const existing = bundleId ? routes.find((route) => route.id === bundleId) : undefined;
     const routeKey = existing?.routeKey ?? routeKeyFromPath(resolvedPath);
-    if (!existing && routes.some((route) => (route.routeKey ?? routeKeyFromPath(this.#absolutePath(route))) === routeKey)) {
+    if (
+      !existing &&
+      routes.some(
+        (route) => (route.routeKey ?? routeKeyFromPath(this.#absolutePath(route))) === routeKey,
+      )
+    ) {
       throw new RouteCompositionError(
         "invalid",
         "This route's generated key collides with another route's — adjust the path slightly so the keys no longer collide.",
@@ -565,7 +571,10 @@ export class MemoryContentAdapter
  */
 function routeKeyFromPath(path: string): string {
   if (path === "/") return "home";
-  return path.replace(/^\/+|\/+$/g, "").replace(/:/g, "").replace(/\//g, "-");
+  return path
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/:/g, "")
+    .replace(/\//g, "-");
 }
 
 function safeNormalize(pattern: string): string {

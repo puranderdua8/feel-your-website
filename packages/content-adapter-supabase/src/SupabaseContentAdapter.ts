@@ -188,7 +188,9 @@ export class SupabaseContentAdapter implements ContentAdapter {
 
     const { data, error } = await this.#client
       .from("published_route_headers")
-      .select("bundle_id, path, path_segment, parent_bundle_id, param_meta, route_key, offline, title");
+      .select(
+        "bundle_id, path, path_segment, parent_bundle_id, param_meta, route_key, offline, title",
+      );
     if (error) throw mapContentError(error);
 
     return (data ?? []).map((row) => ({

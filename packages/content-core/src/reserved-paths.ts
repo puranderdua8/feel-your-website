@@ -23,7 +23,5 @@ export const RESERVED_ROUTE_PREFIXES = [
 ] as const;
 
 export function isReservedRoutePath(path: string): boolean {
-  return RESERVED_ROUTE_PREFIXES.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-  );
+  return RESERVED_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
