@@ -15,9 +15,7 @@
       "parentKey": "blog",
       "hasOutlet": false,
       "offline": false,
-      "paramNames": [
-        "slug"
-      ]
+      "paramNames": ["slug"]
     },
     {
       "routeKey": "help",

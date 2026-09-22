@@ -1,10 +1,25 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import * as prettier from "prettier";
+
 import { renderGeneratedFile, renderManifest } from "./codegen.js";
 import { CMS_ROUTES_DIR, MANIFEST_PATH, SNAPSHOT_PATH } from "./fs-layout.js";
 import type { GeneratedRouteFile } from "./mapping.js";
 import { parseSnapshot, serializeSnapshot, type RoutesSnapshot } from "./snapshot.js";
+
+/**
+ * Formats generated source through the repo's own Prettier config before it
+ * ever reaches disk, keyed by `filepath` so plugins like
+ * `prettier-plugin-tailwindcss` and per-extension rules (JSON vs. TS) apply
+ * correctly. This is what keeps `pnpm format:check` — which runs over every
+ * committed file, generated or not — from ever drifting against what this
+ * generator writes.
+ */
+async function formatSource(filepath: string, source: string): Promise<string> {
+  const config = await prettier.resolveConfig(filepath);
+  return prettier.format(source, { ...config, filepath });
+}
 
 export function readSnapshotFile(): RoutesSnapshot {
   if (!fs.existsSync(SNAPSHOT_PATH)) {
@@ -15,8 +30,9 @@ export function readSnapshotFile(): RoutesSnapshot {
   return parseSnapshot(fs.readFileSync(SNAPSHOT_PATH, "utf8"));
 }
 
-export function writeSnapshotFile(snapshot: RoutesSnapshot): void {
-  fs.writeFileSync(SNAPSHOT_PATH, serializeSnapshot(snapshot));
+export async function writeSnapshotFile(snapshot: RoutesSnapshot): Promise<void> {
+  const formatted = await formatSource(SNAPSHOT_PATH, serializeSnapshot(snapshot));
+  fs.writeFileSync(SNAPSHOT_PATH, formatted);
 }
 
 /** Every `.tsx` file under `CMS_ROUTES_DIR` today, relative to it, POSIX-separated. */
@@ -58,10 +74,10 @@ export interface WriteResult {
  * removing any previously generated file that `files` no longer produces
  * (a route renamed or deleted since the last generate).
  */
-export function writeGeneratedFiles(
+export async function writeGeneratedFiles(
   files: readonly GeneratedRouteFile[],
   snapshot: RoutesSnapshot,
-): WriteResult {
+): Promise<WriteResult> {
   const desired = new Map(files.map((f) => [f.relativePath, f]));
   const existing = new Set(listExistingGeneratedFiles());
 
@@ -69,7 +85,7 @@ export function writeGeneratedFiles(
   for (const file of files) {
     const full = path.join(CMS_ROUTES_DIR, file.relativePath);
     fs.mkdirSync(path.dirname(full), { recursive: true });
-    fs.writeFileSync(full, renderGeneratedFile(file));
+    fs.writeFileSync(full, await formatSource(full, renderGeneratedFile(file)));
     written.push(file.relativePath);
   }
 
@@ -82,7 +98,7 @@ export function writeGeneratedFiles(
   pruneEmptyDirs(CMS_ROUTES_DIR);
 
   fs.mkdirSync(path.dirname(MANIFEST_PATH), { recursive: true });
-  fs.writeFileSync(MANIFEST_PATH, renderManifest(snapshot));
+  fs.writeFileSync(MANIFEST_PATH, await formatSource(MANIFEST_PATH, renderManifest(snapshot)));
 
   return { written, removed };
 }
@@ -100,29 +116,31 @@ export interface DriftReport {
 }
 
 /** Read-only counterpart to {@link writeGeneratedFiles}, for `routes:generate --check`. */
-export function checkGeneratedFiles(
+export async function checkGeneratedFiles(
   files: readonly GeneratedRouteFile[],
   snapshot: RoutesSnapshot,
-): DriftReport {
-  const desired = new Map(files.map((f) => [f.relativePath, renderGeneratedFile(f)]));
-  const existingPaths = new Set(listExistingGeneratedFiles());
-
+): Promise<DriftReport> {
   const stale: string[] = [];
   const missing: string[] = [];
-  for (const [relativePath, expectedContent] of desired) {
-    const full = path.join(CMS_ROUTES_DIR, relativePath);
+  const desiredPaths = new Set<string>();
+
+  for (const file of files) {
+    desiredPaths.add(file.relativePath);
+    const full = path.join(CMS_ROUTES_DIR, file.relativePath);
     if (!fs.existsSync(full)) {
-      missing.push(relativePath);
+      missing.push(file.relativePath);
       continue;
     }
-    if (fs.readFileSync(full, "utf8") !== expectedContent) stale.push(relativePath);
+    const expected = await formatSource(full, renderGeneratedFile(file));
+    if (fs.readFileSync(full, "utf8") !== expected) stale.push(file.relativePath);
   }
 
-  const extra = [...existingPaths].filter((p) => !desired.has(p));
+  const existingPaths = listExistingGeneratedFiles();
+  const extra = existingPaths.filter((p) => !desiredPaths.has(p));
 
+  const expectedManifest = await formatSource(MANIFEST_PATH, renderManifest(snapshot));
   const manifestStale =
-    !fs.existsSync(MANIFEST_PATH) ||
-    fs.readFileSync(MANIFEST_PATH, "utf8") !== renderManifest(snapshot);
+    !fs.existsSync(MANIFEST_PATH) || fs.readFileSync(MANIFEST_PATH, "utf8") !== expectedManifest;
 
   return {
     clean: stale.length === 0 && missing.length === 0 && extra.length === 0 && !manifestStale,

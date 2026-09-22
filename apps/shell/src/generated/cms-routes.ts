@@ -14,25 +14,25 @@ export interface CmsRouteManifestEntry {
 /** Every route `routes:generate` produced this build, from routes.snapshot.json. */
 export const CMS_ROUTES: readonly CmsRouteManifestEntry[] = [
   {
-    "routeKey": "blog",
-    "path": "/blog",
-    "offline": false
+    routeKey: "blog",
+    path: "/blog",
+    offline: false,
   },
   {
-    "routeKey": "blog-slug",
-    "path": "/blog/:slug",
-    "offline": false
+    routeKey: "blog-slug",
+    path: "/blog/:slug",
+    offline: false,
   },
   {
-    "routeKey": "help",
-    "path": "/help",
-    "offline": false
+    routeKey: "help",
+    path: "/help",
+    offline: false,
   },
   {
-    "routeKey": "releases",
-    "path": "/releases",
-    "offline": false
-  }
+    routeKey: "releases",
+    path: "/releases",
+    offline: false,
+  },
 ];
 
 /** Hash of the snapshot this manifest was generated from — see `snapshot.ts`'s `hashSnapshot`. */

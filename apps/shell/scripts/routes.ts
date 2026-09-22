@@ -48,7 +48,7 @@ async function cmdSync(argv: readonly string[]): Promise<void> {
   const snapshot = await withAdapterEnv(env, () =>
     buildSnapshotFromAdapter(getContentAdapter(), DEFAULT_LOCALE),
   );
-  writeSnapshotFile(snapshot);
+  await writeSnapshotFile(snapshot);
   console.log(`routes.snapshot.json refreshed from "${env}": ${snapshot.routes.length} route(s).`);
 }
 
@@ -65,7 +65,7 @@ async function cmdGenerate(argv: readonly string[]): Promise<void> {
   }
 
   if (check) {
-    const report = checkGeneratedFiles(files, snapshot);
+    const report = await checkGeneratedFiles(files, snapshot);
     if (report.clean) {
       console.log(`routes:generate --check: clean (${files.length} file(s), no drift).`);
       return;
@@ -79,7 +79,7 @@ async function cmdGenerate(argv: readonly string[]): Promise<void> {
     return;
   }
 
-  const result = writeGeneratedFiles(files, snapshot);
+  const result = await writeGeneratedFiles(files, snapshot);
   console.log(
     `routes:generate: wrote ${result.written.length} file(s)${result.removed.length ? `, removed ${result.removed.length} stale file(s)` : ""}.`,
   );
