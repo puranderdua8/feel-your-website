@@ -9,6 +9,8 @@ import type { Locale, RouteBundle } from "./types.js";
  */
 export interface RouteHeader {
   readonly id: string;
+  /** Stable identity — see {@link RouteBundle.routeKey}. */
+  readonly routeKey: string;
   /** This route's own path contribution — see {@link RouteBundle.pathSegment}. */
   readonly pathSegment: string;
   /** The absolute path pattern — see {@link RouteBundle.path}. */
@@ -18,6 +20,8 @@ export interface RouteHeader {
   readonly hasParams: boolean;
   /** The route's SEO title per locale, for the nav/breadcrumb label. */
   readonly title: Readonly<Record<Locale, string | undefined>>;
+  /** See {@link RouteBundle.offline}. */
+  readonly offline: boolean;
 }
 
 /**
@@ -52,6 +56,15 @@ export interface ContentAdapter {
    * same as {@link getRouteManifest}.
    */
   getRouteHeaders(): Promise<readonly RouteHeader[]>;
+
+  /**
+   * A single published route by its stable {@link RouteBundle.routeKey},
+   * rather than by path — for callers that already know which route they
+   * mean (an action invocation, a deferred section-data fetch, offline
+   * precaching) and must not re-derive it from an untrusted request path.
+   * `undefined` when no published route has that key.
+   */
+  getRouteByKey(key: string): Promise<RouteBundle | undefined>;
 
   /**
    * UI chrome messages for a locale, as ICU MessageFormat strings.

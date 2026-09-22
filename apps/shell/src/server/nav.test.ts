@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import { buildNav } from "./nav.js";
 
 const header = (over: Partial<RouteHeader> & Pick<RouteHeader, "id" | "path">): RouteHeader => ({
+  routeKey: over.id,
   pathSegment: over.path,
   parentId: null,
   hasParams: over.path.includes(":"),
   title: {},
+  offline: false,
   ...over,
 });
 

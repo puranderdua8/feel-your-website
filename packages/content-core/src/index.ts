@@ -6,6 +6,7 @@ export * from "./template-keys.js";
 export * from "./section-schema.js";
 export * from "./compose.js";
 export * from "./route-match.js";
+export * from "./reserved-paths.js";
 export * from "./route-composition-writer.js";
 export * from "./site-settings.js";
 export * from "./contract-fixture.js";

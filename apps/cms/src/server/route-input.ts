@@ -7,10 +7,13 @@ import {
   composeAbsolutePattern,
   findParentCycle,
   findPatternCollisions,
+  isReservedRoutePath,
   isRoutePatternError,
   templatePlaceholders,
   validateRoutePattern,
 } from "@feel-your-website/content-core";
+
+export { isReservedRoutePath } from "@feel-your-website/content-core";
 
 /**
  * Pure route-authoring validation, shared by the CMS BFF (the authority — every
@@ -19,17 +22,14 @@ import {
  */
 
 /**
- * Paths this deployment's shell serves from a static file route, and which a
- * CMS route must therefore never claim. Kept in sync with (not read from —
- * the shell and CMS are separately deployed apps) `apps/shell/src/reserved-paths.ts`;
- * `/` is deliberately absent there for the same reason it is absent here — the
- * shell's `index.tsx` hands `/` to the matcher.
+ * A static path segment must be filesystem- and URL-safe in a way that also
+ * fits TanStack's file-routing conventions once the route generator turns it
+ * into a file (`.`, `_`, `(…)`, `$` are all reserved there). Applied only at
+ * creation/edit time here and in `save_route_composition`'s matching check —
+ * `parseRoutePattern` itself stays permissive, so an existing non-ASCII
+ * segment (from before this rule existed) still matches at request time.
  */
-const RESERVED_PATHS = ["/admin"] as const;
-
-export function isReservedRoutePath(path: string): boolean {
-  return (RESERVED_PATHS as readonly string[]).includes(path);
-}
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 export interface RouteInputIssue {
   readonly field: "path" | "parent" | "params" | "seo";
@@ -163,6 +163,18 @@ export function validateRouteInput(args: ValidateRouteInputArgs): RouteInputIssu
 
     const validated = validateRoutePattern(absolutePath);
     const patternParamNames = validated.ok ? validated.pattern.paramNames : [];
+
+    if (validated.ok) {
+      const badSlugs = validated.pattern.segments
+        .filter((s) => s.kind === "static" && !SLUG_RE.test(s.value))
+        .map((s) => s.value);
+      if (badSlugs.length > 0) {
+        issues.push({
+          field: "path",
+          message: `"${badSlugs.join('", "')}" must be lowercase letters, numbers and hyphens only (matching ${SLUG_RE.source}).`,
+        });
+      }
+    }
     const paramNames = params.map((p) => p.name);
     const missingLabels = params.filter((p) => p.label.trim() === "");
     const extra = paramNames.filter((n) => !patternParamNames.includes(n));

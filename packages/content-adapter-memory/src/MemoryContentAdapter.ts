@@ -59,6 +59,10 @@ export interface RouteSeed {
   published?: boolean;
   /** Optional in a seed — a fixture route with no SEO simply omits it. */
   seo?: RouteBundle["seo"];
+  /** See {@link RouteBundle.routeKey}. Derived from `path` when omitted. */
+  routeKey?: string;
+  /** See {@link RouteBundle.offline}. Defaults to `false`. */
+  offline?: boolean;
   version: number;
   updatedAt: string;
 }
@@ -121,13 +125,24 @@ export class MemoryContentAdapter
       }
       return {
         id: bundle.id,
+        routeKey: bundle.routeKey,
         pathSegment: bundle.pathSegment,
         path: bundle.path,
         parentId: bundle.parentId,
         hasParams: bundle.paramNames.length > 0,
         title,
+        offline: bundle.offline,
       };
     });
+  }
+
+  async getRouteByKey(key: string): Promise<RouteBundle | undefined> {
+    this.#guard();
+    const route = this.#publishedRoutes().find(
+      (candidate) =>
+        (candidate.routeKey ?? routeKeyFromPath(this.#absolutePath(candidate))) === key,
+    );
+    return route ? this.#toBundle(route) : undefined;
   }
 
   async listCompositions(): Promise<readonly RouteCompositionSummary[]> {
@@ -142,6 +157,7 @@ export class MemoryContentAdapter
         parentId: bundle.parentId,
         published: route.published ?? true,
         hasOutlet: treeHasOutlet(route.tree),
+        offline: bundle.offline,
         version: route.version,
         updatedAt: route.updatedAt,
       };
@@ -161,6 +177,7 @@ export class MemoryContentAdapter
       parentId: bundle.parentId,
       published: route.published ?? true,
       hasOutlet: treeHasOutlet(route.tree),
+      offline: bundle.offline,
       version: route.version,
       tree: route.tree,
       seo: route.seo ?? {},
@@ -196,6 +213,14 @@ export class MemoryContentAdapter
     const parentId = input.parentId ?? null;
     const pathSegment = input.pathSegment;
     const params = [...(input.params ?? [])];
+    const offline = input.offline ?? false;
+
+    if (offline && params.length > 0) {
+      throw new RouteCompositionError(
+        "invalid",
+        "An offline route cannot take path params — it must be reachable with no author-supplied data.",
+      );
+    }
 
     // Parent + cycle checks. These mirror the invariants the Supabase RPC
     // enforces transactionally, so the shared contract stays meaningful.
@@ -217,6 +242,24 @@ export class MemoryContentAdapter
     }
 
     const resolvedPath = this.#composePath(parentId, pathSegment);
+
+    // route_key is set once, at creation, and never recomputed on update — the
+    // in-memory mirror of `route_bundles_route_key_key` + save_route_composition
+    // only ever inserting it. A fresh key colliding with another route's is the
+    // in-memory mirror of that unique index firing.
+    const existing = bundleId ? routes.find((route) => route.id === bundleId) : undefined;
+    const routeKey = existing?.routeKey ?? routeKeyFromPath(resolvedPath);
+    if (
+      !existing &&
+      routes.some(
+        (route) => (route.routeKey ?? routeKeyFromPath(this.#absolutePath(route))) === routeKey,
+      )
+    ) {
+      throw new RouteCompositionError(
+        "invalid",
+        "This route's generated key collides with another route's — adjust the path slightly so the keys no longer collide.",
+      );
+    }
 
     // Structural-collision guard — the in-memory mirror of the DB's
     // `unique (normalized_path)`. A rename or reparent doesn't only move this
@@ -323,6 +366,8 @@ export class MemoryContentAdapter
       published: input.published,
       tree: input.tree,
       seo: input.seo,
+      routeKey,
+      offline,
       version: (base.version ?? 0) + 1,
       updatedAt: now,
     });
@@ -502,6 +547,7 @@ export class MemoryContentAdapter
     const path = this.#absolutePath(seed);
     return {
       id: seed.id,
+      routeKey: seed.routeKey ?? routeKeyFromPath(path),
       path,
       pathSegment: seed.pathSegment ?? seed.path ?? path,
       parentId: seed.parentId ?? null,
@@ -509,10 +555,26 @@ export class MemoryContentAdapter
       paramMeta: paramMetaToRecord((seed.params ?? []).map((param) => ({ ...param }))),
       tree: seed.tree,
       seo: seed.seo ?? {},
+      offline: seed.offline ?? false,
       version: seed.version,
       updatedAt: seed.updatedAt,
     };
   }
+}
+
+/**
+ * TypeScript mirror of the SQL `route_key_from_path` function
+ * (`supabase/migrations/20260922000100_route_offline_and_key.sql`): strips
+ * leading/trailing slashes and `:` markers, folds remaining `/` to `-`. Used
+ * only as a fallback when a seed omits `routeKey` — a real write always
+ * stores one explicitly (see `saveComposition`).
+ */
+function routeKeyFromPath(path: string): string {
+  if (path === "/") return "home";
+  return path
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/:/g, "")
+    .replace(/\//g, "-");
 }
 
 function safeNormalize(pattern: string): string {

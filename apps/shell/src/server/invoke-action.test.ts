@@ -10,12 +10,14 @@ import { describe, expect, it } from "vitest";
 import { resolveAndInvokeAction, type InvokeActionDeps } from "./invoke-action.js";
 
 const bundle = (over: Partial<RouteBundle> & Pick<RouteBundle, "id" | "path">): RouteBundle => ({
+  routeKey: over.id,
   pathSegment: over.path,
   parentId: null,
   paramNames: [],
   paramMeta: {},
   tree: [],
   seo: {},
+  offline: false,
   version: 1,
   updatedAt: "2026-01-01T00:00:00.000Z",
   ...over,

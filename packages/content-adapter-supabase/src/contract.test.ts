@@ -72,6 +72,9 @@ if (hasLocalSupabase) {
         path_segment: "/contract-test",
         normalized_path: "/contract-test",
         published: true,
+        // Inserted directly rather than through the RPC (see below), so
+        // route_key — not null, no default — needs an explicit value too.
+        route_key: "contract-test",
       });
       if (routeBundleError) throw routeBundleError;
 
@@ -143,6 +146,7 @@ if (hasLocalSupabase) {
         normalized_path: "/contract-test/:param",
         param_meta: [{ name: "slug", label: "Slug" }],
         published: true,
+        route_key: "contract-test-slug",
       });
       if (childRouteError) throw childRouteError;
 
