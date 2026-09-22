@@ -40,6 +40,11 @@ export interface RouteCompositionInput {
   readonly tree: readonly RouteSectionNode[];
   /** SEO metadata per locale, replaced wholesale with the tree. `{}` for none. */
   readonly seo: Readonly<Record<Locale, RouteSeo>>;
+  /**
+   * See {@link RouteBundle.offline}. Defaults to `false`; a writer must reject
+   * `true` when {@link params} is non-empty.
+   */
+  readonly offline?: boolean;
 }
 
 export interface RouteCompositionWriter {
@@ -104,6 +109,8 @@ export interface RouteCompositionSummary {
    * `route_bundles.has_outlet`.
    */
   readonly hasOutlet: boolean;
+  /** See {@link RouteBundle.offline}. */
+  readonly offline: boolean;
   readonly version: number;
   readonly updatedAt: string;
 }

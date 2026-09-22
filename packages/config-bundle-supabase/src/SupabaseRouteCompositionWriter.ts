@@ -70,6 +70,7 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       p_seo: input.seo,
       p_parent_id: input.parentId ?? null,
       p_params: input.params ?? [],
+      p_offline: input.offline ?? false,
     });
     if (error) throw mapRouteCompositionError(error, expectedVersion);
 
@@ -82,7 +83,7 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
     // this `manage:routes` session read its own just-written (possibly draft) row.
     const { data: persisted, error: readError } = await this.#client
       .from("route_bundles")
-      .select("path, path_segment, parent_bundle_id, param_meta")
+      .select("path, path_segment, parent_bundle_id, param_meta, route_key, offline")
       .eq("bundle_id", row.id)
       .single();
     if (readError) throw mapRouteCompositionError(readError, expectedVersion);
@@ -92,10 +93,13 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       path_segment: string;
       parent_bundle_id: string | null;
       param_meta: unknown;
+      route_key: string;
+      offline: boolean;
     };
 
     return {
       id: row.id,
+      routeKey: meta.route_key,
       path: meta.path,
       // The RPC returns only the bundle header, but tree (with per-instance
       // content) and SEO are exactly what was just written.
@@ -105,6 +109,7 @@ export class SupabaseRouteCompositionWriter implements RouteCompositionWriter {
       parentId: meta.parent_bundle_id,
       paramNames: safeParamNames(meta.path),
       paramMeta: paramMetaToRecord(meta.param_meta),
+      offline: meta.offline,
       version: row.version,
       updatedAt: row.updated_at,
     };

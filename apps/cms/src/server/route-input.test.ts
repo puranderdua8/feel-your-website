@@ -16,6 +16,7 @@ const summary = (
   parentId: null,
   published: true,
   hasOutlet: false,
+  offline: false,
   version: 1,
   updatedAt: "2026-01-01T00:00:00.000Z",
   ...over,
@@ -92,6 +93,29 @@ describe("validateRouteInput", () => {
       params: [{ name: "other", label: "Other" }],
     });
     expect(issues.some((i) => i.field === "params")).toBe(true);
+  });
+
+  it("rejects a static segment that violates the slug rule", () => {
+    const issues = validateRouteInput({ ...blank, pathSegment: "/Blog_Post" });
+    expect(issues.some((i) => i.field === "path" && i.message.includes("lowercase"))).toBe(true);
+  });
+
+  it("rejects a non-ASCII static segment even though parseRoutePattern itself would accept it", () => {
+    // The slug rule is creation-time only (here), not baked into
+    // parseRoutePattern — an existing café-style route (from before this
+    // rule existed) keeps matching at request time, but authoring a new one
+    // is refused here.
+    const issues = validateRouteInput({ ...blank, pathSegment: "/caf%C3%A9" });
+    expect(issues.some((i) => i.field === "path" && i.message.includes("lowercase"))).toBe(true);
+  });
+
+  it("accepts a param segment (`:name`) without applying the slug rule to it", () => {
+    const issues = validateRouteInput({
+      ...blank,
+      pathSegment: "/blog/:slug",
+      params: [{ name: "slug", label: "Slug" }],
+    });
+    expect(issues).toEqual([]);
   });
 
   it("rejects a reserved path", () => {

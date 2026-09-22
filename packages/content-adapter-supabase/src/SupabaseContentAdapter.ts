@@ -20,7 +20,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { mapContentError } from "./mapContentError.js";
 import { type RouteSeoRow, rowToRouteSeo } from "./routeSeo.js";
 
-/** One `published_route_sections` row; the last two are absent on a pre-migration DB. */
+/** One `published_route_sections` row; the last four are absent on a pre-migration DB. */
 interface SectionRow {
   bundle_id: string;
   path: string;
@@ -34,6 +34,8 @@ interface SectionRow {
   content: unknown;
   parent_bundle_id?: string | null;
   param_meta?: unknown;
+  route_key?: string;
+  offline?: boolean;
 }
 
 export interface SupabaseContentAdapterOptions {
@@ -109,6 +111,8 @@ export class SupabaseContentAdapter implements ContentAdapter {
       string,
       {
         path: string;
+        routeKey: string;
+        offline: boolean;
         parentId: string | null;
         paramMeta: Readonly<Record<string, RouteParamMeta>>;
         version: number;
@@ -122,6 +126,11 @@ export class SupabaseContentAdapter implements ContentAdapter {
       if (!entry) {
         entry = {
           path: row.path,
+          // Falls back to bundle_id on a pre-20260922 DB — a real route_key
+          // is unavailable until that migration runs, same tolerance as
+          // parent_bundle_id/param_meta below.
+          routeKey: row.route_key ?? row.bundle_id,
+          offline: row.offline ?? false,
           parentId: row.parent_bundle_id ?? null,
           paramMeta: paramMetaToRecord(row.param_meta),
           version: row.version,
@@ -146,6 +155,7 @@ export class SupabaseContentAdapter implements ContentAdapter {
 
     return [...byBundle.entries()].map(([id, entry]) => ({
       id,
+      routeKey: entry.routeKey,
       path: entry.path,
       // Derived from the parent's absolute pattern; a route with no parent
       // contributes its whole path.
@@ -155,9 +165,22 @@ export class SupabaseContentAdapter implements ContentAdapter {
       paramMeta: entry.paramMeta,
       tree: assembleSectionTree(entry.rows),
       seo: seoByBundle.get(id) ?? {},
+      offline: entry.offline,
       version: entry.version,
       updatedAt: entry.updatedAt,
     }));
+  }
+
+  /**
+   * A single published route by `route_key`. Reuses {@link getRouteManifest}'s
+   * query rather than a narrower `.eq("route_key", key)` read, because the
+   * shared assembly path (join sections, fold SEO, build the tree) is exactly
+   * what a caller needing a full {@link RouteBundle} wants — this is not a
+   * hot path, so the extra rows are not worth a second code path to avoid.
+   */
+  async getRouteByKey(key: string): Promise<RouteBundle | undefined> {
+    const manifest = await this.getRouteManifest("en");
+    return manifest.find((bundle) => bundle.routeKey === key);
   }
 
   async getRouteHeaders(): Promise<readonly RouteHeader[]> {
@@ -165,16 +188,18 @@ export class SupabaseContentAdapter implements ContentAdapter {
 
     const { data, error } = await this.#client
       .from("published_route_headers")
-      .select("bundle_id, path, path_segment, parent_bundle_id, param_meta, title");
+      .select("bundle_id, path, path_segment, parent_bundle_id, param_meta, route_key, offline, title");
     if (error) throw mapContentError(error);
 
     return (data ?? []).map((row) => ({
       id: row.bundle_id as string,
+      routeKey: (row.route_key as string | undefined) ?? (row.bundle_id as string),
       pathSegment: row.path_segment as string,
       path: row.path as string,
       parentId: (row.parent_bundle_id as string | null | undefined) ?? null,
       hasParams: (row.path as string).includes(":"),
       title: (row.title as Record<string, string | undefined> | null) ?? {},
+      offline: (row.offline as boolean | undefined) ?? false,
     }));
   }
 
@@ -206,7 +231,7 @@ export class SupabaseContentAdapter implements ContentAdapter {
 
     const full = await this.#client
       .from("published_route_sections")
-      .select(`${base}, parent_bundle_id, param_meta`);
+      .select(`${base}, parent_bundle_id, param_meta, route_key, offline`);
     if (!full.error || full.error.code !== "42703") return full;
 
     if (!this.#warnedNoHierarchy) {

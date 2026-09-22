@@ -111,6 +111,14 @@ export interface RouteSeo {
 export interface RouteBundle {
   id: string;
   /**
+   * Stable, human-readable identity for this route, independent of {@link id}
+   * (an environment-specific bundle UUID). Seeded once from `path` at
+   * creation and immutable thereafter — generated route files and
+   * cross-environment lookups (`ContentAdapter.getRouteByKey`) key off this,
+   * never {@link id}.
+   */
+  routeKey: string;
+  /**
    * The absolute path **pattern** this bundle renders at, e.g. `/help` or
    * `/blog/:slug`. Derived from {@link pathSegment} and the parent chain — see
    * `route-match.ts`'s `composeAbsolutePattern`. Matched against a request
@@ -142,6 +150,12 @@ export interface RouteBundle {
    * none; a locale absent here has no metadata (no fallback to another).
    */
   seo: Readonly<Record<Locale, RouteSeo>>;
+  /**
+   * Whether this route is precached by the service worker for offline
+   * navigation. Only ever `true` when {@link paramNames} is empty — enforced
+   * by `route_bundles_offline_no_params` in the database.
+   */
+  offline: boolean;
   version: number;
   updatedAt: string;
 }

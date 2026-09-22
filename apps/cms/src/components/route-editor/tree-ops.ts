@@ -1,5 +1,5 @@
 import type { JsonValue, Locale, RouteSectionNode } from "@feel-your-website/content-core";
-import { OUTLET_SECTION_KEY, treeHasOutlet } from "@feel-your-website/content-core";
+import { flattenNodes, OUTLET_SECTION_KEY, treeHasOutlet } from "@feel-your-website/content-core";
 
 /**
  * Immutable edits on a `RouteSectionNode[]` keyed by `instanceId`. The route
@@ -85,6 +85,30 @@ export function addSlotChild(
 
 /** Whether `tree` already carries an `outlet` node anywhere. At most one is allowed. */
 export { treeHasOutlet as hasOutlet };
+
+/**
+ * Whether the tree carries a `button` bound to a registered action —
+ * `mode: "action"` with a non-empty `actionId`, the same predicate
+ * `ButtonSection` in `section-registry`'s `registry.tsx` uses to decide
+ * whether to actually invoke `renderActionCta` (rather than fall back to a
+ * disabled CTA). An action means a server round trip (`invokeAction`), which
+ * cannot work offline — the CMS-app-level mirror of
+ * `route_bundles_offline_no_params` in SQL: content-core has no notion of a
+ * `button` section's field conventions, only this app's section schema does,
+ * so this lives here rather than there. Deliberately catalog-free (no lookup
+ * against `actionCatalog`) so it stays safe to import from client code —
+ * `route-buttons.ts`'s catalog-aware checks are server-only.
+ */
+export function treeHasAction(tree: readonly RouteSectionNode[]): boolean {
+  for (const node of flattenNodes(tree)) {
+    if (node.sectionKey !== "button") continue;
+    for (const fields of Object.values(node.content)) {
+      const actionId = typeof fields.actionId === "string" ? fields.actionId.trim() : "";
+      if (fields.mode === "action" && actionId !== "") return true;
+    }
+  }
+  return false;
+}
 
 /** A fresh `outlet` marker node — where this route's matched child renders. */
 export function newOutletNode(): RouteSectionNode {

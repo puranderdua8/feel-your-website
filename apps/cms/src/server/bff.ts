@@ -26,6 +26,8 @@ import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import { sectionCatalog } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 
+import { treeHasAction } from "@/components/route-editor/tree-ops.js";
+
 import {
   getAuthProvider,
   getConfigBundleStore,
@@ -346,6 +348,7 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
       published: boolean;
       tree: RouteSectionNode[];
       seo: Record<string, RouteSeo>;
+      offline: boolean;
       expectedVersion: number | null;
       actor: string;
     } => {
@@ -358,6 +361,7 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
         published,
         tree,
         seo,
+        offline,
         expectedVersion,
         actor,
       } = (input ?? {}) as Record<string, unknown>;
@@ -374,6 +378,7 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
         published: Boolean(published),
         tree: parseTree(tree),
         seo: parseSeo(seo),
+        offline: Boolean(offline),
         expectedVersion: typeof expectedVersion === "number" ? expectedVersion : null,
         actor: typeof actor === "string" ? actor : "unknown",
       };
@@ -427,6 +432,12 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
     if (issues.length > 0) {
       throw new Error(issues.map((issue) => issue.message).join(" "));
     }
+    if (data.offline && data.params.length > 0) {
+      throw new Error("An offline route cannot take path params.");
+    }
+    if (data.offline && treeHasAction(data.tree)) {
+      throw new Error("An offline route cannot contain a button bound to an action.");
+    }
 
     // `validateRouteInput` above already confirmed the segment composes
     // cleanly against the parent; the adapter derives the absolute path.
@@ -440,6 +451,7 @@ export const saveRouteComposition = createServerFn({ method: "POST" })
         published: data.published,
         tree: data.tree,
         seo: data.seo,
+        offline: data.offline,
       },
       data.expectedVersion,
       data.actor,

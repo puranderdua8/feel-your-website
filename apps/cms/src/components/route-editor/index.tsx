@@ -54,7 +54,7 @@ import { PublishBar } from "./publish-bar.js";
 import { SectionFieldForm } from "./section-field-form.js";
 import { SectionTree } from "./section-tree.js";
 import { SeoPanel } from "./seo-panel.js";
-import { findNode, newOutletNode, setNodeContent } from "./tree-ops.js";
+import { findNode, newOutletNode, setNodeContent, treeHasAction } from "./tree-ops.js";
 
 /**
  * The Routes surface: a hierarchy on the left, and on the right a route's
@@ -85,6 +85,7 @@ type OpenRoute = {
   published: boolean;
   tree: readonly RouteSectionNode[];
   seo: Readonly<Record<string, RouteSeo>>;
+  offline: boolean;
 };
 
 const BLANK: OpenRoute = {
@@ -97,6 +98,7 @@ const BLANK: OpenRoute = {
   published: false,
   tree: [],
   seo: {},
+  offline: false,
 };
 
 function RouteEditorInner({ actor }: { actor: string }) {
@@ -133,6 +135,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
       published: composition.published,
       tree: composition.tree,
       seo: composition.seo,
+      offline: composition.offline,
     });
   }, []);
 
@@ -157,6 +160,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
           published,
           tree: open.tree,
           seo: open.seo,
+          offline: open.offline,
           expectedVersion: open.version ?? undefined,
           actor,
         },
@@ -214,6 +218,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
   /** `null` when this route is top-level; otherwise whether its parent is a layout. */
   const parentHasOutlet = open?.parentId ? (parent?.hasOutlet ?? false) : null;
   const treeHasOutletNow = open ? treeHasOutlet(open.tree) : false;
+  const treeHasActionNow = open ? treeHasAction(open.tree) : false;
   const composedPath = open
     ? composeCandidatePath({
         parentId: open.parentId,
@@ -346,7 +351,9 @@ function RouteEditorInner({ actor }: { actor: string }) {
               <ParamEditor
                 paramNames={paramNames}
                 params={open.params}
-                onChange={(params) => setOpen({ ...open, params })}
+                onChange={(params) =>
+                  setOpen({ ...open, params, offline: params.length > 0 ? false : open.offline })
+                }
               />
 
               <div className="flex items-center gap-2">
@@ -397,6 +404,28 @@ function RouteEditorInner({ actor }: { actor: string }) {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="route-offline"
+                  checked={open.offline}
+                  disabled={paramNames.length > 0 || treeHasActionNow}
+                  onCheckedChange={(checked) => setOpen({ ...open, offline: checked })}
+                />
+                <Label htmlFor="route-offline">
+                  Available offline
+                  {paramNames.length > 0 && (
+                    <span className="text-muted-foreground ml-1 font-normal">
+                      (routes with parameters can&rsquo;t be precached)
+                    </span>
+                  )}
+                  {paramNames.length === 0 && treeHasActionNow && (
+                    <span className="text-muted-foreground ml-1 font-normal">
+                      (a button bound to an action can&rsquo;t be precached)
+                    </span>
+                  )}
+                </Label>
               </div>
               {error && (
                 <p role="alert" className="text-destructive text-sm">

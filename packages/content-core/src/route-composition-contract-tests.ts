@@ -169,6 +169,101 @@ export function runRouteCompositionWriterContract(
       expect(flattenTree(updated.tree)).toEqual(["card", "icon"]);
     });
 
+    it("stores routeKey once and keeps it stable across updates", async () => {
+      const writer = await createWriter();
+      const created = await writer.saveComposition(
+        null,
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+      expect(created.routeKey.length).toBeGreaterThan(0);
+
+      const updated = await writer.saveComposition(
+        created.id,
+        { name: f.name, pathSegment: f.path, published: true, tree: cardTree(), seo: {} },
+        created.version,
+        "user-1",
+      );
+      expect(updated.routeKey).toBe(created.routeKey);
+    });
+
+    it("round-trips the offline flag and rejects it alongside params", async () => {
+      const writer = await createWriter();
+      const offlineRoute = await writer.saveComposition(
+        null,
+        {
+          name: f.name,
+          pathSegment: f.path,
+          published: false,
+          tree: heroTree(),
+          seo: {},
+          offline: true,
+        },
+        null,
+        "user-1",
+      );
+      expect(offlineRoute.offline).toBe(true);
+
+      try {
+        await writer.saveComposition(
+          null,
+          {
+            name: f.childName,
+            pathSegment: "/contract-offline-params/:slug",
+            params: [f.param],
+            published: false,
+            tree: heroTree(),
+            seo: {},
+            offline: true,
+          },
+          null,
+          "user-1",
+        );
+        expect.unreachable("offline with params should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
+
+    hierarchyIt("rejects a routeKey that collides with another route's", async () => {
+      const writer = await createWriter();
+      // `/contract-parent/dup` and `/contract-parent-dup` both fold to the
+      // same routeKey once `/` -> `-`, so the second write must be refused.
+      const parent = await savePublishedParent(writer);
+      await writer.saveComposition(
+        null,
+        {
+          name: f.childName,
+          pathSegment: "dup",
+          parentId: parent.id,
+          published: true,
+          tree: heroTree(),
+          seo: {},
+        },
+        null,
+        "user-1",
+      );
+
+      try {
+        await writer.saveComposition(
+          null,
+          {
+            name: "Contract Duplicate Key",
+            pathSegment: "/contract-parent-dup",
+            published: false,
+            tree: heroTree(),
+            seo: {},
+          },
+          null,
+          "user-1",
+        );
+        expect.unreachable("a routeKey collision should have thrown");
+      } catch (error) {
+        expect(isRouteCompositionError(error) && error.code === "invalid").toBe(true);
+      }
+    });
+
     it("rejects a write against a stale version", async () => {
       const writer = await createWriter();
       const created = await writer.saveComposition(

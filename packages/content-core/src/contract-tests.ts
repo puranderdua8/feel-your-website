@@ -91,7 +91,20 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
             expect(bundle.path).toContain(":");
             expect([...parseRoutePattern(bundle.path).paramNames]).toEqual([...bundle.paramNames]);
           }
+
+          // Stable identity + the offline flag.
+          expect(typeof bundle.routeKey).toBe("string");
+          expect(bundle.routeKey.length).toBeGreaterThan(0);
+          expect(typeof bundle.offline).toBe("boolean");
+          if (bundle.offline) {
+            expect(bundle.paramNames.length).toBe(0);
+          }
         }
+
+        expect(
+          new Set(manifest.map((b) => b.routeKey)).size,
+          "routeKey must be unique across the manifest",
+        ).toBe(manifest.length);
       });
 
       (supportsHierarchy ? it : it.skip)(
@@ -164,6 +177,16 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
           expect(header.hasParams).toBe(header.path.includes(":"));
           expect(header.title).toBeTypeOf("object");
           expect(header.title).not.toBeNull();
+          expect(typeof header.routeKey).toBe("string");
+          expect(header.routeKey.length).toBeGreaterThan(0);
+          expect(typeof header.offline).toBe("boolean");
+        }
+
+        // Same routeKey per id as the manifest — headers are a lighter
+        // projection of the same rows, not a separate source of identity.
+        const routeKeyById = new Map(manifest.map((b) => [b.id, b.routeKey]));
+        for (const header of headers) {
+          expect(header.routeKey).toBe(routeKeyById.get(header.id));
         }
       });
 
@@ -175,6 +198,24 @@ export function runContentAdapterContract(options: ContentAdapterContractOptions
         const child = headers.find((h) => h.parentId !== null);
         expect(child, "the seed should include a nested route").toBeDefined();
         expect(ids.has(child!.parentId!)).toBe(true);
+      });
+    });
+
+    describe("getRouteByKey", () => {
+      it("returns the published route with that key", async () => {
+        const adapter = await createAdapter();
+        const manifest = await adapter.getRouteManifest(f.defaultLocale);
+        const target = manifest[0];
+        expect(target, "the seed should include at least one published route").toBeDefined();
+
+        const found = await adapter.getRouteByKey(target!.routeKey);
+        expect(found?.id).toBe(target!.id);
+        expect(found?.path).toBe(target!.path);
+      });
+
+      it("returns undefined for a key no published route has", async () => {
+        const adapter = await createAdapter();
+        await expect(adapter.getRouteByKey("no-such-route-key")).resolves.toBeUndefined();
       });
     });
 
