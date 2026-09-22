@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && node scripts/generate-sw.mjs",
+    "build": "pnpm run routes:generate && vite build && node scripts/generate-sw.mjs",
     "start": "vite start",
     "start:node": "node server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "clean": "rm -rf .output .netlify dist .turbo"
+    "clean": "rm -rf .output .netlify dist .turbo",
+    "routes:sync": "tsx --env-file=.env scripts/routes.ts sync",
+    "routes:generate": "tsx scripts/routes.ts generate",
+    "routes:check": "tsx --env-file=.env scripts/routes.ts check"
   },
   "dependencies": {
     "@feel-your-website/action-core": "workspace:*",
@@ -51,7 +54,9 @@
     "@vitejs/plugin-react": "catalog:",
     "eslint": "catalog:",
     "jsdom": "catalog:",
+    "prettier": "^3.9.6",
     "tailwindcss": "catalog:",
+    "tsx": "^4.23.15",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",

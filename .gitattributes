@@ -1,0 +1,6 @@
+# Committed, build-generated files: real source (a fresh clone typechecks and
+# builds without a CMS reachable) but not hand-authored, so PR diffs collapse
+# them by default. See apps/shell/scripts/routes.ts.
+apps/shell/src/routes/(cms)/** linguist-generated
+apps/shell/src/routeTree.gen.ts linguist-generated
+apps/shell/src/generated/cms-routes.ts linguist-generated

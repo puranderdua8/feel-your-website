@@ -6,6 +6,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@feel-your-website/ui";
+import { Fragment } from "react";
 
 import type { RouteChainEntry } from "@/server/bff";
 
@@ -24,18 +25,18 @@ export function Breadcrumbs({ chain }: { chain: readonly RouteChainEntry[] }) {
         {chain.map((entry, i) => {
           const isCurrent = i === chain.length - 1;
           return (
-            <BreadcrumbItem key={entry.id}>
-              {isCurrent ? (
-                <BreadcrumbPage>{entry.title}</BreadcrumbPage>
-              ) : (
-                <>
+            <Fragment key={entry.id}>
+              <BreadcrumbItem>
+                {isCurrent ? (
+                  <BreadcrumbPage>{entry.title}</BreadcrumbPage>
+                ) : (
                   <BreadcrumbLink asChild>
                     <a href={entry.href}>{entry.title}</a>
                   </BreadcrumbLink>
-                  <BreadcrumbSeparator />
-                </>
-              )}
-            </BreadcrumbItem>
+                )}
+              </BreadcrumbItem>
+              {!isCurrent && <BreadcrumbSeparator />}
+            </Fragment>
           );
         })}
       </BreadcrumbList>

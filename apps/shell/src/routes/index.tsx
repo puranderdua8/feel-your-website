@@ -14,8 +14,8 @@ import { Route as RootRoute } from "./__root";
 /**
  * The home page delegates to the route matcher: if a CMS route is published at
  * `/`, it renders that; otherwise it falls back to the built-in showcase below.
- * `/` is not a reserved path (see `reserved-paths.ts`) precisely so it can be
- * authored.
+ * `/` is deliberately absent from content-core's `RESERVED_ROUTE_PREFIXES`
+ * precisely so it can be authored.
  */
 export const Route = createFileRoute("/")({
   loader: async (): Promise<RoutePage | null> => loadRoutePage({ data: { path: "/" } }),

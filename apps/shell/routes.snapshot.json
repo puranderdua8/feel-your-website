@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "routeKey": "blog",
+      "path": "/blog",
+      "parentKey": null,
+      "hasOutlet": true,
+      "offline": false,
+      "paramNames": []
+    },
+    {
+      "routeKey": "blog-slug",
+      "path": "/blog/:slug",
+      "parentKey": "blog",
+      "hasOutlet": false,
+      "offline": false,
+      "paramNames": ["slug"]
+    },
+    {
+      "routeKey": "help",
+      "path": "/help",
+      "parentKey": null,
+      "hasOutlet": false,
+      "offline": false,
+      "paramNames": []
+    },
+    {
+      "routeKey": "releases",
+      "path": "/releases",
+      "parentKey": null,
+      "hasOutlet": false,
+      "offline": false,
+      "paramNames": []
+    }
+  ]
+}
