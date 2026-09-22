@@ -16,6 +16,20 @@ function lastSegment(path: string): string {
 }
 
 /**
+ * `headers` restricted to routes the current build actually generated a file
+ * for. A route freshly published in the CMS has no file until the next
+ * `routes:sync` + deploy — linking to it from nav before then would 404 (plan
+ * finding 6). `knownRouteKeys` is the current build's `CMS_ROUTES` manifest
+ * (`src/generated/cms-routes.ts`), mapped to just its `routeKey`s.
+ */
+export function knownRouteHeaders(
+  headers: readonly RouteHeader[],
+  knownRouteKeys: ReadonlySet<string>,
+): RouteHeader[] {
+  return headers.filter((header) => knownRouteKeys.has(header.routeKey));
+}
+
+/**
  * Builds the site-nav forest from the published route headers.
  *
  * A route whose path carries a `:name` segment has no single URL, so it — and

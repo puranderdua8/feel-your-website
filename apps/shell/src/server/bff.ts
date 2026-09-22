@@ -8,6 +8,7 @@ import type { SectionDataEntry } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookies } from "@tanstack/react-start/server";
 
+import { CMS_ROUTES } from "@/generated/cms-routes.js";
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
 import {
@@ -20,7 +21,7 @@ import { parseAnalyticsBatch } from "./analytics-ingest.js";
 import { loadAnalyticsConfig, type AnalyticsConfig } from "./config/analytics.js";
 import { assertSameOrigin } from "./http-guards.js";
 import { resolveAndInvokeAction, type InvokeActionInput } from "./invoke-action.js";
-import { buildNav, type NavNode } from "./nav.js";
+import { buildNav, knownRouteHeaders, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 import { deferredSectionIds, loadRouteSectionData } from "./route-page-data.js";
 
@@ -119,7 +120,8 @@ export const loadBootstrap = createServerFn({ method: "GET" }).handler(
         adapter.getRouteHeaders(),
       ]);
       messages = { ...messages, ...fromCms };
-      nav = buildNav(headers, locale);
+      const knownRouteKeys = new Set(CMS_ROUTES.map((route) => route.routeKey));
+      nav = buildNav(knownRouteHeaders(headers, knownRouteKeys), locale);
     } catch (error) {
       // A CMS outage must degrade to the bootstrap set and an empty nav, not to
       // a blank page. This is the whole reason that set exists.

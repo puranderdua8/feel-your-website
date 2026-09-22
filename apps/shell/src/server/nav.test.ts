@@ -1,7 +1,7 @@
 import type { RouteHeader } from "@feel-your-website/content-core";
 import { describe, expect, it } from "vitest";
 
-import { buildNav } from "./nav.js";
+import { buildNav, knownRouteHeaders } from "./nav.js";
 
 const header = (over: Partial<RouteHeader> & Pick<RouteHeader, "id" | "path">): RouteHeader => ({
   routeKey: over.id,
@@ -69,5 +69,29 @@ describe("buildNav", () => {
 
   it("returns [] for no headers", () => {
     expect(buildNav([], "en")).toEqual([]);
+  });
+});
+
+describe("knownRouteHeaders", () => {
+  it("keeps only headers whose routeKey is in the known set", () => {
+    const headers = [
+      header({ id: "blog", path: "/blog" }),
+      header({ id: "new-route", path: "/new-route" }),
+    ];
+    const kept = knownRouteHeaders(headers, new Set(["blog"]));
+    expect(kept.map((h) => h.routeKey)).toEqual(["blog"]);
+  });
+
+  it("returns [] when nothing is known yet", () => {
+    expect(knownRouteHeaders([header({ id: "blog", path: "/blog" })], new Set())).toEqual([]);
+  });
+
+  it("feeding the result into buildNav drops a not-yet-generated route from nav", () => {
+    const headers = [
+      header({ id: "blog", path: "/blog", title: { en: "Blog" } }),
+      header({ id: "pending", path: "/pending", title: { en: "Pending" } }),
+    ];
+    const nav = buildNav(knownRouteHeaders(headers, new Set(["blog"])), "en");
+    expect(nav.map((n) => n.path)).toEqual(["/blog"]);
   });
 });
