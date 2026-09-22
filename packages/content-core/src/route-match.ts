@@ -20,6 +20,25 @@ import type { RouteParamMeta, RouteSeo } from "./types.js";
 /** A single `:name` in a pattern must look like a safe identifier. */
 const PARAM_NAME_RE = /^[a-z][a-zA-Z0-9_]*$/;
 
+/**
+ * A static path segment must be filesystem- and URL-safe in a way that also
+ * fits TanStack's file-routing conventions once `routes:generate` turns it
+ * into a file (`.`, `_`, `(…)`, `$` are all reserved there). Enforced only at
+ * creation/edit time — `parseRoutePattern` itself stays permissive, so an
+ * existing non-ASCII segment (from before this rule existed) still matches at
+ * request time — by `apps/cms/src/server/route-input.ts`'s `validateRouteInput`,
+ * the `route_path_segments_ok` SQL mirror, and defensively re-checked by the
+ * generator against the committed snapshot before it reaches generated source.
+ */
+export const SLUG_SEGMENT_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+/** The static segments of `pattern` that fail {@link SLUG_SEGMENT_RE}, in order. */
+export function findInvalidSlugSegments(pattern: RoutePattern): readonly string[] {
+  return pattern.segments
+    .filter((s) => s.kind === "static" && !SLUG_SEGMENT_RE.test(s.value))
+    .map((s) => s.value);
+}
+
 /** `{{ name }}` — the SEO-template placeholder. Whitespace-tolerant. */
 const PLACEHOLDER_RE = /\{\{\s*([a-z][a-zA-Z0-9_]*)\s*\}\}/g;
 

@@ -5,10 +5,12 @@ import type {
 } from "@feel-your-website/content-core";
 import {
   composeAbsolutePattern,
+  findInvalidSlugSegments,
   findParentCycle,
   findPatternCollisions,
   isReservedRoutePath,
   isRoutePatternError,
+  SLUG_SEGMENT_RE,
   templatePlaceholders,
   validateRoutePattern,
 } from "@feel-your-website/content-core";
@@ -20,16 +22,6 @@ export { isReservedRoutePath } from "@feel-your-website/content-core";
  * save runs it) and the route editor's live preview (same rules, no round
  * trip). No server-only imports, so it bundles into the browser too.
  */
-
-/**
- * A static path segment must be filesystem- and URL-safe in a way that also
- * fits TanStack's file-routing conventions once the route generator turns it
- * into a file (`.`, `_`, `(…)`, `$` are all reserved there). Applied only at
- * creation/edit time here and in `save_route_composition`'s matching check —
- * `parseRoutePattern` itself stays permissive, so an existing non-ASCII
- * segment (from before this rule existed) still matches at request time.
- */
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 export interface RouteInputIssue {
   readonly field: "path" | "parent" | "params" | "seo";
@@ -165,13 +157,11 @@ export function validateRouteInput(args: ValidateRouteInputArgs): RouteInputIssu
     const patternParamNames = validated.ok ? validated.pattern.paramNames : [];
 
     if (validated.ok) {
-      const badSlugs = validated.pattern.segments
-        .filter((s) => s.kind === "static" && !SLUG_RE.test(s.value))
-        .map((s) => s.value);
+      const badSlugs = findInvalidSlugSegments(validated.pattern);
       if (badSlugs.length > 0) {
         issues.push({
           field: "path",
-          message: `"${badSlugs.join('", "')}" must be lowercase letters, numbers and hyphens only (matching ${SLUG_RE.source}).`,
+          message: `"${badSlugs.join('", "')}" must be lowercase letters, numbers and hyphens only (matching ${SLUG_SEGMENT_RE.source}).`,
         });
       }
     }

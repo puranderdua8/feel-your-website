@@ -2,6 +2,7 @@ import {
   buildHref,
   interpolateSeo,
   interpolateTemplate,
+  isReservedRoutePath,
   matchRoute,
   normalizeRequestPath,
   parseRoutePattern,
@@ -12,8 +13,6 @@ import {
   type RouteSeo,
 } from "@feel-your-website/content-core";
 import type { SectionDataEntry } from "@feel-your-website/section-registry";
-
-import { isReservedPath } from "@/reserved-paths.js";
 
 /** One level of a nested route's render stack, outermost (root) first. */
 export interface RouteLayer {
@@ -131,7 +130,7 @@ export function resolveRoutePage(
   // `//`, percent-decoding. `stripLocaleSegment` stays unset while locale rides
   // on a cookie; wiring URL-locale is a change here, not at every call site.
   const { pathname } = normalizeRequestPath(rawPath);
-  if (isReservedPath(pathname)) return null;
+  if (isReservedRoutePath(pathname)) return null;
 
   const match = matchRoute(
     pathname,
