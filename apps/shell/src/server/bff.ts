@@ -1,31 +1,26 @@
 import type { ActionResult } from "@feel-your-website/action-core";
 import type { AnalyticsEvent } from "@feel-your-website/analytics-core";
 import { CONSENT_COOKIE_NAME, type ConsentStatus } from "@feel-your-website/consent-core";
-import {
-  isContentAdapterError,
-  treeHasOutlet,
-  type JsonValue,
-} from "@feel-your-website/content-core";
-import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
+import { treeHasOutlet, type JsonValue } from "@feel-your-website/content-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import type { SectionDataEntry } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
 import { getCookies } from "@tanstack/react-start/server";
 
-import { CMS_ROUTES } from "@/generated/cms-routes.js";
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
 import {
   getActionInvoker,
-  getAnalyticsSink,
   getAuthProvider,
   getContentAdapter,
+  getAnalyticsSink,
 } from "./adapters.js";
 import { parseAnalyticsBatch } from "./analytics-ingest.js";
 import { loadAnalyticsConfig, type AnalyticsConfig } from "./config/analytics.js";
 import { assertSameOrigin } from "./http-guards.js";
 import { resolveAndInvokeActionByRouteKey, type InvokeActionByKeyInput } from "./invoke-action.js";
-import { buildNav, knownRouteHeaders, type NavNode } from "./nav.js";
+import type { NavNode } from "./nav.js";
+import { buildPublicBootstrap } from "./public-bootstrap.js";
 import {
   deferredRouteContentSectionIds,
   loadRouteContentSectionData,
@@ -142,32 +137,10 @@ async function resolveSessionPermissions(): Promise<{
 export const loadBootstrap = createServerFn({ method: "GET" }).handler(
   async (): Promise<BootstrapPayload> => {
     const locale = resolveLocale();
-    const { userId, permissions } = await resolveSessionPermissions();
-
-    let messages: Record<string, string> = { ...BOOTSTRAP_MESSAGES };
-    let nav: NavNode[] = [];
-    let degraded = false;
-
-    try {
-      const adapter = getContentAdapter();
-      const [fromCms, headers] = await Promise.all([
-        adapter.getMessages(locale),
-        // `getRouteHeaders`, never `getRouteManifest` — this call is on every
-        // SSR navigation and must not pull section rows.
-        adapter.getRouteHeaders(),
-      ]);
-      messages = { ...messages, ...fromCms };
-      const knownRouteKeys = new Set(CMS_ROUTES.map((route) => route.routeKey));
-      nav = buildNav(knownRouteHeaders(headers, knownRouteKeys), locale);
-    } catch (error) {
-      // A CMS outage must degrade to the bootstrap set and an empty nav, not to
-      // a blank page. This is the whole reason that set exists.
-      degraded = true;
-      console.error(
-        "[cms] content unavailable, serving bootstrap set:",
-        isContentAdapterError(error) ? error.code : error,
-      );
-    }
+    const [{ userId, permissions }, { messages, nav, degraded }] = await Promise.all([
+      resolveSessionPermissions(),
+      buildPublicBootstrap(locale),
+    ]);
 
     return {
       locale,

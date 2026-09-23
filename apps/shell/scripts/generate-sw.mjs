@@ -42,10 +42,13 @@ const { count, size, warnings } = await injectManifest({
   swSrc: swSrcResolved,
   swDest: join(clientDir, "sw.js"),
   globDirectory: clientDir,
-  // Fingerprinted client assets, plus `_shell.html` — the SPA-shell TanStack
+  // Fingerprinted client assets; `_shell.html` — the SPA-shell TanStack
   // Start's `spa` build option prerenders (`vite.config.ts`), precached as
-  // the offline navigation fallback `sw-src.js`'s `setCatchHandler` serves.
-  globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+  // the offline navigation fallback `sw-src.js`'s `setCatchHandler` serves;
+  // and `offline-data/*.json` — `generate-offline-data.ts`'s seed for each
+  // `offline: true` route and locale bootstrap (empty when nothing is
+  // offline, so this glob matches nothing extra in that build).
+  globPatterns: ["**/*.{js,css,html,json,ico,png,svg,woff2}"],
   // The just-copied Workbox runtime is itself served from `dist/client/` —
   // `importScripts` fetches it at install time, so it needs no cache-busting
   // precache entry of its own (unlike the fingerprinted build assets above).

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm run routes:generate && vite build && node scripts/generate-sw.mjs",
+    "build": "pnpm run routes:generate && vite build && tsx scripts/generate-offline-data.ts && node scripts/generate-sw.mjs",
     "start": "vite start",
     "start:node": "node server.js",
     "lint": "eslint .",
@@ -14,7 +14,8 @@
     "clean": "rm -rf .output .netlify dist .turbo",
     "routes:sync": "tsx --env-file=.env scripts/routes.ts sync",
     "routes:generate": "tsx scripts/routes.ts generate",
-    "routes:check": "tsx --env-file=.env scripts/routes.ts check"
+    "routes:check": "tsx --env-file=.env scripts/routes.ts check",
+    "offline-data:generate": "tsx --env-file=.env scripts/generate-offline-data.ts"
   },
   "dependencies": {
     "@feel-your-website/action-core": "workspace:*",
