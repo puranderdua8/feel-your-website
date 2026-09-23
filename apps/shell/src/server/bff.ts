@@ -1,7 +1,11 @@
 import type { ActionResult } from "@feel-your-website/action-core";
 import type { AnalyticsEvent } from "@feel-your-website/analytics-core";
 import { CONSENT_COOKIE_NAME, type ConsentStatus } from "@feel-your-website/consent-core";
-import { isContentAdapterError, type JsonValue } from "@feel-your-website/content-core";
+import {
+  isContentAdapterError,
+  treeHasOutlet,
+  type JsonValue,
+} from "@feel-your-website/content-core";
 import { BOOTSTRAP_MESSAGES } from "@feel-your-website/i18n-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import type { SectionDataEntry } from "@feel-your-website/section-registry";
@@ -20,9 +24,19 @@ import {
 import { parseAnalyticsBatch } from "./analytics-ingest.js";
 import { loadAnalyticsConfig, type AnalyticsConfig } from "./config/analytics.js";
 import { assertSameOrigin } from "./http-guards.js";
-import { resolveAndInvokeAction, type InvokeActionInput } from "./invoke-action.js";
+import {
+  resolveAndInvokeAction,
+  resolveAndInvokeActionByRouteKey,
+  type InvokeActionByKeyInput,
+  type InvokeActionInput,
+} from "./invoke-action.js";
 import { buildNav, knownRouteHeaders, type NavNode } from "./nav.js";
 import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
+import {
+  deferredRouteContentSectionIds,
+  loadRouteContentSectionData,
+} from "./route-content-data.js";
+import { resolveRouteByKey, type RouteContentResult } from "./route-content.js";
 import { deferredSectionIds, loadRouteSectionData } from "./route-page-data.js";
 
 /**
@@ -59,6 +73,38 @@ export interface BootstrapPayload {
 
 export type { NavNode } from "./nav.js";
 export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-page.js";
+
+/**
+ * One resolved bundle's own content — the bundle-scoped counterpart to
+ * {@link RoutePage} (plan finding 3). No `chain`/`layers`: each route level
+ * (layout, leaf) fetches and renders only its own bundle, TanStack's own
+ * nested `<Outlet/>` does the composition, and breadcrumbs come from
+ * `useMatches()` client-side.
+ */
+export interface RouteContent {
+  readonly routeKey: string;
+  /** This bundle's absolute path pattern, e.g. `/blog/:slug`. */
+  readonly path: string;
+  readonly locale: string;
+  /** `:name` segment values, sanitised. `{}` for a static route. */
+  readonly params: Record<string, string>;
+  readonly tree: RouteContentResult["bundle"]["tree"];
+  /** Whether this bundle's tree carries an `outlet` node — see `RouteBundle` docs. */
+  readonly hasOutlet: boolean;
+  readonly seo: RouteContentResult["seo"];
+  readonly sectionData?: Readonly<Record<string, SectionDataEntry>>;
+  readonly deferredSections?: string[];
+}
+
+/** Parses an untrusted `params` object into `Record<string, string>`, dropping non-string values. */
+function parseParamsRecord(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof v === "string") out[key] = v;
+  }
+  return out;
+}
 
 /**
  * The signed-in user's id and their permissions, resolved against the code
@@ -284,6 +330,120 @@ export const invokeAction = createServerFn({ method: "POST" })
 
     return resolveAndInvokeAction(data, {
       manifest,
+      locale,
+      session: await resolveSessionPermissions(),
+      invoker: getActionInvoker(),
+      replayCache: invokeReplayCache,
+    });
+  });
+
+/**
+ * The bundle-scoped counterpart to {@link loadRoutePage} (plan finding 3):
+ * looks the route up directly by its stable `routeKey`
+ * (`ContentAdapter.getRouteByKey`), never by re-matching a path, and
+ * validates `params` against *that bundle's own* `paramNames`. Returns
+ * `null` for an unknown/unpublished key or an invalid param — both are
+ * `notFound()` at the route layer.
+ *
+ * Section data is fetched for *this bundle's own tree only* — no ancestor
+ * fan-out. Each route level (a generated layout or leaf file) calls this
+ * independently; TanStack's own `<Outlet/>` composes the render, not a
+ * server-side chain walk.
+ */
+export const loadRouteContent = createServerFn({ method: "GET" })
+  .validator((input: unknown): { routeKey: string; params: Record<string, string> } => {
+    const raw = (input ?? {}) as Record<string, unknown>;
+    if (typeof raw.routeKey !== "string" || raw.routeKey.trim() === "") {
+      throw new Error("routeKey is required.");
+    }
+    return { routeKey: raw.routeKey, params: parseParamsRecord(raw.params) };
+  })
+  .handler(async ({ data }): Promise<RouteContent | null> => {
+    const locale = resolveLocale();
+    const bundle = await getContentAdapter().getRouteByKey(data.routeKey);
+    const resolved = resolveRouteByKey(bundle, locale, data.params);
+    if (resolved === "not_found" || resolved === "invalid_params") return null;
+
+    const sectionData = await loadRouteContentSectionData(
+      resolved,
+      resolved.bundle.path,
+      locale,
+      getActionInvoker(),
+    );
+    const deferredSections = deferredRouteContentSectionIds(resolved, resolved.bundle.path, locale);
+
+    return {
+      routeKey: resolved.bundle.routeKey,
+      path: resolved.bundle.path,
+      locale,
+      params: resolved.params,
+      tree: resolved.bundle.tree,
+      hasOutlet: treeHasOutlet(resolved.bundle.tree),
+      seo: resolved.seo,
+      ...(Object.keys(sectionData).length > 0 ? { sectionData } : {}),
+      ...(deferredSections.length > 0 ? { deferredSections } : {}),
+    };
+  });
+
+/**
+ * The bundle-scoped counterpart to {@link loadSectionData}: the client-refetch
+ * pass for one bundle's non-blocking sections, addressed by `routeKey` +
+ * `params` rather than a path.
+ */
+export const loadSectionDataByKey = createServerFn({ method: "GET" })
+  .validator((input: unknown): { routeKey: string; params: Record<string, string> } => {
+    const raw = (input ?? {}) as Record<string, unknown>;
+    if (typeof raw.routeKey !== "string" || raw.routeKey.trim() === "") {
+      throw new Error("routeKey is required.");
+    }
+    return { routeKey: raw.routeKey, params: parseParamsRecord(raw.params) };
+  })
+  .handler(async ({ data }): Promise<Record<string, SectionDataEntry>> => {
+    const locale = resolveLocale();
+    const bundle = await getContentAdapter().getRouteByKey(data.routeKey);
+    const resolved = resolveRouteByKey(bundle, locale, data.params);
+    if (resolved === "not_found" || resolved === "invalid_params") return {};
+    return loadRouteContentSectionData(resolved, resolved.bundle.path, locale, getActionInvoker(), {
+      phase: "deferred",
+    });
+  });
+
+/**
+ * The bundle-scoped counterpart to {@link invokeAction} (plan finding 3): the
+ * client sends `routeKey` + `params` instead of a pathname, so the server
+ * looks the bundle up directly rather than re-deriving it from a request
+ * path. See {@link resolveAndInvokeActionByRouteKey}.
+ */
+export const invokeActionByKey = createServerFn({ method: "POST" })
+  .validator((input: unknown): InvokeActionByKeyInput => {
+    const raw = (input ?? {}) as Record<string, unknown>;
+    const requireString = (key: "routeKey" | "instanceId" | "requestId"): string => {
+      const value = raw[key];
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(`${key} is required.`);
+      }
+      return value;
+    };
+    const formInput =
+      typeof raw.formInput === "object" && raw.formInput !== null && !Array.isArray(raw.formInput)
+        ? (raw.formInput as Record<string, JsonValue>)
+        : undefined;
+    return {
+      routeKey: requireString("routeKey"),
+      params: parseParamsRecord(raw.params),
+      instanceId: requireString("instanceId"),
+      requestId: requireString("requestId"),
+      formInput,
+    };
+  })
+  .handler(async ({ data }): Promise<ActionResult> => {
+    assertSameOrigin();
+
+    const locale = resolveLocale();
+    const bundle = await getContentAdapter().getRouteByKey(data.routeKey);
+
+    return resolveAndInvokeActionByRouteKey(data, {
+      bundle,
       locale,
       session: await resolveSessionPermissions(),
       invoker: getActionInvoker(),
