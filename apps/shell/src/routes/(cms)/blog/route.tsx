@@ -4,8 +4,12 @@
 // routes.snapshot.json, and `routes:generate` (or a full build) to
 // regenerate this file. `routes:generate --check` fails CI on drift.
 
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { cmsHead, cmsLayoutRouteComponent, cmsLoader } from "@/cms-route";
 
 export const Route = createFileRoute("/(cms)/blog")({
-  component: Outlet,
+  loader: (ctx) => cmsLoader(ctx, "blog"),
+  head: cmsHead,
+  component: cmsLayoutRouteComponent(true),
 });

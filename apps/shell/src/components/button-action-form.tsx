@@ -1,18 +1,20 @@
 import { actionCatalog } from "@feel-your-website/action-registry";
 import type { ActionCtaSpec, RenderActionCta } from "@feel-your-website/section-registry";
-import { useRouter } from "@tanstack/react-router";
 import { useId, useRef, useState } from "react";
 
-import { invokeAction } from "@/server/bff";
+import { useRouteKey } from "@/route-key-context";
+import { invokeActionByKey } from "@/server/bff";
 
 /**
  * The shell's `mode: "action"` CTA — injected into `renderComposition` as
  * `renderActionCta`. A button that fires a registered mutation through the
- * `invokeAction` server fn and reports the outcome.
+ * `invokeActionByKey` server fn and reports the outcome.
  *
- * It never sends the action id, the body, or a tree — only the pathname, the
- * node's `instanceId`, and a fresh `requestId` per submit. The server
- * re-derives everything else from published content (see `resolveAndInvokeAction`).
+ * It never sends the action id, the body, or a tree — only the routeKey +
+ * params of the bundle it renders inside (from `useRouteKey()`, set by
+ * `RouteContentView`), the node's `instanceId`, and a fresh `requestId` per
+ * submit. The server re-derives everything else from published content (see
+ * `resolveAndInvokeActionByRouteKey`).
  */
 
 type Status =
@@ -46,7 +48,7 @@ function newRequestId(): string {
 }
 
 export function ButtonActionForm({ spec }: { spec: ActionCtaSpec }): React.JSX.Element {
-  const router = useRouter();
+  const { routeKey, params } = useRouteKey();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const regionRef = useRef<HTMLParagraphElement>(null);
   const regionId = useId();
@@ -65,9 +67,10 @@ export function ButtonActionForm({ spec }: { spec: ActionCtaSpec }): React.JSX.E
 
     setStatus({ kind: "submitting" });
     try {
-      const result = await invokeAction({
+      const result = await invokeActionByKey({
         data: {
-          path: router.state.location.pathname,
+          routeKey,
+          params,
           instanceId: spec.instanceId,
           requestId: newRequestId(),
           // The values the visitor typed into the enclosing `form`, if any.

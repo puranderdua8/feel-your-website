@@ -28,35 +28,63 @@ function routeIdFor(relativePath: string): string {
   return `/(cms)/${withoutExt}`;
 }
 
-/** A leaf file: fetches and renders — the whole page, or a layout's own-path SEO half. */
+/**
+ * A leaf file: either fetches and renders its own bundle (no CMS ancestor
+ * fold — plan finding 3), or, for the exact-index half of a layout pair
+ * (`file.source.hasOutlet`, sharing its `routeKey` with the sibling
+ * `route.tsx`), renders nothing — the layout already owns that bundle.
+ *
+ * `wrap` (true only when this bundle has no CMS ancestor, i.e.
+ * `parentKey === null`) is baked in here rather than computed at runtime:
+ * whichever bundle sits outermost on the page owns the `<main>` landmark
+ * once, and that's a fact about the route tree, not about a single request.
+ */
 export function renderLeafFile(file: GeneratedRouteFile): string {
   const id = routeIdFor(file.relativePath);
+
+  if (file.source.hasOutlet) {
+    return `${GENERATED_HEADER}
+import { createFileRoute } from "@tanstack/react-router";
+
+import { NullRouteComponent } from "@/cms-route";
+
+export const Route = createFileRoute(${JSON.stringify(id)})({
+  component: NullRouteComponent,
+});
+`;
+  }
+
+  const wrap = file.source.parentKey === null;
   return `${GENERATED_HEADER}
 import { createFileRoute } from "@tanstack/react-router";
 
-import { cmsHead, cmsLoader, CmsRouteComponent } from "@/cms-route";
+import { cmsHead, cmsLoader, cmsRouteComponent } from "@/cms-route";
 
 export const Route = createFileRoute(${JSON.stringify(id)})({
-  loader: cmsLoader,
+  loader: (ctx) => cmsLoader(ctx, ${JSON.stringify(file.routeKey)}),
   head: cmsHead,
-  component: CmsRouteComponent,
+  component: cmsRouteComponent(${JSON.stringify(wrap)}),
 });
 `;
 }
 
 /**
- * A layout file: renders only its matched child. No loader/head of its own —
- * see `cms-route.tsx`'s doc comment for why: the sibling `index.tsx` (or a
- * deeper leaf) already fetches and folds the whole ancestor chain in one
- * render.
+ * A layout file: fetches and renders its own bundle, with `<Outlet/>` filling
+ * whatever outlet node that bundle's tree carries — the sibling `index.tsx`
+ * (same `routeKey`) renders nothing, since this file already owns it.
  */
 export function renderLayoutFile(file: GeneratedRouteFile): string {
   const id = routeIdFor(file.relativePath);
+  const wrap = file.source.parentKey === null;
   return `${GENERATED_HEADER}
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { cmsHead, cmsLayoutRouteComponent, cmsLoader } from "@/cms-route";
 
 export const Route = createFileRoute(${JSON.stringify(id)})({
-  component: Outlet,
+  loader: (ctx) => cmsLoader(ctx, ${JSON.stringify(file.routeKey)}),
+  head: cmsHead,
+  component: cmsLayoutRouteComponent(${JSON.stringify(wrap)}),
 });
 `;
 }
