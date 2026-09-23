@@ -13,6 +13,20 @@ export default [
     rules: { "turbo/no-undeclared-env-vars": "off" },
   },
   {
+    // The service worker source runs in its own worker global scope, not
+    // Node or the DOM: `self` (not `window`), `importScripts`, and `workbox`
+    // (the namespace `importScripts`-ing the Workbox runtime creates).
+    files: ["scripts/sw-src.js"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        importScripts: "readonly",
+        workbox: "readonly",
+        Response: "readonly",
+      },
+    },
+  },
+  {
     ignores: [".output/**", ".netlify/**", "dist/**", "src/routeTree.gen.ts"],
   },
 ];
