@@ -7,7 +7,12 @@ import { actionCatalog } from "@feel-your-website/action-registry";
 import type { RouteBundle, RouteSectionNode } from "@feel-your-website/content-core";
 import { describe, expect, it } from "vitest";
 
-import { resolveAndInvokeAction, type InvokeActionDeps } from "./invoke-action.js";
+import {
+  resolveAndInvokeAction,
+  resolveAndInvokeActionByRouteKey,
+  type InvokeActionByKeyDeps,
+  type InvokeActionDeps,
+} from "./invoke-action.js";
 
 const bundle = (over: Partial<RouteBundle> & Pick<RouteBundle, "id" | "path">): RouteBundle => ({
   routeKey: over.id,
@@ -233,5 +238,108 @@ describe("resolveAndInvokeAction", () => {
       invoker: new MemoryActionInvoker({ echoUnseeded: true }),
     });
     expect(result).toEqual({ ok: true, data: { email: "hello" } });
+  });
+});
+
+describe("resolveAndInvokeActionByRouteKey", () => {
+  const bundleWith = (node: RouteSectionNode): RouteBundle =>
+    bundle({
+      id: "n",
+      path: "/n/:slug",
+      pathSegment: "/n/:slug",
+      paramNames: ["slug"],
+      tree: [node],
+    });
+
+  const keyDeps = (over: Partial<InvokeActionByKeyDeps>): InvokeActionByKeyDeps => ({
+    bundle: bundleWith(actionButton()),
+    locale: "en",
+    session: { userId: "u1", permissions: new Set() },
+    invoker: new MemoryActionInvoker({ echoUnseeded: true }),
+    ...over,
+  });
+
+  const keyInput = (
+    over: Partial<Parameters<typeof resolveAndInvokeActionByRouteKey>[0]> = {},
+  ) => ({
+    routeKey: "n",
+    params: { slug: "hello" },
+    instanceId: "cta",
+    requestId: "req-1",
+    ...over,
+  });
+
+  it("looks the bundle up directly, validates params against it, rebuilds the body, and invokes", async () => {
+    const result = await resolveAndInvokeActionByRouteKey(keyInput(), keyDeps({}));
+    expect(result).toEqual({ ok: true, data: { email: "hello" } });
+  });
+
+  it("returns not_found for an undefined bundle (unpublished or unknown routeKey)", async () => {
+    const result = await resolveAndInvokeActionByRouteKey(
+      keyInput(),
+      keyDeps({ bundle: undefined }),
+    );
+    expect(result).toEqual({ ok: false, code: "not_found" });
+  });
+
+  it("returns not_found when a required param is missing (not one this bundle's paramNames covers)", async () => {
+    const result = await resolveAndInvokeActionByRouteKey(keyInput({ params: {} }), keyDeps({}));
+    expect(result).toEqual({ ok: false, code: "not_found" });
+  });
+
+  it("returns not_found when a param value fails sanitizeParam", async () => {
+    const result = await resolveAndInvokeActionByRouteKey(
+      keyInput({ params: { slug: "../etc" } }),
+      keyDeps({}),
+    );
+    expect(result).toEqual({ ok: false, code: "not_found" });
+  });
+
+  it("searches only this bundle's own tree — an instanceId from another bundle is not_found", async () => {
+    const result = await resolveAndInvokeActionByRouteKey(
+      keyInput({ instanceId: "ghost" }),
+      keyDeps({}),
+    );
+    expect(result).toEqual({ ok: false, code: "not_found" });
+  });
+
+  it("enforces RBAC through the same shared path as the pathname-based invoker", async () => {
+    const gated = defineActions([
+      {
+        id: "gated.mutate",
+        kind: "mutation",
+        method: "POST",
+        description: "needs a permission",
+        input: [],
+        allowedSources: [],
+        requiredPermission: "manage:things",
+      },
+    ]);
+    const result = await resolveAndInvokeActionByRouteKey(
+      keyInput(),
+      keyDeps({
+        bundle: bundleWith(actionButton({ actionId: "gated.mutate", body: "{}" })),
+        catalog: gated,
+        session: { userId: "u1", permissions: new Set() },
+      }),
+    );
+    expect(result).toEqual({ ok: false, code: "forbidden" });
+  });
+
+  it("replays the first result for a repeated requestId, same as the pathname-based invoker", async () => {
+    let calls = 0;
+    const invoker = {
+      invoke: (_id: string, body: Record<string, unknown>) => {
+        calls += 1;
+        return Promise.resolve({ ok: true, data: { ...body, n: calls } });
+      },
+    };
+    const replayCache = new Map();
+    const d = keyDeps({ invoker: invoker as ActionInvoker, replayCache });
+
+    const a = await resolveAndInvokeActionByRouteKey(keyInput({ requestId: "same" }), d);
+    const b = await resolveAndInvokeActionByRouteKey(keyInput({ requestId: "same" }), d);
+    expect(calls).toBe(1);
+    expect(a).toEqual(b);
   });
 });
