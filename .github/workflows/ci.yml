@@ -42,6 +42,15 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # `scripts/routes.ts` imports `src/server/adapters.ts` even for the
+      # `generate` command (module-level, not conditional on the subcommand),
+      # which pulls in every content/action/analytics package shell depends
+      # on — none built yet this early. `^...` selects only shell's
+      # dependencies, not shell itself (whose own `build` script is what the
+      # later Build step runs, and still would even if this step ran it too).
+      - name: Build shell's dependencies
+        run: pnpm exec turbo run build --filter=@feel-your-website/shell^...
+
       # Before Build: `pnpm build` runs `routes:generate` itself (as a safety
       # net) and would silently regenerate any drift before this could see
       # it. Catches a hand-edited `(cms)/**` file or a `routes.snapshot.json`
