@@ -10,6 +10,7 @@ import { AppAnalyticsProvider } from "@/analytics/provider";
 import { ConsentBanner } from "@/components/consent-banner";
 import { ServiceWorkerNotice } from "@/components/service-worker";
 import { SiteNav } from "@/components/site-nav";
+import { refreshOfflineBootstrap } from "@/offline-refresh";
 import { loadBootstrap, type BootstrapPayload, type NavNode } from "@/server/bff";
 import { ANALYTICS_OFF } from "@/server/config/analytics.js";
 import { readOfflineLocale } from "@/server/offline-locale";
@@ -47,7 +48,19 @@ export const Route = createRootRoute({
   // itself can't be reached — every child route's own loader depends on this
   // one succeeding first, so falling back here is what makes any offline
   // route (plan finding 1) reachable at all, not just its own content.
-  loader: async (): Promise<BootstrapPayload> => loadBootstrap().catch(loadOfflineBootstrap),
+  loader: async (): Promise<BootstrapPayload> => {
+    try {
+      const bootstrap = await loadBootstrap();
+      // Only a genuine online success refreshes the offline seed — the
+      // fallback below reads that same seed (or a placeholder, if there
+      // isn't one yet), and writing either of those back would either be a
+      // no-op or, worse, overwrite a real seed with the placeholder.
+      refreshOfflineBootstrap(bootstrap);
+      return bootstrap;
+    } catch {
+      return loadOfflineBootstrap();
+    }
+  },
   // Every generated `(cms)/**` file's `cmsLoader` `throw notFound()`s for an
   // unknown or unpublished routeKey. Configured here, at the root, rather
   // than per-route, so it is also what TanStack Router itself falls back to
