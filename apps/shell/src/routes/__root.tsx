@@ -2,7 +2,7 @@ import { ThemeProvider } from "@feel-your-website/theme/client";
 import { ConsentProvider } from "@feel-your-website/consent-core/react";
 import { I18nProvider } from "@feel-your-website/i18n-core/react";
 import { PermissionsProvider } from "@feel-your-website/rbac/react";
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, redirect, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { AppAnalyticsProvider } from "@/analytics/provider";
@@ -13,6 +13,26 @@ import { loadBootstrap, type BootstrapPayload } from "@/server/bff";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
+  // A raw request for a non-canonical URL (a trailing slash, a doubled `/`)
+  // gets redirected here. `trailingSlash: 'never'` (router.tsx) only affects
+  // the router's own internal matching — it doesn't rewrite what a direct hit
+  // on `/blog/` shows in the address bar. Runs before every loader, on every
+  // request, so the redirect is the very first thing the server does.
+  //
+  // Requests `statusCode: 301` (permanent), but verified against both `vite
+  // dev` and the production `node server.js` build: this TanStack Start
+  // version (`@tanstack/react-start` ^1.168) always sends `307` for a
+  // `beforeLoad`-thrown redirect during SSR, regardless of the requested
+  // code — a deliberate framework choice, not a bug here (a redirect thrown
+  // mid-match isn't one a browser/CDN should cache permanently). Left as
+  // `301` anyway: it's the technically correct intent, costs nothing, and a
+  // future TanStack version honouring it needs no change here.
+  beforeLoad: ({ location }) => {
+    const canonical = canonicalPathname(location.pathname);
+    if (canonical === location.pathname) return;
+    const hash = location.hash ? `#${location.hash}` : "";
+    throw redirect({ href: `${canonical}${location.searchStr}${hash}`, statusCode: 301 });
+  },
   // One call for locale, messages and permissions, resolved server-side
   // before the first paint. Fetching them separately would stack a waterfall
   // in front of every page.
@@ -80,6 +100,20 @@ function RootComponent() {
       </ConsentProvider>
     </RootDocument>
   );
+}
+
+/**
+ * Collapses duplicate slashes and strips a trailing slash (except root) —
+ * the request-path canonicalisation `normalizeRequestPath` (content-core)
+ * used to do for the hand-rolled matcher. Deliberately leaves case alone: an
+ * uppercase segment simply won't match any generated route (the slug rule
+ * makes every one lowercase), and blindly lowercasing here could turn a
+ * legitimate mixed-case `:param` value (a `:slug` an author published with
+ * capitals) into a redirect to a URL nothing actually publishes.
+ */
+export function canonicalPathname(pathname: string): string {
+  const collapsed = pathname.replace(/\/{2,}/g, "/");
+  return collapsed.length > 1 && collapsed.endsWith("/") ? collapsed.slice(0, -1) : collapsed;
 }
 
 /**
