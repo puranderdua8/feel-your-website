@@ -1,2 +1,6 @@
 # Local Netlify folder
 .netlify
+
+# generate-sw.mjs's scratch copy of sw-src.js with the Workbox runtime path
+# substituted in — written and deleted within one script run.
+.sw-src.generated.js

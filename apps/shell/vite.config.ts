@@ -32,5 +32,20 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  plugins: [tailwindcss(), tanstackStart(), netlify(), viteReact()],
+  plugins: [
+    tailwindcss(),
+    tanstackStart({
+      // Prerenders one generic, data-free HTML document at build time
+      // (`dist/client/_shell.html`) — TanStack Start's own SPA-shell feature
+      // (`router.update({ isShell: true })` skips every loader, so the
+      // output carries no route-specific data and is safe to boot against
+      // any URL). `generate-sw.mjs` precaches it as the offline navigation
+      // fallback (plan finding 1): the server-rendered response is always
+      // preferred online, and this is only what a hard-reload offline falls
+      // back to when the network can't be reached at all.
+      spa: { enabled: true },
+    }),
+    netlify(),
+    viteReact(),
+  ],
 });
