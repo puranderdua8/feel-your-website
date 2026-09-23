@@ -2,12 +2,12 @@ import { contractSeed, MemoryContentAdapter } from "@feel-your-website/content-a
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getActionInvoker, resetAdapters } from "./adapters.js";
-import { resolveRoutePage } from "./resolve-route-page.js";
-import { loadRouteSectionData } from "./route-page-data.js";
+import { loadRouteContentSectionData } from "./route-content-data.js";
+import { resolveRouteByKey, type RouteContentResult } from "./route-content.js";
 
 /**
  * End-to-end for the worked example: the `/releases` fixture route carries a
- * `release-feed` node, whose query the shell's `loadRoutePage` fan-out runs
+ * `release-feed` node, whose query the shell's bundle-scoped fan-out runs
  * against whatever `getActionInvoker()` returns. This exercises the real
  * `SECTION_QUERY_REGISTRY` and the real memory-mode seed in `adapters.ts` —
  * only the content adapter is constructed directly (to skip Supabase).
@@ -21,11 +21,12 @@ afterEach(() => {
   resetAdapters();
 });
 
-async function resolveReleasesPage() {
-  const manifest = await new MemoryContentAdapter(contractSeed).getRouteManifest("en");
-  const page = resolveRoutePage("/releases", manifest, "en");
-  expect(page, "the memory fixtures should publish /releases").not.toBeNull();
-  return page!;
+async function resolveReleasesBundle(): Promise<RouteContentResult> {
+  const bundle = await new MemoryContentAdapter(contractSeed).getRouteByKey("releases");
+  const resolved = resolveRouteByKey(bundle, "en", {});
+  expect(resolved, "the memory fixtures should publish releases").not.toBe("not_found");
+  expect(resolved).not.toBe("invalid_params");
+  return resolved as RouteContentResult;
 }
 
 describe("release-feed end-to-end", () => {
@@ -33,7 +34,13 @@ describe("release-feed end-to-end", () => {
     process.env.ACTION_INVOKER = "memory";
     resetAdapters();
 
-    const data = await loadRouteSectionData(await resolveReleasesPage(), getActionInvoker());
+    const resolved = await resolveReleasesBundle();
+    const data = await loadRouteContentSectionData(
+      resolved,
+      resolved.bundle.path,
+      "en",
+      getActionInvoker(),
+    );
 
     const entry = data["releases-feed"];
     expect(entry && "ok" in entry && entry.ok).toBe(true);
@@ -64,7 +71,13 @@ describe("release-feed end-to-end", () => {
     delete process.env.ACTION_INVOKER;
     resetAdapters();
 
-    const data = await loadRouteSectionData(await resolveReleasesPage(), getActionInvoker());
+    const resolved = await resolveReleasesBundle();
+    const data = await loadRouteContentSectionData(
+      resolved,
+      resolved.bundle.path,
+      "en",
+      getActionInvoker(),
+    );
     expect(data["releases-feed"]).toEqual({ ok: false, error: { code: "not_found" } });
   });
 });

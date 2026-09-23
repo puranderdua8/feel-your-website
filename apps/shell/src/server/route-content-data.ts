@@ -10,16 +10,22 @@ import {
   type SectionQuerySpec,
 } from "@feel-your-website/section-registry";
 
-import { SECTION_QUERY_BUDGET_MS } from "./route-page-data.js";
 import type { RouteContentResult } from "./route-content.js";
 
 /**
- * The bundle-scoped counterpart to `route-page-data.ts`: fetches a single
- * bundle's own section data, never an ancestor chain's. Each route level
- * (layout, leaf) runs its own independent fan-out under the same shared
- * budget — no longer one fan-out for the whole page, since there is no
- * longer one server call resolving the whole page (plan finding 3).
+ * Fetches a single bundle's own section data, never an ancestor chain's.
+ * Each route level (layout, leaf) runs its own independent fan-out under the
+ * same shared budget — one fan-out per bundle, not one for a whole page,
+ * since there is no longer one server call resolving a whole page (plan
+ * finding 3).
  */
+
+/**
+ * Total wall-clock budget for one bundle's whole query fan-out. Deliberately
+ * below `CONTENT_TIMEOUT_MS` (5s): a slow upstream must degrade one section to
+ * its fallback, never stall the SSR response.
+ */
+export const SECTION_QUERY_BUDGET_MS = 3_500;
 
 /** The route facts a section's `deriveInvocation` may read, for one resolved bundle. */
 export function routeContentRenderContext(
@@ -71,7 +77,7 @@ export function deferredRouteContentSectionIds(
   );
 }
 
-/** {@link loadRouteContentSectionData}'s counterpart in `route-page-data.ts` — see that doc comment. */
+/** Runs one bundle's data-backed sections' queries (see `phase`), never an ancestor chain's. */
 export async function loadRouteContentSectionData(
   resolved: RouteContentResult,
   pathname: string,

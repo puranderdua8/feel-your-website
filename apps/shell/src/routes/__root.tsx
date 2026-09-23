@@ -40,11 +40,12 @@ export const Route = createRootRoute({
   // The locale needs no argument: it rides on the request cookie, so the
   // server resolves it before rendering anything.
   loader: async (): Promise<BootstrapPayload> => loadBootstrap(),
-  // `src/routes/$.tsx` `throw notFound()`s for a path with no published
-  // route bundle. Configured here, at the root, rather than per-route, so it
-  // is also what TanStack Router itself falls back to for any path no route
-  // claims at all — one component covers both "no CMS route" and "no route
-  // file", which are the same experience for a visitor either way.
+  // Every generated `(cms)/**` file's `cmsLoader` `throw notFound()`s for an
+  // unknown or unpublished routeKey. Configured here, at the root, rather
+  // than per-route, so it is also what TanStack Router itself falls back to
+  // for any path no route file claims at all — one component covers both
+  // "no CMS route" and "no route file", which are the same experience for a
+  // visitor either way.
   notFoundComponent: NotFoundPage,
   head: () => ({
     meta: [

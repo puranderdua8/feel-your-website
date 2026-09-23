@@ -6,6 +6,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useSectionView } from "@/analytics/section-view";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { renderActionCta } from "@/components/button-action-form";
 import { renderCtaLink } from "@/components/cta-link";
 import { RouteKeyProvider } from "@/route-key-context";
@@ -49,15 +50,13 @@ export function seoToHead(content: RouteContent): {
  * `outlet` substituted wherever the tree carries an outlet node. Each CMS
  * route level (a generated layout or leaf file) fetches and renders only its
  * own bundle; TanStack's nested `<Outlet/>` does the composition, so there is
- * no ancestor-chain fold here (contrast the old `RoutePageView`).
+ * no ancestor-chain fold here.
  *
  * `wrap` is baked in at generation time from `parentKey === null` (see
  * `codegen.ts`): the bundle with no CMS ancestor owns the page's `<main>`
- * landmark once; a nested layout or leaf renders straight into its
- * ancestor's outlet instead of nesting another `<main>`.
- *
- * Breadcrumbs are not rendered here — deferred to the `useMatches()` rewrite
- * (plan phase 3 cleanup), which also deletes the old chain-based `RoutePageView`.
+ * landmark (and the `<Breadcrumbs/>` trail, built from `useMatches()`) once;
+ * a nested layout or leaf renders straight into its ancestor's outlet
+ * instead of nesting either.
  */
 export function RouteContentView({
   content,
@@ -120,7 +119,10 @@ export function RouteContentView({
   return (
     <RouteKeyProvider value={{ routeKey: content.routeKey, params: content.params }}>
       {wrap ? (
-        <main className="mx-auto flex max-w-3xl flex-col gap-8 p-8">{rendered}</main>
+        <main className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
+          <Breadcrumbs />
+          {rendered}
+        </main>
       ) : (
         rendered
       )}

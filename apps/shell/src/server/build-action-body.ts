@@ -1,7 +1,7 @@
 import type { ActionInputMapping, MutationActionDefinition } from "@feel-your-website/action-core";
 import type { JsonValue, SectionFieldSpec } from "@feel-your-website/content-core";
 
-import { sanitizeParam } from "./resolve-route-page.js";
+import { sanitizeParam } from "./sanitize-param.js";
 
 /** What the builder is allowed to draw a mapped value from. */
 export interface BuildActionBodyContext {

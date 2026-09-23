@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SplatRouteImport } from './routes/$'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as cmsBlogRouteRouteImport } from './routes/(cms)/blog/route'
 import { Route as cmsHelpRouteImport } from './routes/(cms)/help'
@@ -21,11 +20,6 @@ import { Route as cmsBlogSlugRouteImport } from './routes/(cms)/blog/$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SplatRoute = SplatRouteImport.update({
-  id: '/$',
-  path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -61,7 +55,6 @@ const cmsBlogSlugRoute = cmsBlogSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/$': typeof SplatRoute
   '/admin': typeof AdminRoute
   '/blog': typeof cmsBlogRouteRouteWithChildren
   '/help': typeof cmsHelpRoute
@@ -71,7 +64,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/$': typeof SplatRoute
   '/admin': typeof AdminRoute
   '/help': typeof cmsHelpRoute
   '/releases': typeof cmsReleasesRoute
@@ -81,7 +73,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/$': typeof SplatRoute
   '/admin': typeof AdminRoute
   '/(cms)/blog': typeof cmsBlogRouteRouteWithChildren
   '/(cms)/help': typeof cmsHelpRoute
@@ -92,20 +83,12 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/$'
-    | '/admin'
-    | '/blog'
-    | '/help'
-    | '/releases'
-    | '/blog/$slug'
-    | '/blog/'
+    '/' | '/admin' | '/blog' | '/help' | '/releases' | '/blog/$slug' | '/blog/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$' | '/admin' | '/help' | '/releases' | '/blog/$slug' | '/blog'
+  to: '/' | '/admin' | '/help' | '/releases' | '/blog/$slug' | '/blog'
   id:
     | '__root__'
     | '/'
-    | '/$'
     | '/admin'
     | '/(cms)/blog'
     | '/(cms)/help'
@@ -116,7 +99,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SplatRoute: typeof SplatRoute
   AdminRoute: typeof AdminRoute
   cmsBlogRouteRoute: typeof cmsBlogRouteRouteWithChildren
   cmsHelpRoute: typeof cmsHelpRoute
@@ -130,13 +112,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/$': {
-      id: '/$'
-      path: '/$'
-      fullPath: '/$'
-      preLoaderRoute: typeof SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -200,7 +175,6 @@ const cmsBlogRouteRouteWithChildren = cmsBlogRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SplatRoute: SplatRoute,
   AdminRoute: AdminRoute,
   cmsBlogRouteRoute: cmsBlogRouteRouteWithChildren,
   cmsHelpRoute: cmsHelpRoute,

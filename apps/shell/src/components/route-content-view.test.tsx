@@ -1,28 +1,35 @@
 import { MemoryAnalyticsAdapter } from "@feel-your-website/analytics-core";
 import { AnalyticsProvider } from "@feel-your-website/analytics-core/react";
-import type { RouteSectionNode } from "@feel-your-website/content-core";
+import type { RouteBundle, RouteSectionNode } from "@feel-your-website/content-core";
 import { resetSectionObserver } from "@feel-your-website/section-registry";
 import { act, render, screen, waitFor, type RenderResult } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { RouteLayer, RoutePage } from "@/server/resolve-route-page";
+import type { RouteContent } from "@/server/bff";
 
-const loadSectionData = vi.fn().mockResolvedValue({});
+const loadSectionDataByKey = vi.fn().mockResolvedValue({});
 vi.mock("@/server/bff", () => ({
-  loadSectionData: (arg: unknown) => loadSectionData(arg) as Promise<Record<string, unknown>>,
+  loadSectionDataByKey: (arg: unknown) =>
+    loadSectionDataByKey(arg) as Promise<Record<string, unknown>>,
 }));
+// Breadcrumbs reads `useMatches()`, which needs a real router — out of scope
+// for this component's own tests; see `breadcrumbs.test.tsx`.
+vi.mock("@/components/breadcrumbs", () => ({ Breadcrumbs: () => null }));
 
-const { RoutePageView } = await import("./route-page");
+const { RouteContentView } = await import("./route-content-view");
 
-/** RoutePageView calls `useSectionView()`, so it must render under an AnalyticsProvider. */
+/** RouteContentView calls `useSectionView()`, so it must render under an AnalyticsProvider. */
 function renderView(
-  page: RoutePage,
-  { consentGranted = false }: { consentGranted?: boolean } = {},
+  content: RouteContent,
+  {
+    consentGranted = false,
+    outlet = null,
+  }: { consentGranted?: boolean; outlet?: React.ReactNode } = {},
 ): RenderResult & { adapter: MemoryAnalyticsAdapter } {
   const adapter = new MemoryAnalyticsAdapter();
   const result = render(
     <AnalyticsProvider adapter={adapter} consentGranted={consentGranted}>
-      <RoutePageView page={page} />
+      <RouteContentView content={content} outlet={outlet} wrap />
     </AnalyticsProvider>,
   );
   return Object.assign(result, { adapter });
@@ -31,8 +38,8 @@ function renderView(
 afterEach(() => {
   resetSectionObserver();
   vi.unstubAllGlobals();
-  loadSectionData.mockClear();
-  loadSectionData.mockResolvedValue({});
+  loadSectionDataByKey.mockClear();
+  loadSectionDataByKey.mockResolvedValue({});
 });
 
 const hero = (id: string, title: string): RouteSectionNode => ({
@@ -42,7 +49,7 @@ const hero = (id: string, title: string): RouteSectionNode => ({
   slots: {},
 });
 
-const outlet = (id: string): RouteSectionNode => ({
+const outletNode = (id: string): RouteSectionNode => ({
   instanceId: id,
   sectionKey: "outlet",
   content: {},
@@ -56,81 +63,64 @@ const feed = (id: string): RouteSectionNode => ({
   slots: {},
 });
 
-const page = (layers: RouteLayer[]): RoutePage => ({
-  pathname: "/home/about",
+const content = (
+  tree: RouteSectionNode[],
+  overrides: Partial<RouteContent> = {},
+): RouteContent => ({
+  routeKey: "about",
+  path: "/about",
   locale: "en",
   params: {},
-  pattern: "/home/about",
-  chain: [
-    { id: "home", path: "/home", href: "/home", title: "Home" },
-    { id: "about", path: "/home/about", href: "/home/about", title: "About" },
-  ],
-  layers,
+  tree: tree as unknown as RouteBundle["tree"],
+  hasOutlet: false,
   seo: {},
+  ...overrides,
 });
 
-describe("RoutePageView", () => {
-  it("renders the matched route standalone when its parent has no outlet", () => {
-    renderView(
-      page([
-        { bundleId: "home", tree: [hero("h", "Home page")], hasOutlet: false },
-        { bundleId: "about", tree: [hero("a", "About page")], hasOutlet: false },
-      ]),
-    );
-
-    // The child's content shows; the parent's does not swallow it.
-    expect(screen.getByRole("heading", { name: "About page" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Home page" })).toBeNull();
-  });
-
-  it("nests the matched route inside a parent that does have an outlet", () => {
-    renderView(
-      page([
-        { bundleId: "home", tree: [hero("h", "Home page"), outlet("o")], hasOutlet: true },
-        { bundleId: "about", tree: [hero("a", "About page")], hasOutlet: false },
-      ]),
-    );
-
-    expect(screen.getByRole("heading", { name: "Home page" })).toBeTruthy();
+describe("RouteContentView", () => {
+  it("renders its own tree standalone when outlet is null", () => {
+    renderView(content([hero("a", "About page")]));
     expect(screen.getByRole("heading", { name: "About page" })).toBeTruthy();
   });
 
-  it("renders a lone top-level route unchanged", () => {
-    renderView(page([{ bundleId: "about", tree: [hero("a", "About page")], hasOutlet: false }]));
-
-    expect(screen.getByRole("heading", { name: "About page" })).toBeTruthy();
+  it("fills the tree's outlet node with the given outlet content", () => {
+    renderView(content([hero("h", "Blog"), outletNode("o")]), {
+      outlet: <p>child content</p>,
+    });
+    expect(screen.getByRole("heading", { name: "Blog" })).toBeTruthy();
+    expect(screen.getByText("child content")).toBeTruthy();
   });
 
   describe("deferred (non-blocking) sections", () => {
     it("shows a skeleton, then the data once the client fetch resolves", async () => {
-      loadSectionData.mockResolvedValue({
+      loadSectionDataByKey.mockResolvedValue({
         f: { ok: true, data: [{ title: "v1", url: "https://x/1", date: "2026-01-01" }] },
       });
-      const p = page([{ bundleId: "r", tree: [feed("f")], hasOutlet: false }]);
-      p.deferredSections = ["f"];
+      const c = content([feed("f")], { routeKey: "releases", deferredSections: ["f"] });
 
-      renderView(p);
+      renderView(c);
 
       expect(document.querySelectorAll(".bg-muted").length).toBeGreaterThan(0);
       expect(screen.queryByText(/unavailable right now/)).toBeNull();
-      expect(loadSectionData).toHaveBeenCalledWith({ data: { path: "/home/about" } });
+      expect(loadSectionDataByKey).toHaveBeenCalledWith({
+        data: { routeKey: "releases", params: {} },
+      });
 
       await waitFor(() => expect(screen.getByRole("link", { name: "v1" })).toBeTruthy());
       expect(document.querySelectorAll(".bg-muted").length).toBe(0);
     });
 
     it("falls back to the section's own error state when the deferred fetch throws", async () => {
-      loadSectionData.mockRejectedValue(new Error("boom"));
-      const p = page([{ bundleId: "r", tree: [feed("f")], hasOutlet: false }]);
-      p.deferredSections = ["f"];
+      loadSectionDataByKey.mockRejectedValue(new Error("boom"));
+      const c = content([feed("f")], { deferredSections: ["f"] });
 
-      renderView(p);
+      renderView(c);
       await waitFor(() => expect(screen.getByText(/unavailable right now/)).toBeTruthy());
     });
 
     it("does not fetch when there are no deferred sections", () => {
-      renderView(page([{ bundleId: "r", tree: [feed("f")], hasOutlet: false }]));
-      expect(loadSectionData).not.toHaveBeenCalled();
+      renderView(content([feed("f")]));
+      expect(loadSectionDataByKey).not.toHaveBeenCalled();
     });
   });
 
@@ -155,16 +145,9 @@ describe("RoutePageView", () => {
     }
     vi.stubGlobal("IntersectionObserver", MockIO);
 
-    const { adapter } = renderView(
-      page([
-        {
-          bundleId: "about",
-          tree: [hero("a", "About page"), hero("b", "More")],
-          hasOutlet: false,
-        },
-      ]),
-      { consentGranted: true },
-    );
+    const { adapter } = renderView(content([hero("a", "About page"), hero("b", "More")]), {
+      consentGranted: true,
+    });
 
     const io = MockIO.last!;
     const first = document.querySelector("[data-section-instance='a']")!;
