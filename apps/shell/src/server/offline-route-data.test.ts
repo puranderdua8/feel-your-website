@@ -1,7 +1,11 @@
 import type { RouteBundle } from "@feel-your-website/content-core";
 import { describe, expect, it } from "vitest";
 
-import { toOfflineRouteData } from "./offline-route-data.js";
+import {
+  fromOfflineRouteData,
+  toOfflineRouteData,
+  type OfflineRouteData,
+} from "./offline-route-data.js";
 
 const bundle = (overrides: Partial<RouteBundle> = {}): RouteBundle => ({
   id: "uuid-1",
@@ -39,5 +43,41 @@ describe("toOfflineRouteData", () => {
       tree: [{ instanceId: "o", sectionKey: "outlet", content: {}, slots: {} }],
     });
     expect(toOfflineRouteData(withOutlet).hasOutlet).toBe(true);
+  });
+});
+
+describe("fromOfflineRouteData", () => {
+  const data: OfflineRouteData = {
+    routeKey: "blog-post",
+    path: "/blog/:slug",
+    tree: [{ instanceId: "n", sectionKey: "hero", content: {}, slots: {} }],
+    seo: {
+      en: { title: "{{slug}} — Blog" },
+      hi: { title: "{{slug}} — ब्लॉग" },
+    },
+    hasOutlet: false,
+  };
+
+  it("builds a RouteContent for the given locale, with empty params", () => {
+    const result = fromOfflineRouteData(data, "en");
+    expect(result).toEqual({
+      routeKey: "blog-post",
+      path: "/blog/:slug",
+      locale: "en",
+      params: {},
+      tree: data.tree,
+      hasOutlet: false,
+      // No params to fill — `{{slug}}` interpolates to empty, same as
+      // `interpolateSeo` does for any placeholder it has no value for.
+      seo: { title: " — Blog" },
+    });
+  });
+
+  it("picks the requested locale's own seo bag", () => {
+    expect(fromOfflineRouteData(data, "hi").seo).toEqual({ title: " — ब्लॉग" });
+  });
+
+  it("returns {} seo for a locale the seed has none for", () => {
+    expect(fromOfflineRouteData(data, "fr").seo).toEqual({});
   });
 });

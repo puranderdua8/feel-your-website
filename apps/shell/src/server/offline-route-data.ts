@@ -1,9 +1,12 @@
 import {
+  interpolateSeo,
   treeHasOutlet,
   type RouteBundle,
   type RouteSectionNode,
   type RouteSeo,
 } from "@feel-your-website/content-core";
+
+import type { RouteContent } from "./bff.js";
 
 /**
  * One `offline: true` bundle's precached seed (plan finding 1/10):
@@ -37,5 +40,26 @@ export function toOfflineRouteData(bundle: RouteBundle): OfflineRouteData {
     tree: bundle.tree,
     seo: bundle.seo,
     hasOutlet: treeHasOutlet(bundle.tree),
+  };
+}
+
+/**
+ * The inverse of {@link toOfflineRouteData}: turns a precached offline seed
+ * back into a `RouteContent`, for whichever locale the visitor currently
+ * has — `cms-route.tsx`'s client-side fallback when `loadRouteContent` can't
+ * be reached at all. `params` is always `{}` (offline routes never take
+ * any), so interpolation is a no-op; it still runs, for the same reason
+ * `resolveRouteByKey` always does: the `RouteContent` shape promises
+ * interpolated values, never a raw `{{}}` template.
+ */
+export function fromOfflineRouteData(data: OfflineRouteData, locale: string): RouteContent {
+  return {
+    routeKey: data.routeKey,
+    path: data.path,
+    locale,
+    params: {},
+    tree: data.tree,
+    hasOutlet: data.hasOutlet,
+    seo: interpolateSeo(data.seo[locale] ?? {}, {}),
   };
 }

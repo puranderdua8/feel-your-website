@@ -1,7 +1,10 @@
-import { notFound, Outlet, useLoaderData } from "@tanstack/react-router";
+import { isNotFound, notFound, Outlet, useLoaderData } from "@tanstack/react-router";
 
 import { RouteContentView, seoToHead } from "@/components/route-content-view";
+import { CMS_ROUTES } from "@/generated/cms-routes.js";
 import { loadRouteContent, type RouteContent } from "@/server/bff";
+import { readOfflineLocale } from "@/server/offline-locale";
+import { fromOfflineRouteData, type OfflineRouteData } from "@/server/offline-route-data";
 
 /**
  * The shared runtime every generated `(cms)/**` file points at.
@@ -43,14 +46,52 @@ import { loadRouteContent, type RouteContent } from "@/server/bff";
  * ```
  */
 
-/** Resolves one bundle by `routeKey`, validating `ctx.params` against it; `notFound()` otherwise. */
+/** Every `offline: true` routeKey in this build — `cmsLoader`'s offline fallback only applies to these. */
+const OFFLINE_ROUTE_KEYS = new Set(
+  CMS_ROUTES.filter((route) => route.offline).map((route) => route.routeKey),
+);
+
+/**
+ * Fetches `/offline-data/<routeKey>.json` — the seed `generate-offline-data.ts`
+ * wrote at build time and the service worker precached — for the visitor's
+ * own locale. `null` if it's missing (an offline build with no seed for this
+ * key, or the browser truly has nothing precached), which `cmsLoader` treats
+ * the same as any other failure: it re-throws whatever the network attempt
+ * itself threw.
+ */
+async function loadOfflineRouteContent(routeKey: string): Promise<RouteContent | null> {
+  const response = await fetch(`/offline-data/${routeKey}.json`).catch(() => null);
+  if (!response || !response.ok) return null;
+  const data = (await response.json()) as OfflineRouteData;
+  return fromOfflineRouteData(data, readOfflineLocale());
+}
+
+/**
+ * Resolves one bundle by `routeKey`, validating `ctx.params` against it;
+ * `notFound()` if it isn't published.
+ *
+ * `loadRouteContent` is a network call (a `_serverFn` request the service
+ * worker's "bff" cache may or may not have anything for), so it can fail for
+ * reasons that have nothing to do with the route itself — offline, with no
+ * cached response for this exact request. For an `offline: true` route,
+ * that specific failure falls back to the precached seed (plan finding 1)
+ * rather than the generic error boundary; `notFound()` and any other route
+ * are re-thrown unchanged.
+ */
 export async function cmsLoader(
   ctx: { params: Record<string, string> },
   routeKey: string,
 ): Promise<RouteContent> {
-  const content = await loadRouteContent({ data: { routeKey, params: ctx.params } });
-  if (!content) throw notFound();
-  return content;
+  try {
+    const content = await loadRouteContent({ data: { routeKey, params: ctx.params } });
+    if (!content) throw notFound();
+    return content;
+  } catch (error) {
+    if (isNotFound(error) || !OFFLINE_ROUTE_KEYS.has(routeKey)) throw error;
+    const offline = await loadOfflineRouteContent(routeKey);
+    if (!offline) throw error;
+    return offline;
+  }
 }
 
 /** The matched bundle's (already param-interpolated) SEO as `head()` meta/links. */
