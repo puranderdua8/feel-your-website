@@ -1,10 +1,19 @@
 import { useTranslations } from "@feel-your-website/i18n-core/react";
 import { Button } from "@feel-your-website/ui";
+import { useRouterState } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 
+import { CMS_ROUTES } from "@/generated/cms-routes.js";
+
+/** Every path this build precaches for offline — always exact, since an offline route never takes params. */
+const OFFLINE_PATHS = new Set(
+  CMS_ROUTES.filter((route) => route.offline).map((route) => route.path),
+);
+
 /**
- * Registers the service worker and surfaces the two states a user can act on:
- * "you are offline" and "a new version is ready".
+ * Registers the service worker and surfaces the states a user can act on:
+ * "you are offline" (with real, precached content), "this page isn't
+ * available offline", and "a new version is ready".
  *
  * Registration uses the plain `navigator.serviceWorker` API rather than
  * vite-plugin-pwa's `virtual:pwa-register` module. The virtual module has to
@@ -19,6 +28,7 @@ import { useCallback, useEffect, useState } from "react";
  */
 export function ServiceWorkerNotice() {
   const t = useTranslations();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [offline, setOffline] = useState(false);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
 
@@ -92,7 +102,13 @@ export function ServiceWorkerNotice() {
       className="border-border bg-background flex items-center justify-between gap-4 border-b px-4 py-2 text-sm"
     >
       {offline ? (
-        <span>{t("bootstrap.offline.body")}</span>
+        <span>
+          {t(
+            OFFLINE_PATHS.has(pathname)
+              ? "bootstrap.offline.body"
+              : "bootstrap.offline.unavailable",
+          )}
+        </span>
       ) : (
         <>
           <span>{t("bootstrap.update.body")}</span>

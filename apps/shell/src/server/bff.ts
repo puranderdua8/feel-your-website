@@ -5,7 +5,7 @@ import { treeHasOutlet, type JsonValue } from "@feel-your-website/content-core";
 import { platformCatalog, resolvePermissions } from "@feel-your-website/rbac";
 import type { SectionDataEntry } from "@feel-your-website/section-registry";
 import { createServerFn } from "@tanstack/react-start";
-import { getCookies } from "@tanstack/react-start/server";
+import { getCookies, setResponseHeader } from "@tanstack/react-start/server";
 
 import { isSupportedLocale, persistLocale, resolveLocale } from "@/i18n/strategy.server";
 
@@ -133,9 +133,16 @@ async function resolveSessionPermissions(): Promise<{
  * messages, and the resolved permission set.
  *
  * One call rather than three so the first paint is not gated on a waterfall.
+ *
+ * `Cache-Control: no-store` — unlike `loadRouteContent`, this response
+ * carries the visitor's own `permissions`/`userId`, so it must never be the
+ * shared, cross-visitor response the service worker's "bff" cache would
+ * otherwise keep (`sw-src.js`'s `cacheWillUpdate` checks for this header).
  */
 export const loadBootstrap = createServerFn({ method: "GET" }).handler(
   async (): Promise<BootstrapPayload> => {
+    setResponseHeader("Cache-Control", "no-store");
+
     const locale = resolveLocale();
     const [{ userId, permissions }, { messages, nav, degraded }] = await Promise.all([
       resolveSessionPermissions(),

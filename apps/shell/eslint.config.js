@@ -23,6 +23,8 @@ export default [
         importScripts: "readonly",
         workbox: "readonly",
         Response: "readonly",
+        caches: "readonly",
+        BroadcastChannel: "readonly",
       },
     },
   },

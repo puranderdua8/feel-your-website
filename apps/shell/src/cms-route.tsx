@@ -2,6 +2,7 @@ import { isNotFound, notFound, Outlet, useLoaderData } from "@tanstack/react-rou
 
 import { RouteContentView, seoToHead } from "@/components/route-content-view";
 import { CMS_ROUTES } from "@/generated/cms-routes.js";
+import { refreshOfflineRoute } from "@/offline-refresh";
 import { loadRouteContent, type RouteContent } from "@/server/bff";
 import { readOfflineLocale } from "@/server/offline-locale";
 import { fromOfflineRouteData, type OfflineRouteData } from "@/server/offline-route-data";
@@ -85,6 +86,7 @@ export async function cmsLoader(
   try {
     const content = await loadRouteContent({ data: { routeKey, params: ctx.params } });
     if (!content) throw notFound();
+    refreshOfflineRoute(content, OFFLINE_ROUTE_KEYS);
     return content;
   } catch (error) {
     if (isNotFound(error) || !OFFLINE_ROUTE_KEYS.has(routeKey)) throw error;

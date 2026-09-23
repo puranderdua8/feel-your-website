@@ -17,6 +17,7 @@ export const BOOTSTRAP_MESSAGES: Readonly<Record<string, string>> = {
   "bootstrap.loading": "Loading…",
   "bootstrap.offline.title": "No connection",
   "bootstrap.offline.body": "You are offline. Showing the last saved version.",
+  "bootstrap.offline.unavailable": "This page isn't available offline.",
   "bootstrap.error.title": "Something went wrong",
   "bootstrap.error.body": "The page could not be loaded.",
   "bootstrap.retry": "Try again",
