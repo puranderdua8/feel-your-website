@@ -16,20 +16,39 @@ const route = (overrides: Partial<SnapshotRoute> = {}): SnapshotRoute => ({
 });
 
 describe("renderGeneratedFile", () => {
-  it("a leaf file imports and wires cmsLoader/cmsHead/CmsRouteComponent", () => {
+  it("a top-level leaf file wires cmsLoader/cmsHead/cmsRouteComponent, wrapped", () => {
     const { files } = planGeneratedFiles({
       version: 1,
       routes: [route({ routeKey: "about", path: "/about" })],
     });
     const source = renderGeneratedFile(files[0]!);
     expect(source).toContain('createFileRoute("/(cms)/about")');
-    expect(source).toContain("loader: cmsLoader");
+    expect(source).toContain('loader: (ctx) => cmsLoader(ctx, "about")');
     expect(source).toContain("head: cmsHead");
-    expect(source).toContain("component: CmsRouteComponent");
+    expect(source).toContain("component: cmsRouteComponent(true)");
     expect(source).toContain('from "@/cms-route"');
   });
 
-  it("a layout file renders only Outlet, no loader or head", () => {
+  it("a nested leaf (has a parentKey) wires cmsRouteComponent unwrapped", () => {
+    const { files } = planGeneratedFiles({
+      version: 1,
+      routes: [
+        route({ routeKey: "blog", path: "/blog", hasOutlet: true }),
+        route({
+          routeKey: "blog-slug",
+          path: "/blog/:slug",
+          parentKey: "blog",
+          paramNames: ["slug"],
+        }),
+      ],
+    });
+    const leaf = files.find((f) => f.routeKey === "blog-slug")!;
+    const source = renderGeneratedFile(leaf);
+    expect(source).toContain('loader: (ctx) => cmsLoader(ctx, "blog-slug")');
+    expect(source).toContain("component: cmsRouteComponent(false)");
+  });
+
+  it("a layout file fetches and renders its own bundle, with <Outlet/> filling its outlet", () => {
     const { files } = planGeneratedFiles({
       version: 1,
       routes: [route({ routeKey: "blog", path: "/blog", hasOutlet: true })],
@@ -37,13 +56,12 @@ describe("renderGeneratedFile", () => {
     const layout = files.find((f) => f.kind === "layout")!;
     const source = renderGeneratedFile(layout);
     expect(source).toContain('createFileRoute("/(cms)/blog")');
-    expect(source).toContain("component: Outlet");
-    expect(source).not.toContain("cmsLoader");
-    expect(source).not.toContain("loader:");
-    expect(source).not.toContain("head:");
+    expect(source).toContain('loader: (ctx) => cmsLoader(ctx, "blog")');
+    expect(source).toContain("head: cmsHead");
+    expect(source).toContain("component: cmsLayoutRouteComponent(true)");
   });
 
-  it("the layout's sibling index.tsx carries the loader/head (SEO only at the leaf)", () => {
+  it("the layout's sibling index.tsx renders nothing — the layout already owns that bundle", () => {
     const { files } = planGeneratedFiles({
       version: 1,
       routes: [route({ routeKey: "blog", path: "/blog", hasOutlet: true })],
@@ -51,7 +69,10 @@ describe("renderGeneratedFile", () => {
     const index = files.find((f) => f.kind === "leaf")!;
     const source = renderGeneratedFile(index);
     expect(source).toContain('createFileRoute("/(cms)/blog/")');
-    expect(source).toContain("loader: cmsLoader");
+    expect(source).toContain("component: NullRouteComponent");
+    expect(source).not.toContain("cmsLoader");
+    expect(source).not.toContain("loader:");
+    expect(source).not.toContain("head:");
   });
 
   it("a param segment maps to $name in both the file path and the route id", () => {

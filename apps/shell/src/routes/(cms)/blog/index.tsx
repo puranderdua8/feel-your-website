@@ -6,10 +6,8 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 
-import { cmsHead, cmsLoader, CmsRouteComponent } from "@/cms-route";
+import { NullRouteComponent } from "@/cms-route";
 
 export const Route = createFileRoute("/(cms)/blog/")({
-  loader: cmsLoader,
-  head: cmsHead,
-  component: CmsRouteComponent,
+  component: NullRouteComponent,
 });
