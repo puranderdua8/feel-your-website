@@ -24,20 +24,13 @@ import {
 import { parseAnalyticsBatch } from "./analytics-ingest.js";
 import { loadAnalyticsConfig, type AnalyticsConfig } from "./config/analytics.js";
 import { assertSameOrigin } from "./http-guards.js";
-import {
-  resolveAndInvokeAction,
-  resolveAndInvokeActionByRouteKey,
-  type InvokeActionByKeyInput,
-  type InvokeActionInput,
-} from "./invoke-action.js";
+import { resolveAndInvokeActionByRouteKey, type InvokeActionByKeyInput } from "./invoke-action.js";
 import { buildNav, knownRouteHeaders, type NavNode } from "./nav.js";
-import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 import {
   deferredRouteContentSectionIds,
   loadRouteContentSectionData,
 } from "./route-content-data.js";
 import { resolveRouteByKey, type RouteContentResult } from "./route-content.js";
-import { deferredSectionIds, loadRouteSectionData } from "./route-page-data.js";
 
 /**
  * The BFF.
@@ -72,14 +65,12 @@ export interface BootstrapPayload {
 }
 
 export type { NavNode } from "./nav.js";
-export type { RouteChainEntry, RouteLayer, RoutePage } from "./resolve-route-page.js";
 
 /**
- * One resolved bundle's own content — the bundle-scoped counterpart to
- * {@link RoutePage} (plan finding 3). No `chain`/`layers`: each route level
- * (layout, leaf) fetches and renders only its own bundle, TanStack's own
- * nested `<Outlet/>` does the composition, and breadcrumbs come from
- * `useMatches()` client-side.
+ * One resolved bundle's own content (plan finding 3). No `chain`/`layers`:
+ * each route level (layout, leaf) fetches and renders only its own bundle,
+ * TanStack's own nested `<Outlet/>` does the composition, and breadcrumbs
+ * come from `useMatches()` client-side.
  */
 export interface RouteContent {
   readonly routeKey: string;
@@ -225,67 +216,7 @@ export const setLocale = createServerFn({ method: "POST" })
   });
 
 /**
- * Resolves a request path against the published route manifest — the piece
- * that turns a CMS author publishing a route into an actual page. The matching,
- * parent-chain walk, param sanitising and SEO interpolation are the pure
- * {@link resolveRoutePage}; this wrapper just supplies the locale and manifest.
- *
- * Returns `null` for no match, a reserved path, or a hostile param — all of
- * which are `notFound()` at the route layer, not BFF errors to throw.
- *
- * When a section on the matched page references a query action, its external
- * data is fetched here — one fan-out under a shared budget — and attached as
- * {@link RoutePage.sectionData}, so the first paint carries it and no client
- * waterfall follows. A fan-out failure degrades to no `sectionData`, never a
- * 500: each such section renders its own fallback.
- */
-export const loadRoutePage = createServerFn({ method: "GET" })
-  .validator((input: unknown): { path: string } => {
-    const path = (input as { path?: unknown })?.path;
-    if (typeof path !== "string" || path.trim() === "") {
-      throw new Error("path is required.");
-    }
-    return { path };
-  })
-  .handler(async ({ data }): Promise<RoutePage | null> => {
-    const locale = resolveLocale();
-    // `getRouteManifest` ignores its own locale argument — route structure is
-    // shared across locales and every node ships content for all of them.
-    const manifest = await getContentAdapter().getRouteManifest(locale);
-    const page = resolveRoutePage(data.path, manifest, locale);
-    if (!page) return null;
-
-    const sectionData = await loadRouteSectionData(page, getActionInvoker());
-    const deferredSections = deferredSectionIds(page);
-
-    const withData = Object.keys(sectionData).length > 0 ? { ...page, sectionData } : page;
-    return deferredSections.length > 0 ? { ...withData, deferredSections } : withData;
-  });
-
-/**
- * The client-refetch pass for a route's non-blocking sections. `RoutePageView`
- * calls this after mount for every id in {@link RoutePage.deferredSections};
- * the route is re-resolved from published content — the request carries only
- * the pathname.
- */
-export const loadSectionData = createServerFn({ method: "GET" })
-  .validator((input: unknown): { path: string } => {
-    const path = (input as { path?: unknown })?.path;
-    if (typeof path !== "string" || path.trim() === "") {
-      throw new Error("path is required.");
-    }
-    return { path };
-  })
-  .handler(async ({ data }): Promise<Record<string, SectionDataEntry>> => {
-    const locale = resolveLocale();
-    const manifest = await getContentAdapter().getRouteManifest(locale);
-    const page = resolveRoutePage(data.path, manifest, locale);
-    if (!page) return {};
-    return loadRouteSectionData(page, getActionInvoker(), { phase: "deferred" });
-  });
-
-/**
- * Idempotency replay for {@link invokeAction}: a completed invoke of an
+ * Idempotency replay for {@link invokeActionByKey}: a completed invoke of an
  * `idempotent` action, keyed by `actionId\0requestId`. Process-local, so it
  * covers a double-click and an in-flight retry on the same instance, not a
  * fleet — a money/state action still needs an upstream `Idempotency-Key`.
@@ -293,53 +224,7 @@ export const loadSectionData = createServerFn({ method: "GET" })
 const invokeReplayCache = new Map<string, Promise<ActionResult>>();
 
 /**
- * Fires the registered mutation a `mode: "action"` CTA points at.
- *
- * The client sends only the pathname, the firing node's `instanceId` and a
- * per-submit `requestId`. The server re-resolves the route from published
- * content, reads the action id / input mapping / permission off that node, and
- * rebuilds the request body from re-sanitised route params — nothing about the
- * call is taken from the request. See {@link resolveAndInvokeAction}.
- */
-export const invokeAction = createServerFn({ method: "POST" })
-  .validator((input: unknown): InvokeActionInput => {
-    const raw = (input ?? {}) as Record<string, unknown>;
-    const requireString = (key: "path" | "instanceId" | "requestId"): string => {
-      const value = raw[key];
-      if (typeof value !== "string" || value.trim() === "") {
-        throw new Error(`${key} is required.`);
-      }
-      return value;
-    };
-    const formInput =
-      typeof raw.formInput === "object" && raw.formInput !== null && !Array.isArray(raw.formInput)
-        ? (raw.formInput as Record<string, JsonValue>)
-        : undefined;
-    return {
-      path: requireString("path"),
-      instanceId: requireString("instanceId"),
-      requestId: requireString("requestId"),
-      formInput,
-    };
-  })
-  .handler(async ({ data }): Promise<ActionResult> => {
-    assertSameOrigin();
-
-    const locale = resolveLocale();
-    const manifest = await getContentAdapter().getRouteManifest(locale);
-
-    return resolveAndInvokeAction(data, {
-      manifest,
-      locale,
-      session: await resolveSessionPermissions(),
-      invoker: getActionInvoker(),
-      replayCache: invokeReplayCache,
-    });
-  });
-
-/**
- * The bundle-scoped counterpart to {@link loadRoutePage} (plan finding 3):
- * looks the route up directly by its stable `routeKey`
+ * Looks the route up directly by its stable `routeKey`
  * (`ContentAdapter.getRouteByKey`), never by re-matching a path, and
  * validates `params` against *that bundle's own* `paramNames`. Returns
  * `null` for an unknown/unpublished key or an invalid param — both are
@@ -386,9 +271,8 @@ export const loadRouteContent = createServerFn({ method: "GET" })
   });
 
 /**
- * The bundle-scoped counterpart to {@link loadSectionData}: the client-refetch
- * pass for one bundle's non-blocking sections, addressed by `routeKey` +
- * `params` rather than a path.
+ * The client-refetch pass for one bundle's non-blocking sections, called
+ * after mount for every id in {@link RouteContent.deferredSections}.
  */
 export const loadSectionDataByKey = createServerFn({ method: "GET" })
   .validator((input: unknown): { routeKey: string; params: Record<string, string> } => {
@@ -409,10 +293,14 @@ export const loadSectionDataByKey = createServerFn({ method: "GET" })
   });
 
 /**
- * The bundle-scoped counterpart to {@link invokeAction} (plan finding 3): the
- * client sends `routeKey` + `params` instead of a pathname, so the server
- * looks the bundle up directly rather than re-deriving it from a request
- * path. See {@link resolveAndInvokeActionByRouteKey}.
+ * Fires the registered mutation a `mode: "action"` CTA points at.
+ *
+ * The client sends only the `routeKey` + `params` of the bundle it renders
+ * inside, the firing node's `instanceId`, and a per-submit `requestId` — the
+ * server looks the bundle up directly rather than re-deriving it from a
+ * request path, reads the action id / input mapping / permission off that
+ * node, and rebuilds the request body from re-sanitised route params. See
+ * {@link resolveAndInvokeActionByRouteKey}.
  */
 export const invokeActionByKey = createServerFn({ method: "POST" })
   .validator((input: unknown): InvokeActionByKeyInput => {

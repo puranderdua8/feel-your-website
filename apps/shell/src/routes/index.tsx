@@ -4,21 +4,26 @@ import { ThemeProvider } from "@feel-your-website/theme/client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { RoutePageView, seoToHead } from "@/components/route-page";
+import { RouteContentView, seoToHead } from "@/components/route-content-view";
+import { CMS_ROUTES } from "@/generated/cms-routes.js";
 import { localeConfig } from "@/i18n/config";
-import { loadRoutePage, type RoutePage } from "@/server/bff";
+import { loadRouteContent, type RouteContent } from "@/server/bff";
 
 import { ThemeShowcase } from "@/components/theme-showcase";
 import { Route as RootRoute } from "./__root";
 
+/** Set once, from the build manifest — `/` has no path params, so this is the whole lookup. */
+const HOME_ROUTE_KEY = CMS_ROUTES.find((route) => route.path === "/")?.routeKey ?? null;
+
 /**
- * The home page delegates to the route matcher: if a CMS route is published at
- * `/`, it renders that; otherwise it falls back to the built-in showcase below.
- * `/` is deliberately absent from content-core's `RESERVED_ROUTE_PREFIXES`
+ * The home page delegates to the CMS: if a route is published at `/`, it
+ * renders that; otherwise it falls back to the built-in showcase below. `/`
+ * is deliberately absent from content-core's `RESERVED_ROUTE_PREFIXES`
  * precisely so it can be authored.
  */
 export const Route = createFileRoute("/")({
-  loader: async (): Promise<RoutePage | null> => loadRoutePage({ data: { path: "/" } }),
+  loader: async (): Promise<RouteContent | null> =>
+    HOME_ROUTE_KEY ? loadRouteContent({ data: { routeKey: HOME_ROUTE_KEY, params: {} } }) : null,
   head: ({ loaderData }) => (loaderData ? seoToHead(loaderData) : {}),
   component: Home,
 });
@@ -28,10 +33,10 @@ const THEMES = ["base", "corporate", "playful"] as const;
 function Home() {
   const t = useTranslations();
   const bootstrap = RootRoute.useLoaderData();
-  const page = Route.useLoaderData();
+  const content = Route.useLoaderData();
 
   // A CMS-authored `/` wins; the showcase below is the fallback.
-  if (page) return <RoutePageView page={page} />;
+  if (content) return <RouteContentView content={content} outlet={null} wrap />;
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-8 p-8">

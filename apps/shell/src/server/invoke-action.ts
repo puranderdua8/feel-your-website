@@ -10,20 +10,7 @@ import type { JsonValue, RouteBundle, RouteSectionNode } from "@feel-your-websit
 import { flattenNodes } from "@feel-your-website/content-core";
 
 import { buildActionBody } from "./build-action-body.js";
-import { resolveRoutePage, type RoutePage } from "./resolve-route-page.js";
 import { resolveRouteByKey } from "./route-content.js";
-
-/** What a CTA click posts. `path` + `instanceId` let the server re-derive everything itself. */
-export interface InvokeActionInput {
-  /** The pathname the CTA is on — the server re-resolves it, never trusting a client tree. */
-  readonly path: string;
-  /** The `button` node that fired. */
-  readonly instanceId: string;
-  /** Per-submit id: an idempotent action replays the first result for a repeated id. */
-  readonly requestId: string;
-  /** Submitted form values (the form-input primitive is not built yet, so normally absent). */
-  readonly formInput?: Readonly<Record<string, JsonValue>>;
-}
 
 interface RunInvokeDeps {
   readonly locale: string;
@@ -33,19 +20,6 @@ interface RunInvokeDeps {
   readonly catalog?: ActionCatalog;
   /** Idempotency replay store, keyed by `actionId\0requestId`. Injectable for tests. */
   readonly replayCache?: Map<string, Promise<ActionResult>>;
-}
-
-export interface InvokeActionDeps extends RunInvokeDeps {
-  readonly manifest: readonly RouteBundle[];
-}
-
-function findButtonNode(page: RoutePage, instanceId: string): RouteSectionNode | null {
-  for (const layer of page.layers) {
-    for (const node of flattenNodes(layer.tree)) {
-      if (node.instanceId === instanceId && node.sectionKey === "button") return node;
-    }
-  }
-  return null;
 }
 
 function findButtonNodeInTree(
@@ -78,13 +52,11 @@ async function runInvoke(
 }
 
 /**
- * The shared authoritative half, once the firing `button` node and its route's
- * params are in hand — everything both {@link resolveAndInvokeAction} and
- * {@link resolveAndInvokeActionByRouteKey} do identically: read the action id /
- * input mapping / RBAC requirement off the node's *published* content, rebuild
- * the request body from re-sanitised route params, validate, and invoke
- * (with idempotency replay). Never trusts the request for any of this beyond
- * `formInput` and `requestId`.
+ * Once the firing `button` node and its route's params are in hand: read the
+ * action id / input mapping / RBAC requirement off the node's *published*
+ * content, rebuild the request body from re-sanitised route params, validate,
+ * and invoke (with idempotency replay). Never trusts the request for any of
+ * this beyond `formInput` and `requestId`.
  */
 async function invokeFromNode(
   node: RouteSectionNode,
@@ -134,34 +106,10 @@ async function invokeFromNode(
 }
 
 /**
- * The authoritative half of the `invokeAction` server fn — everything but
- * `assertSameOrigin()` and gathering the deps.
- *
- * The route is re-resolved from the published manifest, the firing node is
- * found by `instanceId`, and the action id, input mapping and RBAC requirement
- * are read from *published* content — never from the request. The body is
- * rebuilt by {@link buildActionBody} from re-sanitised route params. Expected
- * failures come back as an `ok: false` {@link ActionResult}, not a throw, and
- * never carry upstream text.
- */
-export async function resolveAndInvokeAction(
-  input: InvokeActionInput,
-  deps: InvokeActionDeps,
-): Promise<ActionResult> {
-  const page = resolveRoutePage(input.path, deps.manifest, deps.locale);
-  if (!page) return { ok: false, code: "not_found" };
-
-  const node = findButtonNode(page, input.instanceId);
-  if (!node) return { ok: false, code: "not_found" };
-
-  return invokeFromNode(node, page.params, input, deps);
-}
-
-/**
- * What a CTA click posts under the bundle-scoped model (plan finding 3):
- * `routeKey` + `params` name the button's own route directly, instead of a
- * path the server would have to re-match. See `route-content.ts`'s doc
- * comment for why this is the model every route level now uses.
+ * What a CTA click posts (plan finding 3): `routeKey` + `params` name the
+ * button's own route directly, instead of a path the server would have to
+ * re-match. See `route-content.ts`'s doc comment for why this is the model
+ * every route level uses.
  */
 export interface InvokeActionByKeyInput {
   readonly routeKey: string;
@@ -177,11 +125,17 @@ export interface InvokeActionByKeyDeps extends RunInvokeDeps {
 }
 
 /**
- * The bundle-scoped counterpart to {@link resolveAndInvokeAction}: the bundle
- * is looked up directly by `routeKey` (never re-matched from a path), params
- * are validated against *that bundle's own* `paramNames`, and the firing node
- * is searched for only in that bundle's own tree — a button belongs to
- * whichever bundle authored it, never an ancestor's or a descendant's.
+ * The authoritative half of the `invokeActionByKey` server fn — everything but
+ * `assertSameOrigin()` and gathering the deps.
+ *
+ * The bundle is looked up directly by `routeKey` (never re-matched from a
+ * path), params are validated against *that bundle's own* `paramNames`, and
+ * the firing node is searched for only in that bundle's own tree — a button
+ * belongs to whichever bundle authored it, never an ancestor's or a
+ * descendant's. The action id, input mapping and RBAC requirement are read
+ * from *published* content — never from the request. Expected failures come
+ * back as an `ok: false` {@link ActionResult}, not a throw, and never carry
+ * upstream text.
  */
 export async function resolveAndInvokeActionByRouteKey(
   input: InvokeActionByKeyInput,

@@ -1,12 +1,12 @@
 import { interpolateSeo, type RouteBundle, type RouteSeo } from "@feel-your-website/content-core";
 
-import { sanitizeParam } from "./resolve-route-page.js";
+import { sanitizeParam } from "./sanitize-param.js";
 
 /**
- * The bundle-scoped counterpart to `resolve-route-page.ts`'s `resolveRoutePage`
- * (plan finding 3): a caller that already knows *which* route it means — a
- * generated route file's own loader, an action invocation, a deferred
- * section-data fetch — looks the bundle up by its stable `routeKey`
+ * Resolves one bundle for a caller that already knows *which* route it means
+ * (plan finding 3) — a generated route file's own loader, an action
+ * invocation, a deferred section-data fetch — by looking it up by its stable
+ * `routeKey`
  * (`ContentAdapter.getRouteByKey`, never by re-deriving identity from a
  * request path) and validates params against *that bundle's own*
  * `paramNames`. There is no ancestor-chain walk here: each route level
