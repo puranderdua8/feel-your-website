@@ -94,6 +94,8 @@ export interface RouteCompositionWriter {
 export interface RouteCompositionSummary {
   readonly id: string;
   readonly name: string;
+  /** See {@link RouteBundle.routeKey} — the editor's own key into `/build-info.json`'s deployed route list. */
+  readonly routeKey: string;
   /** The absolute path pattern — see {@link RouteBundle.path}. */
   readonly path: string;
   /** This route's own path contribution — see {@link RouteBundle.pathSegment}. */

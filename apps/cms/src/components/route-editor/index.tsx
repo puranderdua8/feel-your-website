@@ -36,10 +36,12 @@ import { useContentLocale } from "@/i18n/content-locale";
 import {
   deleteRouteComposition,
   deleteRouteSubtree,
+  getDeployStatus,
   listRouteCompositions,
   loadRouteComposition,
   saveRouteComposition,
 } from "@/server/bff";
+import { type DeployStatus, pendingRouteKeys } from "@/server/deploy-status";
 import { composeCandidatePath } from "@/server/route-input";
 
 import { LockedNotice } from "../locked-notice.js";
@@ -104,13 +106,16 @@ const BLANK: OpenRoute = {
 function RouteEditorInner({ actor }: { actor: string }) {
   const { contentLocale } = useContentLocale();
   const [routes, setRoutes] = useState<readonly RouteCompositionSummary[]>([]);
+  const [deployStatus, setDeployStatus] = useState<DeployStatus | null>(null);
   const [open, setOpen] = useState<OpenRoute | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setRoutes(await listRouteCompositions());
+    const [compositions, status] = await Promise.all([listRouteCompositions(), getDeployStatus()]);
+    setRoutes(compositions);
+    setDeployStatus(status);
   }, []);
 
   useEffect(() => {
@@ -268,6 +273,7 @@ function RouteEditorInner({ actor }: { actor: string }) {
         selectedId={open?.bundleId ?? null}
         onSelect={(id) => void openRoute(id)}
         onNew={startNew}
+        pendingRouteKeys={pendingRouteKeys(routes, deployStatus)}
       />
 
       {!open ? (

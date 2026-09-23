@@ -36,6 +36,7 @@ interface RouteBundleMeta {
   param_meta: unknown;
   has_outlet: boolean;
   offline: boolean;
+  route_key: string;
 }
 
 interface HeaderRow {
@@ -97,7 +98,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
     const { data, error } = await this.#client
       .from("config_bundles")
       .select(
-        "id, name, version, updated_at, route_bundles!inner(path, path_segment, published, parent_bundle_id, param_meta, has_outlet, offline)",
+        "id, name, version, updated_at, route_bundles!inner(path, path_segment, published, parent_bundle_id, param_meta, has_outlet, offline, route_key)",
       )
       .eq("vocabulary", "template_key")
       .order("name");
@@ -110,6 +111,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
         {
           id: row.id,
           name: row.name,
+          routeKey: meta.route_key,
           path: meta.path,
           pathSegment: meta.path_segment,
           parentId: meta.parent_bundle_id ?? null,
@@ -127,7 +129,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
     const { data: header, error: headerError } = await this.#client
       .from("config_bundles")
       .select(
-        "id, name, version, updated_at, route_bundles(path, path_segment, published, parent_bundle_id, param_meta, has_outlet, offline)",
+        "id, name, version, updated_at, route_bundles(path, path_segment, published, parent_bundle_id, param_meta, has_outlet, offline, route_key)",
       )
       .eq("id", bundleId)
       .eq("vocabulary", "template_key")
@@ -175,6 +177,7 @@ export class SupabaseRouteCompositionReader implements RouteCompositionReader {
     return {
       id: header.id,
       name: header.name,
+      routeKey: routeMeta.route_key,
       path: routeMeta.path,
       pathSegment: routeMeta.path_segment,
       parentId: routeMeta.parent_bundle_id ?? null,

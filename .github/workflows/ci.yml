@@ -42,6 +42,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Before Build: `pnpm build` runs `routes:generate` itself (as a safety
+      # net) and would silently regenerate any drift before this could see
+      # it. Catches a hand-edited `(cms)/**` file or a `routes.snapshot.json`
+      # someone forgot to run `routes:generate` after (plan Phase 5).
+      - name: CMS routes are in sync
+        run: pnpm --filter @feel-your-website/shell run routes:generate -- --check
+
       - name: Format check
         run: pnpm format:check
 

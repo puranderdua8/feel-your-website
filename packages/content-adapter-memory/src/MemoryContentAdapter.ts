@@ -152,6 +152,7 @@ export class MemoryContentAdapter
       return {
         id: bundle.id,
         name: route.name ?? bundle.path,
+        routeKey: bundle.routeKey,
         path: bundle.path,
         pathSegment: bundle.pathSegment,
         parentId: bundle.parentId,
@@ -172,6 +173,7 @@ export class MemoryContentAdapter
     return {
       id: bundle.id,
       name: route.name ?? bundle.path,
+      routeKey: bundle.routeKey,
       path: bundle.path,
       pathSegment: bundle.pathSegment,
       parentId: bundle.parentId,

@@ -30,7 +30,8 @@
     "ANALYTICS_COLLECTOR_PATH",
     "ANALYTICS_SAMPLE_RATE",
     "ANALYTICS_SINK",
-    "ANALYTICS_MP_API_SECRET"
+    "ANALYTICS_MP_API_SECRET",
+    "SHELL_BASE_URL"
   ],
   "tasks": {
     "build": {

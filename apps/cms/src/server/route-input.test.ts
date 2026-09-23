@@ -12,6 +12,7 @@ const summary = (
   over: Partial<RouteCompositionSummary> & Pick<RouteCompositionSummary, "id" | "path">,
 ): RouteCompositionSummary => ({
   name: over.id,
+  routeKey: over.id,
   pathSegment: over.path,
   parentId: null,
   published: true,
