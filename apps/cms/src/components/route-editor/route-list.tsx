@@ -12,11 +12,14 @@ export function RouteList({
   selectedId,
   onSelect,
   onNew,
+  pendingRouteKeys,
 }: {
   routes: readonly RouteCompositionSummary[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  /** Published route keys the deployed build doesn't know about yet — see `deploy-status.ts`. */
+  pendingRouteKeys: ReadonlySet<string>;
 }) {
   const forest = buildRouteForest(routes);
 
@@ -45,6 +48,11 @@ export function RouteList({
               {summary.path.includes(":") && (
                 <Badge variant="outline" className="text-[10px]">
                   param
+                </Badge>
+              )}
+              {summary.published && pendingRouteKeys.has(summary.routeKey) && (
+                <Badge variant="secondary" className="text-[10px]">
+                  pending — not in code yet
                 </Badge>
               )}
             </span>

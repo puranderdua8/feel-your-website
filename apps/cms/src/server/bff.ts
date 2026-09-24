@@ -37,6 +37,7 @@ import {
   getRouteCompositionWriter,
   getSiteSettingsStore,
 } from "./adapters.js";
+import { type DeployStatus, fetchDeployStatus } from "./deploy-status.js";
 import { collectRouteButtonIssues, firstUnsafeButtonHref } from "./route-buttons.js";
 import { parseParams, validateRouteInput } from "./route-input.js";
 
@@ -312,6 +313,16 @@ function parseSeo(value: unknown): Record<string, RouteSeo> {
 export const listRouteCompositions = createServerFn({ method: "GET" }).handler(
   async (): Promise<readonly RouteCompositionSummary[]> =>
     getRouteCompositionReader().listCompositions(),
+);
+
+/**
+ * The deployed shell build's own route manifest (plan Phase 5), so the
+ * editor can tell a published route apart from one that's "pending — not in
+ * code yet". `null` whenever `SHELL_BASE_URL` isn't configured or the deploy
+ * can't be reached — see `deploy-status.ts`.
+ */
+export const getDeployStatus = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DeployStatus | null> => fetchDeployStatus(process.env.SHELL_BASE_URL),
 );
 
 /** One route's whole section tree, drafts included — for the route editor. */

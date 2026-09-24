@@ -52,7 +52,10 @@ const { count, size, warnings } = await injectManifest({
   // The just-copied Workbox runtime is itself served from `dist/client/` —
   // `importScripts` fetches it at install time, so it needs no cache-busting
   // precache entry of its own (unlike the fingerprinted build assets above).
-  globIgnores: [`${workboxLibsDir}/**/*`],
+  // `build-info.json` (`generate-build-info.ts`) is metadata the CMS fetches
+  // server-to-server to compare against its own published routes — nothing
+  // in the app itself reads it, so precaching it would only add a dead entry.
+  globIgnores: [`${workboxLibsDir}/**/*`, "build-info.json"],
 });
 
 await rm(swSrcResolved);

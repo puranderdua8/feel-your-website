@@ -781,5 +781,21 @@ export function runRouteCompositionWriterContract(
       );
       expect((await reader.getComposition(plain.id))?.hasOutlet).toBe(true);
     });
+
+    readerIt("reports the route's routeKey on the summary and the full composition", async () => {
+      const writer = await createWriter();
+      const reader = readerFor!(writer);
+
+      const saved = await writer.saveComposition(
+        null,
+        { name: f.name, pathSegment: f.path, published: false, tree: heroTree(), seo: {} },
+        null,
+        "user-1",
+      );
+
+      const byId = new Map((await reader.listCompositions()).map((r) => [r.id, r]));
+      expect(byId.get(saved.id)?.routeKey).toBe(saved.routeKey);
+      expect((await reader.getComposition(saved.id))?.routeKey).toBe(saved.routeKey);
+    });
   });
 }
