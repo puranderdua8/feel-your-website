@@ -14,6 +14,8 @@ export interface RouteButtonIssue {
 export interface CollectRouteButtonOptions {
   /** Published route patterns, for the internal-link warning. */
   readonly knownRoutePatterns?: readonly string[];
+  /** The deployed shell build's route patterns, for the "not deployed yet" warning. */
+  readonly deployedRoutePatterns?: readonly string[];
   /** Param names this route exposes, for a `routeParam` mapping on an action CTA. */
   readonly routeParamNames?: readonly string[];
 }

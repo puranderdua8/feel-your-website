@@ -1,22 +1,15 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
-const push = vi.fn();
-vi.mock("@tanstack/react-router", () => ({
-  useRouter: () => ({ history: { push } }),
-}));
+import { renderWithRouter } from "@/test-utils/render-with-router";
 
-// Imported after the mock is registered.
-const { renderCtaLink } = await import("./cta-link.js");
-
-afterEach(() => {
-  push.mockClear();
-});
+import { renderCtaLink } from "./cta-link";
 
 function link(overrides: Partial<Parameters<typeof renderCtaLink>[0]> = {}) {
   return renderCtaLink({
     href: "/about",
     internal: true,
+    route: { pathname: "/about", search: "", hash: "" },
     newTab: false,
     label: "Go",
     children: "Go",
@@ -26,45 +19,56 @@ function link(overrides: Partial<Parameters<typeof renderCtaLink>[0]> = {}) {
 }
 
 describe("renderCtaLink", () => {
-  it("makes an internal same-tab link a client transition", () => {
-    render(link());
+  it("makes an internal same-tab link a client-side router transition", async () => {
+    const { router } = await renderWithRouter(link());
     const anchor = screen.getByRole("link", { name: "Go" });
     expect(anchor.getAttribute("href")).toBe("/about");
     expect(anchor.hasAttribute("target")).toBe(false);
+    expect(anchor.className).toContain("cta");
 
     fireEvent.click(anchor, { button: 0 });
-    expect(push).toHaveBeenCalledWith("/about");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/about"));
   });
 
-  it("does not intercept a modified click", () => {
-    render(link());
-    fireEvent.click(screen.getByRole("link", { name: "Go" }), {
-      button: 0,
-      metaKey: true,
-      // keep jsdom from attempting the (unimplemented) navigation
-      preventDefault: () => undefined,
-    });
-    // The real assertion: the handler saw the modifier and did nothing.
-    expect(push).not.toHaveBeenCalled();
+  it("keeps an authored query and fragment on the router link", async () => {
+    await renderWithRouter(
+      link({
+        href: "/blog/hello?ref=cta#comments",
+        route: { pathname: "/blog/hello", search: "?ref=cta", hash: "comments" },
+      }),
+    );
+    expect(screen.getByRole("link", { name: "Go" }).getAttribute("href")).toBe(
+      "/blog/hello?ref=cta#comments",
+    );
   });
 
-  it("renders an external link as a plain anchor", () => {
-    render(link({ href: "https://example.com", internal: false }));
+  it("does not client-transition a modified click", async () => {
+    const { router } = await renderWithRouter(link());
+    fireEvent.click(screen.getByRole("link", { name: "Go" }), { button: 0, metaKey: true });
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("renders an external link as a plain anchor", async () => {
+    await renderWithRouter(
+      link({ href: "https://example.com", internal: false, route: undefined }),
+    );
     const anchor = screen.getByRole("link", { name: "Go" });
     expect(anchor.getAttribute("href")).toBe("https://example.com");
     expect(anchor.hasAttribute("target")).toBe(false);
   });
 
-  it("adds target and rel for a new tab", () => {
-    render(link({ newTab: true }));
+  it("adds target and rel for a new tab", async () => {
+    await renderWithRouter(link({ newTab: true }));
     const anchor = screen.getByRole("link", { name: "Go" });
     expect(anchor.getAttribute("target")).toBe("_blank");
     expect(anchor.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it("does not client-transition a fragment href", () => {
-    render(link({ href: "#section" }));
-    fireEvent.click(screen.getByRole("link", { name: "Go" }), { button: 0 });
-    expect(push).not.toHaveBeenCalled();
+  it("leaves a same-page fragment as a plain anchor", async () => {
+    const { router } = await renderWithRouter(link({ href: "#section", route: undefined }));
+    const anchor = screen.getByRole("link", { name: "Go" });
+    expect(anchor.getAttribute("href")).toBe("#section");
+    fireEvent.click(anchor, { button: 0 });
+    expect(router.state.location.pathname).toBe("/");
   });
 });

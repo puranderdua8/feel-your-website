@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 
 import { AppAnalyticsProvider } from "@/analytics/provider";
 import { ConsentBanner } from "@/components/consent-banner";
+import { RouteAnnouncer } from "@/components/route-announcer";
 import { ServiceWorkerNotice } from "@/components/service-worker";
 import { SiteNav } from "@/components/site-nav";
 import { refreshOfflineBootstrap } from "@/offline-refresh";
@@ -114,6 +115,7 @@ function RootComponent() {
                 <ServiceWorkerNotice />
                 <SiteNav nav={bootstrap.nav} />
                 <Outlet />
+                <RouteAnnouncer />
               </ThemeProvider>
             </PermissionsProvider>
           </I18nProvider>

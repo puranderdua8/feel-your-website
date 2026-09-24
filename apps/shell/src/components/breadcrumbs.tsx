@@ -9,6 +9,7 @@ import {
 import { useMatches } from "@tanstack/react-router";
 import { Fragment } from "react";
 
+import { AppLink } from "@/components/app-link";
 import type { RouteContent } from "@/server/bff";
 
 /** Narrows a match's `loaderData` to a resolved CMS bundle — every `(cms)/**` layout/leaf's shape. */
@@ -71,7 +72,7 @@ export function Breadcrumbs(): React.JSX.Element | null {
                   <BreadcrumbPage>{entry.title}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <a href={entry.href}>{entry.title}</a>
+                    <AppLink to={entry.href}>{entry.title}</AppLink>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

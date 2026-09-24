@@ -636,14 +636,21 @@ export const checkRoutePublishReadiness = createServerFn({ method: "POST" })
 
     // Per-button link checks that `validateSectionFields` can't express: a
     // `link` needs a usable href, and an internal href that matches no
-    // published route is worth warning about. `knownRoutePatterns` are the
-    // published routes' path patterns, so `/blog/hello` matches `/blog/:slug`.
-    const publishedRoutePatterns = (await getRouteCompositionReader().listCompositions())
+    // published route — or no route in the deployed shell build, where it
+    // would 404 until the next deploy — is worth warning about. Both lists are
+    // path patterns, so `/blog/hello` matches `/blog/:slug`. An unreachable
+    // deploy status just skips the deployed check.
+    const [compositions, deployStatus] = await Promise.all([
+      getRouteCompositionReader().listCompositions(),
+      fetchDeployStatus(process.env.SHELL_BASE_URL),
+    ]);
+    const publishedRoutePatterns = compositions
       .filter((route) => route.published)
       .map((route) => route.path);
 
     for (const issue of collectRouteButtonIssues(data.tree, {
       knownRoutePatterns: publishedRoutePatterns,
+      ...(deployStatus ? { deployedRoutePatterns: deployStatus.routePaths } : {}),
       routeParamNames: data.paramNames,
     })) {
       structuralIssues.push({ message: `Button: ${issue.message}`, blocking: issue.blocking });

@@ -18,12 +18,24 @@ export interface DeployStatus {
   readonly snapshotHash: string;
   readonly builtAt: string;
   readonly routeKeys: readonly string[];
+  /**
+   * The deployed build's route path patterns (`/blog/:slug`) — what a CTA's
+   * internal link is checked against, since a link to a route not in the
+   * build lands on the 404 page until the next deploy.
+   */
+  readonly routePaths: readonly string[];
 }
+
+const FETCH_TIMEOUT_MS = 3_000;
 
 export async function fetchDeployStatus(baseUrl: string | undefined): Promise<DeployStatus | null> {
   if (!baseUrl) return null;
   try {
-    const response = await fetch(new URL("/build-info.json", baseUrl));
+    // Bounded: the publish-readiness check awaits this, and a hung deploy
+    // should cost the editor a skipped warning, not a stalled panel.
+    const response = await fetch(new URL("/build-info.json", baseUrl), {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) return null;
     return parseDeployStatus(await response.json());
   } catch {
@@ -44,7 +56,14 @@ function parseDeployStatus(body: unknown): DeployStatus | null {
       ? [(route as { routeKey: string }).routeKey]
       : [],
   );
-  return { snapshotHash, builtAt, routeKeys };
+  const routePaths = routes.flatMap((route) =>
+    typeof route === "object" &&
+    route !== null &&
+    typeof (route as { path?: unknown }).path === "string"
+      ? [(route as { path: string }).path]
+      : [],
+  );
+  return { snapshotHash, builtAt, routeKeys, routePaths };
 }
 
 /** Published route keys absent from the deployed manifest — the plan's "pending — not in code yet". */

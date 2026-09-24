@@ -6,6 +6,14 @@ import type { RouteContent } from "@/server/bff";
 
 let matches: unknown[] = [];
 vi.mock("@tanstack/react-router", () => ({ useMatches: () => matches }));
+// A stand-in for the router-backed link; its real behaviour is covered in app-link.test.
+vi.mock("@/components/app-link", () => ({
+  AppLink: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a data-app-link="" href={to}>
+      {children}
+    </a>
+  ),
+}));
 
 const { Breadcrumbs } = await import("./breadcrumbs");
 
@@ -72,7 +80,7 @@ describe("Breadcrumbs", () => {
     render(<Breadcrumbs />);
 
     const link = screen.getByRole("link", { name: "Blog" });
-    expect(link.tagName).toBe("A");
+    expect(link.hasAttribute("data-app-link")).toBe(true);
     expect(link.getAttribute("href")).toBe("/blog");
 
     const current = screen.getByText("hello — Blog");
