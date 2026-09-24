@@ -120,6 +120,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # The full stack, not `db start`: the live contract suites below talk
       # to `SUPABASE_URL` over HTTP — real GoTrue sign-ins, real PostgREST
