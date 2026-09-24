@@ -30,11 +30,14 @@ describe("fetchDeployStatus", () => {
 
     const status = await fetchDeployStatus("https://example.com");
 
-    expect(fetchMock).toHaveBeenCalledWith(new URL("https://example.com/build-info.json"));
+    expect(fetchMock).toHaveBeenCalledWith(new URL("https://example.com/build-info.json"), {
+      signal: expect.any(AbortSignal),
+    });
     expect(status).toEqual({
       snapshotHash: "abc123",
       builtAt: "2026-01-01T00:00:00.000Z",
       routeKeys: ["help", "blog"],
+      routePaths: ["/help", "/blog"],
     });
   });
 
@@ -66,6 +69,7 @@ describe("fetchDeployStatus", () => {
     );
     const status = await fetchDeployStatus("https://example.com");
     expect(status?.routeKeys).toEqual(["help"]);
+    expect(status?.routePaths).toEqual(["/no-key"]);
   });
 });
 
@@ -81,17 +85,17 @@ describe("pendingRouteKeys", () => {
   });
 
   it("flags a published route missing from the deployed manifest", () => {
-    const status = { snapshotHash: "h", builtAt: "t", routeKeys: ["help"] };
+    const status = { snapshotHash: "h", builtAt: "t", routeKeys: ["help"], routePaths: [] };
     expect(pendingRouteKeys(compositions, status)).toEqual(new Set(["blog"]));
   });
 
   it("never flags an unpublished (draft) route", () => {
-    const status = { snapshotHash: "h", builtAt: "t", routeKeys: ["help", "blog"] };
+    const status = { snapshotHash: "h", builtAt: "t", routeKeys: ["help", "blog"], routePaths: [] };
     expect(pendingRouteKeys(compositions, status).has("draft-route")).toBe(false);
   });
 
   it("flags nothing once the deployed manifest has caught up", () => {
-    const status = { snapshotHash: "h", builtAt: "t", routeKeys: ["help", "blog"] };
+    const status = { snapshotHash: "h", builtAt: "t", routeKeys: ["help", "blog"], routePaths: [] };
     expect(pendingRouteKeys(compositions, status).size).toBe(0);
   });
 });

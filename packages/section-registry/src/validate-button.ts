@@ -1,4 +1,8 @@
-import type { FieldIssue, JsonValue } from "@feel-your-website/content-core";
+import {
+  isReservedRoutePath,
+  type FieldIssue,
+  type JsonValue,
+} from "@feel-your-website/content-core";
 
 import { classifyHref } from "./link.js";
 
@@ -10,6 +14,13 @@ export interface ButtonIssue extends FieldIssue {
 export interface ValidateButtonContext {
   /** Published route patterns, for the internal-link warning. Omit to skip that check. */
   readonly knownRoutePatterns?: readonly string[];
+  /**
+   * Route patterns in the currently deployed shell build. A route that is
+   * published but not yet in a build has no file route, so a client-side link
+   * to it lands on the 404 page until the next deploy. Omit when the deployed
+   * build is unknown to skip that check.
+   */
+  readonly deployedRoutePatterns?: readonly string[];
 }
 
 function str(fields: Readonly<Record<string, JsonValue>>, key: string): string {
@@ -17,8 +28,7 @@ function str(fields: Readonly<Record<string, JsonValue>>, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-function matchesKnownRoute(pathname: string, patterns: readonly string[]): boolean {
-  const path = pathname.split(/[?#]/, 1)[0] ?? pathname;
+function matchesKnownRoute(path: string, patterns: readonly string[]): boolean {
   return patterns.some((pattern) => {
     const source = pattern
       .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -53,26 +63,47 @@ export function validateButtonSection(
     if (raw.trim() === "") {
       issues.push({ field: "href", message: "A link needs a URL.", blocking: true });
     } else {
-      const { kind, href } = classifyHref(raw);
+      const { kind, route } = classifyHref(raw);
       if (kind === "unsafe") {
         issues.push({
           field: "href",
           message: `“${raw}” is not a usable link.`,
           blocking: true,
         });
-      } else if (
-        kind === "internal" &&
-        context.knownRoutePatterns &&
-        !matchesKnownRoute(href, context.knownRoutePatterns)
-      ) {
-        issues.push({
-          field: "href",
-          message: `No published route matches “${href}”.`,
-          blocking: false,
-        });
+      } else if (route) {
+        const issue = internalRouteIssue(route.pathname, context);
+        if (issue) issues.push(issue);
       }
     }
   }
 
   return issues;
+}
+
+/**
+ * The one issue (if any) with an internal link's path. `/` always exists (the
+ * shell's home falls back to its own page) and a reserved prefix belongs to the
+ * shell, not the CMS — neither is checked against published routes.
+ */
+function internalRouteIssue(path: string, context: ValidateButtonContext): ButtonIssue | null {
+  if (path.split("/").some((segment) => segment.startsWith(":"))) {
+    return {
+      field: "href",
+      message: `“${path}” is a route pattern — link to a real page, e.g. with the parameter filled in.`,
+      blocking: true,
+    };
+  }
+  if (path === "/" || isReservedRoutePath(path)) return null;
+
+  if (context.knownRoutePatterns && !matchesKnownRoute(path, context.knownRoutePatterns)) {
+    return { field: "href", message: `No published route matches “${path}”.`, blocking: false };
+  }
+  if (context.deployedRoutePatterns && !matchesKnownRoute(path, context.deployedRoutePatterns)) {
+    return {
+      field: "href",
+      message: `“${path}” isn't in the deployed site yet — this link shows a 404 until the next deploy.`,
+      blocking: false,
+    };
+  }
+  return null;
 }

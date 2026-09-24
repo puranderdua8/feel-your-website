@@ -42,6 +42,52 @@ describe("validateButtonSection", () => {
     ).toEqual([]);
   });
 
+  it("blocks an internal href that is still a route pattern", () => {
+    const issues = validateButtonSection(
+      { mode: "link", href: "/blog/:slug" },
+      { knownRoutePatterns: ["/blog/:slug"] },
+    );
+    expect(issues).toEqual([
+      { field: "href", message: expect.stringContaining("route pattern"), blocking: true },
+    ]);
+  });
+
+  it("never warns about the home page or a shell-owned reserved path", () => {
+    for (const href of ["/", "/admin", "/admin/settings", "/?ref=x"]) {
+      expect(
+        validateButtonSection(
+          { mode: "link", href },
+          { knownRoutePatterns: ["/about"], deployedRoutePatterns: ["/about"] },
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it("warns (non-blocking) about a published route not yet in the deployed build", () => {
+    const issues = validateButtonSection(
+      { mode: "link", href: "/blog/hello?ref=cta#comments" },
+      { knownRoutePatterns: ["/about", "/blog/:slug"], deployedRoutePatterns: ["/about"] },
+    );
+    expect(issues).toEqual([
+      { field: "href", message: expect.stringContaining("next deploy"), blocking: false },
+    ]);
+  });
+
+  it("passes an internal href that is published and deployed", () => {
+    expect(
+      validateButtonSection(
+        { mode: "link", href: "/blog/hello#comments" },
+        { knownRoutePatterns: ["/blog/:slug"], deployedRoutePatterns: ["/blog/:slug"] },
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not route-check a same-page fragment or query", () => {
+    expect(
+      validateButtonSection({ mode: "link", href: "#top" }, { knownRoutePatterns: ["/about"] }),
+    ).toEqual([]);
+  });
+
   it("does not check the href in action mode", () => {
     expect(validateButtonSection({ mode: "action", actionId: "newsletter.subscribe" })).toEqual([]);
   });

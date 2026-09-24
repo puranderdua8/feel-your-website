@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import type { LinkSpec } from "./link.js";
 import { renderSection } from "./registry.js";
 
 describe("renderSection", () => {
@@ -81,6 +82,41 @@ describe("renderSection", () => {
         className: expect.any(String),
       },
     ]);
+  });
+
+  it("hands a link-mode button's split internal route to the host link renderer", () => {
+    const seen: LinkSpec[] = [];
+    const renderLink = (spec: LinkSpec) => {
+      seen.push(spec);
+      return <a href={spec.href}>{spec.children}</a>;
+    };
+
+    const { unmount } = render(
+      renderSection(
+        "button",
+        { label: "Read", mode: "link", href: "/blog/hello/?ref=cta#comments" },
+        {},
+        { renderLink },
+      ),
+    );
+    expect(seen[0]).toMatchObject({
+      href: "/blog/hello?ref=cta#comments",
+      internal: true,
+      newTab: false,
+      route: { pathname: "/blog/hello", search: "?ref=cta", hash: "comments" },
+    });
+    unmount();
+
+    render(
+      renderSection(
+        "button",
+        { label: "Out", mode: "link", href: "https://example.com", linkTarget: "new-tab" },
+        {},
+        { renderLink },
+      ),
+    );
+    expect(seen[1]).toMatchObject({ internal: false, newTab: true });
+    expect(seen[1]).not.toHaveProperty("route");
   });
 
   it("renders a skeleton for release-feed while its data is `{ pending: true }`", () => {

@@ -176,13 +176,14 @@ const ButtonSection: SectionComponent = ({ fields, renderLink, renderActionCta, 
     return <>{renderActionCta(spec)}</>;
   }
 
-  const { kind, href } = classifyHref(text(fields, "href"));
+  const { kind, href, route } = classifyHref(text(fields, "href"));
   if (kind === "unsafe") return <DisabledCta label={label} />;
 
   const newTab = text(fields, "linkTarget") === "new-tab";
   const spec: LinkSpec = {
     href,
     internal: kind === "internal",
+    ...(route ? { route } : {}),
     newTab,
     label,
     className: CTA_CLASS,

@@ -89,6 +89,31 @@ describe("collectRouteButtonIssues", () => {
     ).toEqual([]);
   });
 
+  it("warns once when a published link target isn't in the deployed build", () => {
+    const issues = collectRouteButtonIssues(
+      [
+        button("a", {
+          en: { mode: "link", href: "/blog/hello" },
+          hi: { mode: "link", href: "/blog/hello" },
+        }),
+      ],
+      { knownRoutePatterns: ["/blog/:slug"], deployedRoutePatterns: ["/about"] },
+    );
+    expect(issues).toEqual([
+      { instanceId: "a", message: expect.stringContaining("next deploy"), blocking: false },
+    ]);
+  });
+
+  it("blocks a link authored as a route pattern", () => {
+    const issues = collectRouteButtonIssues(
+      [button("a", { en: { mode: "link", href: "/blog/:slug" } })],
+      { knownRoutePatterns: ["/blog/:slug"] },
+    );
+    expect(issues).toEqual([
+      { instanceId: "a", message: expect.stringContaining("route pattern"), blocking: true },
+    ]);
+  });
+
   it("ignores non-button nodes and a well-formed action-mode button", () => {
     const tree = [
       button("a", {

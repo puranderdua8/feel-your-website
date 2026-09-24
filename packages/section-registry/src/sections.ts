@@ -123,7 +123,8 @@ export const sectionCatalog = defineSections([
         label: "Link URL",
         type: "url",
         showWhen: { field: "mode", equals: "link" },
-        helpText: "An internal path (/about) or a full URL (https://…, mailto:…).",
+        helpText:
+          "An internal path (/about, /blog/my-post?ref=home#comments) or a full URL (https://…, mailto:…).",
       },
       {
         name: "linkTarget",

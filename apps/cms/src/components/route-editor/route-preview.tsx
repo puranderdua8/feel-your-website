@@ -9,13 +9,17 @@ import { useMemo } from "react";
 
 /**
  * The preview has no router, so a CTA link is a plain, inert `<a>` — enough to
- * see the label and target, not to navigate.
+ * see the label and (on hover) the target, not to navigate. The click is
+ * swallowed: an authored `/about` resolves against the CMS's own origin, so
+ * following it would leave the editor and drop any unsaved draft.
  */
 function renderPreviewLink(spec: LinkSpec) {
   return (
     <a
       href={spec.href}
+      title={spec.href}
       className={spec.className}
+      onClick={(event) => event.preventDefault()}
       {...(spec.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     >
       {spec.children}

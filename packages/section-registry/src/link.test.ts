@@ -3,14 +3,40 @@ import { describe, expect, it } from "vitest";
 import { classifyHref } from "./link.js";
 
 describe("classifyHref", () => {
+  const route = (pathname: string, search = "", hash = "") => ({ pathname, search, hash });
+
   it("classifies internal paths and normalises them", () => {
-    expect(classifyHref("/about")).toEqual({ kind: "internal", href: "/about" });
-    expect(classifyHref("/blog/post/")).toEqual({ kind: "internal", href: "/blog/post" });
-    expect(classifyHref("  /a//b  ")).toEqual({ kind: "internal", href: "/a/b" });
+    expect(classifyHref("/about")).toEqual({
+      kind: "internal",
+      href: "/about",
+      route: route("/about"),
+    });
+    expect(classifyHref("/blog/post/")).toEqual({
+      kind: "internal",
+      href: "/blog/post",
+      route: route("/blog/post"),
+    });
+    expect(classifyHref("  /a//b  ")).toEqual({
+      kind: "internal",
+      href: "/a/b",
+      route: route("/a/b"),
+    });
+    expect(classifyHref("/")).toEqual({ kind: "internal", href: "/", route: route("/") });
   });
 
-  it("keeps a query or fragment on an internal path", () => {
-    expect(classifyHref("/p?ref=cta#sec")).toEqual({ kind: "internal", href: "/p?ref=cta#sec" });
+  it("splits a query and fragment off an internal path for the router", () => {
+    expect(classifyHref("/p/?ref=cta&x=2#sec")).toEqual({
+      kind: "internal",
+      href: "/p?ref=cta&x=2#sec",
+      route: route("/p", "?ref=cta&x=2", "sec"),
+    });
+    expect(classifyHref("/p?page=2")).toMatchObject({ route: route("/p", "?page=2") });
+    expect(classifyHref("/p#top")).toMatchObject({ route: route("/p", "", "top") });
+    // A `#` inside the fragment stays part of it; a `?` after `#` is fragment, not query.
+    expect(classifyHref("/p#a?b")).toMatchObject({ route: route("/p", "", "a?b") });
+  });
+
+  it("gives a same-page fragment or query no route", () => {
     expect(classifyHref("#section")).toEqual({ kind: "internal", href: "#section" });
     expect(classifyHref("?tab=2")).toEqual({ kind: "internal", href: "?tab=2" });
   });
